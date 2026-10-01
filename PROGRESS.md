@@ -15,7 +15,7 @@ Playable MVP loop on the gameplay branch:
 - **Settings.** SFX, music, and haptics toggles plus a GameLogic / Ethan credits stub. Stored in `backyard_barrage_settings_v1`, beside the meta save key. Menu and pause both open it.
 - **Haptics.** Charge release, hit, KO, and a successful purchase. Flutter `HapticFeedback`, no-op when the toggle is off or the platform has no vibrator.
 - **UI kit.** Wordmark on the title. Coin icon in the HUD, shop, and defeat. Primary, pressed, and secondary buttons. Shop portrait frames on the upgrade cards and the wide frame on the wave-clear header. `panel_modal` behind shop, pause, settings, and defeat.
-- **Audio.** Studio procedural pack is wired through `flame_audio` (not stubbed): throw whoosh, seasonal impact (snow / wet), hit, KO, win / lose stingers, UI tap, purchase coin, menu loop, `battle_loop_winter.wav` in winter, and `battle_loop_summer.wav` in summer. Toggles gate playback.
+- **Audio.** Studio procedural pack is wired through `flame_audio` (not stubbed): throw whoosh, seasonal impact (snow / wet), hit, KO, win / lose stingers, UI tap, purchase coin, menu loop, `battle_loop_winter.wav` in winter, and `battle_loop_summer.wav` in summer. Toggles gate playback. Music beds were refreshed in place (menu ~7.83s, winter battle ~6.92s, summer battle ~6.67s). Filenames and playback paths are unchanged.
 
 ## Known gaps
 

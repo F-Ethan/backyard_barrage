@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flame/camera.dart';
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
@@ -45,8 +46,19 @@ class BackyardBarrageGame extends FlameGame {
   }) : _save = saveStore ?? SaveStore(),
        _settings = settingsStore ?? SettingsStore(),
        feel = feel ?? FeelBus(),
-       _rng = random ?? math.Random();
+       _rng = random ?? math.Random(),
+       super(
+         camera: CameraComponent.withFixedResolution(
+           width: worldWidth,
+           height: worldHeight,
+           viewfinder: Viewfinder()
+             ..anchor = Anchor.topLeft
+             ..position = Vector2.zero(),
+         ),
+       );
 
+  /// Design resolution of the backyard art. The camera letterboxes this
+  /// rectangle onto the device so phones do not crop it 1:1.
   static const double worldWidth = 1280;
   static const double worldHeight = 720;
   static const double _kidSize = 152;
@@ -114,8 +126,12 @@ class BackyardBarrageGame extends FlameGame {
   Future<void> onLoad() async {
     await super.onLoad();
 
+    // Keep the full 1280×720 yard in frame. FixedResolutionViewport scales
+    // that rectangle to fit the canvas (side bars on wide phones) instead of
+    // showing a 1:1 crop of the top-left, which hides kids on short screens.
     camera.viewfinder.anchor = Anchor.topLeft;
     camera.viewfinder.position = Vector2.zero();
+    camera.viewfinder.zoom = 1;
 
     for (final season in Season.values) {
       _kits[season] = await loadSeasonKit(this, season);

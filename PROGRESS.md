@@ -21,6 +21,7 @@ Playable MVP loop on the gameplay branch:
 
 Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you notice something you are not fixing in the current PR. Remove or rewrite a row when it is actually fixed.
 
+- **World-space HUD scales with the yard.** Hearts, fort bar, coin count, wave label, and the drag hint live in the 1280×720 world, so on a short phone they shrink with the letterboxed backyard. The Flutter Pause button stays screen-sized. A later pass can move that HUD onto the camera viewport if it feels too small in playtest.
 - **Props folders are empty.** `assets/images/props/winter/` and `props/summer/` exist so the asset list analyzes, but they have no sprites yet.
 - **App icon is unused in UI.** `app_icon_1024_draft.png` is still only a store/icon asset.
 - **Walk and throw are single frames.** No multi-frame cycles yet (`docs/STATUS.md`).

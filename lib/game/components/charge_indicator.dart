@@ -3,10 +3,9 @@ import 'package:flutter/painting.dart';
 
 /// Charge ring + bar near the throwing kid; aim arrow while charging.
 class ChargeIndicator extends PositionComponent {
-  ChargeIndicator({
-    Sprite? glowSprite,
-  }) : _glowSprite = glowSprite,
-       super(priority: 30);
+  ChargeIndicator({Sprite? glowSprite})
+    : _glowSprite = glowSprite,
+      super(priority: 30);
 
   final Sprite? _glowSprite;
   double charge = 0;
@@ -46,9 +45,13 @@ class ChargeIndicator extends PositionComponent {
       ),
       bg,
     );
+    final amount = charge.clamp(0.0, 1.0);
+    final full = amount >= 0.995;
+    fill.color = full ? const Color(0xFFFFFFFF) : const Color(0xFFFFE66D);
+    if (full) border.strokeWidth = 3;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(barLeft, barTop, barW * charge.clamp(0.0, 1.0), barH),
+        Rect.fromLTWH(barLeft, barTop, barW * amount, barH),
         const Radius.circular(4),
       ),
       fill,
@@ -60,6 +63,33 @@ class ChargeIndicator extends PositionComponent {
       ),
       border,
     );
+    final label = full ? 'FULL' : '${(amount * 100).round()}%';
+    final painter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: full ? const Color(0xFFFFE66D) : const Color(0xFFFFF8F0),
+          fontSize: full ? 14 : 12,
+          fontWeight: FontWeight.w800,
+          shadows: const [Shadow(color: Color(0xCC2C3E50), blurRadius: 2)],
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    painter.paint(
+      canvas,
+      Offset(anchorWorld.x - painter.width / 2, barTop - painter.height - 2),
+    );
+    if (full) {
+      canvas.drawCircle(
+        Offset(anchorWorld.x, anchorWorld.y),
+        46,
+        Paint()
+          ..color = const Color(0xFFFFE66D)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3,
+      );
+    }
 
     final dir = aimDir.clone();
     if (dir.length2 < 1e-6) {

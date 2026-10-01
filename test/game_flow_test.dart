@@ -2,14 +2,20 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:backyard_barrage/app.dart';
+import 'package:backyard_barrage/audio/game_audio.dart';
+import 'package:backyard_barrage/feel/feel_bus.dart';
+import 'package:backyard_barrage/feel/game_haptics.dart';
 import 'package:backyard_barrage/game/backyard_barrage_game.dart';
 import 'package:backyard_barrage/game/combat_rules.dart';
 import 'package:backyard_barrage/meta/meta_state.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
+import 'package:backyard_barrage/meta/settings_store.dart';
 import 'package:backyard_barrage/seasons/season.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'recording_audio.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -45,16 +51,30 @@ void main() {
     image.dispose();
   }
 
-  Future<({BackyardBarrageGame game, SaveStore store})> boot(
-    WidgetTester tester,
-    MetaState meta,
-  ) async {
+  Future<
+    ({
+      BackyardBarrageGame game,
+      SaveStore store,
+      RecordingPlayback playback,
+      RecordingPulse pulses,
+    })
+  >
+  boot(WidgetTester tester, MetaState meta) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final store = SaveStore(preferences: prefs);
+    final settings = SettingsStore(preferences: prefs);
+    final playback = RecordingPlayback();
+    final pulses = RecordingPulse();
+    final feel = FeelBus(
+      audio: GameAudio(playback: playback),
+      haptics: GameHaptics(pulse: pulses),
+    );
     final game = BackyardBarrageGame(
       meta: meta,
       saveStore: store,
+      settingsStore: settings,
+      feel: feel,
       random: math.Random(1),
     );
     await primeSprites(game);
@@ -63,6 +83,8 @@ void main() {
         home: GameScreen(
           meta: meta,
           saveStore: store,
+          settingsStore: settings,
+          feel: feel,
           onExit: () {},
           game: game,
         ),
@@ -72,7 +94,7 @@ void main() {
       await tester.pump();
     }
     expect(game.isLoaded, isTrue, reason: 'arena failed to finish loading');
-    return (game: game, store: store);
+    return (game: game, store: store, playback: playback, pulses: pulses);
   }
 
   testWidgets('summer crew and fort spawn from the save', (tester) async {
@@ -144,5 +166,59 @@ void main() {
     expect(game.players.single.hp, CombatRules.hitsToKo);
     expect(game.phase, MatchPhase.fight);
     expect(game.enemies, hasLength(2));
+  });
+
+  testWidgets('pause freezes the clear timer until resume', (tester) async {
+    final game = (await boot(tester, MetaState())).game;
+    for (final enemy in game.enemies) {
+      enemy.takeHit();
+      enemy.takeHit();
+    }
+    game.resolveKnockouts();
+    expect(game.phase, MatchPhase.clearing);
+
+    game.pauseMatch();
+    await tester.pump();
+    expect(game.phase, MatchPhase.paused);
+    expect(game.paused, isTrue);
+    expect(find.byKey(const Key('resume-button')), findsOneWidget);
+
+    game.update(5);
+    expect(game.phase, MatchPhase.paused);
+    expect(find.text('Next wave'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('resume-button')));
+    await tester.pump();
+    expect(game.phase, MatchPhase.clearing);
+    expect(game.paused, isFalse);
+
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+    expect(find.text('Next wave'), findsOneWidget);
+  });
+
+  testWidgets('buying from the shop pulses haptics and plays the coin cue', (
+    tester,
+  ) async {
+    final booted = await boot(tester, MetaState(coins: 40));
+    final game = booted.game;
+    for (final enemy in game.enemies) {
+      enemy.takeHit();
+      enemy.takeHit();
+    }
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+
+    booted.pulses.kinds.clear();
+    booted.playback.sfx.clear();
+    await tester.tap(find.byKey(const Key('buy-throw')));
+    await tester.pump();
+    expect(game.meta.throwRank, 1);
+    expect(booted.pulses.kinds, ['medium']);
+    expect(booted.playback.sfx, contains('sfx/purchase_coin.wav'));
+    expect(booted.playback.loops, contains('music/battle_loop_winter.wav'));
   });
 }

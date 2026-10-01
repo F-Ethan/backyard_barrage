@@ -4,10 +4,14 @@ import 'dart:math' as math;
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
+import '../feel/feel_bus.dart';
+import '../meta/game_settings.dart';
 import '../meta/meta_state.dart';
 import '../meta/save_store.dart';
+import '../meta/settings_store.dart';
 import '../seasons/season.dart';
 import '../seasons/season_kit.dart';
 import 'combat_rules.dart';
@@ -23,7 +27,7 @@ import 'components/lob_projectile.dart';
 import 'components/overlay_banner.dart';
 import 'throw_physics.dart';
 
-enum MatchPhase { fight, clearing, defeat, shop }
+enum MatchPhase { fight, clearing, defeat, shop, paused }
 
 enum _Gesture { idle, undecided, move, charge, suppressed }
 
@@ -34,9 +38,13 @@ class BackyardBarrageGame extends FlameGame {
   BackyardBarrageGame({
     required this.meta,
     SaveStore? saveStore,
+    SettingsStore? settingsStore,
+    FeelBus? feel,
     math.Random? random,
     this.onExitToMenu,
   }) : _save = saveStore ?? SaveStore(),
+       _settings = settingsStore ?? SettingsStore(),
+       feel = feel ?? FeelBus(),
        _rng = random ?? math.Random();
 
   static const double worldWidth = 1280;
@@ -49,7 +57,9 @@ class BackyardBarrageGame extends FlameGame {
 
   final MetaState meta;
   final VoidCallback? onExitToMenu;
+  final FeelBus feel;
   final SaveStore _save;
+  final SettingsStore _settings;
   final math.Random _rng;
   final Map<Season, SeasonKit> _kits = {};
   final Map<int, Sprite> _fortSprites = {};
@@ -63,7 +73,21 @@ class BackyardBarrageGame extends FlameGame {
   late SpriteComponent _bg;
   late TextComponent _waveLabel;
 
-  MatchPhase phase = MatchPhase.fight;
+  MatchPhase _phase = MatchPhase.fight;
+  final ValueNotifier<MatchPhase> phaseListenable = ValueNotifier(
+    MatchPhase.fight,
+  );
+  MatchPhase _resumePhase = MatchPhase.fight;
+
+  MatchPhase get phase => _phase;
+
+  set phase(MatchPhase value) {
+    _phase = value;
+    if (phaseListenable.value != value) {
+      phaseListenable.value = value;
+    }
+  }
+
   int wave = 1;
   int lastReward = 0;
 
@@ -181,10 +205,43 @@ class BackyardBarrageGame extends FlameGame {
       ),
     );
     world.add(_ArenaInput(this));
+    overlays.add('hud');
     startWave();
   }
 
   Future<void> persist() => _save.save(meta);
+
+  Future<void> commitSettings(GameSettings next) async {
+    feel.apply(next);
+    await _settings.save(next);
+    await feel.syncMusic(battleSeason: meta.season);
+  }
+
+  void pauseMatch() {
+    if (phase != MatchPhase.fight && phase != MatchPhase.clearing) return;
+    _resumePhase = phase;
+    _endActiveThrow();
+    phase = MatchPhase.paused;
+    if (!overlays.isActive('pause')) overlays.add('pause');
+    if (!paused) pauseEngine();
+  }
+
+  void resumeMatch() {
+    if (phase != MatchPhase.paused) return;
+    closeSettings();
+    if (overlays.isActive('pause')) overlays.remove('pause');
+    phase = _resumePhase;
+    if (paused) resumeEngine();
+  }
+
+  void openSettings() {
+    if (phase != MatchPhase.paused) return;
+    if (!overlays.isActive('settings')) overlays.add('settings');
+  }
+
+  void closeSettings() {
+    if (overlays.isActive('settings')) overlays.remove('settings');
+  }
 
   Future<void> setSeason(Season season) async {
     if (meta.season == season) return;
@@ -192,6 +249,7 @@ class BackyardBarrageGame extends FlameGame {
     final kit = _kits[season];
     if (kit != null && isLoaded) _applyKit(kit);
     await persist();
+    await feel.enterBattle(season);
   }
 
   void _applyKit(SeasonKit kit) {
@@ -248,6 +306,7 @@ class BackyardBarrageGame extends FlameGame {
 
     fort.applyStage(meta.fortStage, _fortSprites[meta.fortStage]!);
     _waveLabel.text = 'Wave $wave';
+    unawaited(feel.enterBattle(meta.season));
   }
 
   KidComponent _makeKid(KidSide side, int slot) {
@@ -338,6 +397,7 @@ class BackyardBarrageGame extends FlameGame {
     meta.coins += lastReward;
     meta.noteWaveCleared(wave);
     unawaited(persist());
+    feel.waveCleared();
     _showBanner('KO!', fontSize: 56, color: const Color(0xFFFFE66D));
     _pendingBanner = _Banner.waveKo;
     _bannerTime = 0.65;
@@ -348,7 +408,13 @@ class BackyardBarrageGame extends FlameGame {
     phase = MatchPhase.defeat;
     _endActiveThrow();
     _clearShots();
-    _showBanner('KO!', fontSize: 56, color: const Color(0xFFFFE66D));
+    feel.defeated();
+    _showBanner(
+      'Crew down',
+      subtitle: 'Every kid is down.',
+      fontSize: 48,
+      color: const Color(0xFF2C3E50),
+    );
     _pendingBanner = _Banner.defeatKo;
     _bannerTime = 0.6;
   }
@@ -357,9 +423,10 @@ class BackyardBarrageGame extends FlameGame {
     switch (_pendingBanner) {
       case _Banner.waveKo:
         _showBanner(
-          'Wave clear!',
-          fontSize: 44,
-          color: const Color(0xFFFFF8F0),
+          'Wave $wave clear!',
+          subtitle: '+$lastReward coins',
+          fontSize: 42,
+          color: const Color(0xFF2C3E50),
         );
         _pendingBanner = _Banner.waveDone;
         _bannerTime = 0.55;
@@ -379,10 +446,16 @@ class BackyardBarrageGame extends FlameGame {
     }
   }
 
-  void _showBanner(String label, {required double fontSize, required Color color}) {
+  void _showBanner(
+    String label, {
+    String? subtitle,
+    required double fontSize,
+    required Color color,
+  }) {
     _clearBanner();
     _banner = OverlayBanner(
       label: label,
+      subtitle: subtitle,
       position: Vector2(worldWidth / 2, worldHeight / 2 - 30),
       fontSize: fontSize,
       color: color,
@@ -397,6 +470,7 @@ class BackyardBarrageGame extends FlameGame {
 
   void _onEnemyFire(KidComponent enemy, Vector2 aim, double charge) {
     if (phase != MatchPhase.fight || enemy.isKo) return;
+    feel.enemyReleased();
     final velocity = ThrowPhysics.launchVelocity(
       charge: charge,
       aimDirection: aim,
@@ -425,6 +499,7 @@ class BackyardBarrageGame extends FlameGame {
       speedScale: CombatRules.projectileSpeedScale(meta.throwRank),
     );
     kid.showThrowPose();
+    feel.playerReleased();
     _spawnShot(
       owner: kid,
       velocity: velocity,
@@ -456,7 +531,9 @@ class BackyardBarrageGame extends FlameGame {
 
   void _onKidHit(LobProjectile shot, KidComponent target) {
     _burst(shot.position);
-    if (phase != MatchPhase.fight) return;
+    if (phase != MatchPhase.fight || target.isKo) return;
+    final knockedOut = target.hp <= 1;
+    feel.kidHit(knockedOut: knockedOut, season: meta.season);
     final selectedHit = identical(target, _selected);
     target.takeHit();
     if (selectedHit) {
@@ -468,6 +545,7 @@ class BackyardBarrageGame extends FlameGame {
 
   void _onFortHit(LobProjectile shot) {
     _burst(shot.position);
+    feel.impact(meta.season);
     if (phase != MatchPhase.fight) return;
     fort.takeHit();
   }
@@ -532,7 +610,8 @@ class BackyardBarrageGame extends FlameGame {
 
   void _onPointerUp() {
     if (!_pointerDown && !_charging) return;
-    final fire = _pointerDown &&
+    final fire =
+        _pointerDown &&
         _gesture == _Gesture.charge &&
         _charging &&
         phase == MatchPhase.fight;
@@ -645,6 +724,7 @@ class BackyardBarrageGame extends FlameGame {
 
   @override
   void update(double dt) {
+    if (paused || phase == MatchPhase.paused) return;
     super.update(dt);
     if (_pointerDown &&
         _gesture == _Gesture.undecided &&
@@ -657,7 +737,8 @@ class BackyardBarrageGame extends FlameGame {
       if (kid == null || kid.isKo || phase != MatchPhase.fight) {
         _endActiveThrow();
       } else {
-        final next = _charge + dt / CombatRules.playerChargeSeconds(meta.throwRank);
+        final next =
+            _charge + dt / CombatRules.playerChargeSeconds(meta.throwRank);
         _charge = next > 1 ? 1 : next;
         kid.showChargePose();
         _syncChargeHud();
@@ -672,14 +753,14 @@ class BackyardBarrageGame extends FlameGame {
 
 class _ArenaInput extends PositionComponent with DragCallbacks {
   _ArenaInput(this.game)
-      : super(
-          size: Vector2(
-            BackyardBarrageGame.worldWidth,
-            BackyardBarrageGame.worldHeight,
-          ),
-          position: Vector2.zero(),
-          priority: 40,
-        );
+    : super(
+        size: Vector2(
+          BackyardBarrageGame.worldWidth,
+          BackyardBarrageGame.worldHeight,
+        ),
+        position: Vector2.zero(),
+        priority: 40,
+      );
 
   final BackyardBarrageGame game;
 

@@ -24,6 +24,8 @@ flutter:
   assets:
     - assets/images/
     - assets/audio/
+    - assets/audio/sfx/
+    - assets/audio/music/
     - assets/images/characters/
     - assets/images/characters/enemy/
     - assets/images/characters/player/

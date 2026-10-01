@@ -6,7 +6,7 @@ import 'package:flutter/animation.dart';
 
 enum KidSide { player, enemy }
 
-/// Simple kid sprite: idle / throw poses, HP, KO tint.
+/// Kid sprite with idle / charge / throw / hit / KO poses.
 class KidComponent extends SpriteComponent {
   KidComponent({
     required this.side,
@@ -14,6 +14,9 @@ class KidComponent extends SpriteComponent {
     required this.throwSprite,
     required Vector2 position,
     required Vector2 size,
+    this.chargeSprite,
+    this.hitSprite,
+    this.koSprite,
     this.maxHp = 2,
   }) : hp = maxHp,
        super(
@@ -27,14 +30,37 @@ class KidComponent extends SpriteComponent {
   final KidSide side;
   final Sprite idleSprite;
   final Sprite throwSprite;
+  final Sprite? chargeSprite;
+  final Sprite? hitSprite;
+  final Sprite? koSprite;
   final int maxHp;
   int hp;
   bool get isKo => hp <= 0;
 
   double _throwPoseTimer = 0;
+  double _hitPoseTimer = 0;
+  bool _chargingPose = false;
+
+  void showChargePose() {
+    if (isKo) return;
+    _chargingPose = true;
+    _throwPoseTimer = 0;
+    _hitPoseTimer = 0;
+    sprite = chargeSprite ?? idleSprite;
+  }
+
+  void clearChargePose() {
+    if (!_chargingPose) return;
+    _chargingPose = false;
+    if (!isKo && _throwPoseTimer <= 0 && _hitPoseTimer <= 0) {
+      sprite = idleSprite;
+    }
+  }
 
   void showThrowPose({double duration = 0.28}) {
     if (isKo) return;
+    _chargingPose = false;
+    _hitPoseTimer = 0;
     sprite = throwSprite;
     _throwPoseTimer = duration;
   }
@@ -42,6 +68,8 @@ class KidComponent extends SpriteComponent {
   void takeHit() {
     if (isKo) return;
     hp = (hp - 1).clamp(0, maxHp);
+    _chargingPose = false;
+    _throwPoseTimer = 0;
     add(
       SequenceEffect([
         OpacityEffect.to(0.35, EffectController(duration: 0.08)),
@@ -50,18 +78,27 @@ class KidComponent extends SpriteComponent {
     );
     if (isKo) {
       _applyKoLook();
+      return;
+    }
+    final hit = hitSprite;
+    if (hit != null) {
+      sprite = hit;
+      _hitPoseTimer = 0.35;
     }
   }
 
   void _applyKoLook() {
-    sprite = idleSprite;
-    paint.colorFilter = const ColorFilter.mode(
-      Color(0xAA2C3E50),
-      BlendMode.srcATop,
-    );
+    sprite = koSprite ?? idleSprite;
+    // Mild fade; prefer KO art over heavy tint when available.
+    if (koSprite == null) {
+      paint.colorFilter = const ColorFilter.mode(
+        Color(0xAA2C3E50),
+        BlendMode.srcATop,
+      );
+    }
     add(
       OpacityEffect.to(
-        0.55,
+        0.7,
         EffectController(duration: 0.35, curve: Curves.easeOut),
       ),
     );
@@ -80,9 +117,15 @@ class KidComponent extends SpriteComponent {
   @override
   void update(double dt) {
     super.update(dt);
+    if (_hitPoseTimer > 0) {
+      _hitPoseTimer -= dt;
+      if (_hitPoseTimer <= 0 && !isKo && !_chargingPose) {
+        sprite = idleSprite;
+      }
+    }
     if (_throwPoseTimer > 0) {
       _throwPoseTimer -= dt;
-      if (_throwPoseTimer <= 0 && !isKo) {
+      if (_throwPoseTimer <= 0 && !isKo && !_chargingPose && _hitPoseTimer <= 0) {
         sprite = idleSprite;
       }
     }

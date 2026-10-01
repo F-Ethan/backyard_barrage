@@ -53,19 +53,36 @@ class BackyardBarrageGame extends FlameGame {
         await loadSprite('characters/player/player_idle_winter_draft.png');
     final playerThrow =
         await loadSprite('characters/player/player_throw_winter_draft.png');
+    final playerCharge =
+        await loadSprite('characters/player/player_charge_winter_draft.png');
+    final playerHit =
+        await loadSprite('characters/player/player_hit_winter_draft.png');
+    final playerKo =
+        await loadSprite('characters/player/player_ko_winter_draft.png');
     final enemyIdle =
         await loadSprite('characters/enemy/enemy_idle_winter_draft.png');
-    // Reuse idle as throw fallback if needed; throw asset exists for enemy too.
     final enemyThrow =
         await loadSprite('characters/enemy/enemy_throw_winter_draft.png');
+    final enemyCharge =
+        await loadSprite('characters/enemy/enemy_charge_winter_draft.png');
+    final enemyHit =
+        await loadSprite('characters/enemy/enemy_hit_winter_draft.png');
+    final enemyKo =
+        await loadSprite('characters/enemy/enemy_ko_winter_draft.png');
     snowballSprite = await loadSprite('projectiles/snowball_draft.png');
     impactSprite = await loadSprite('vfx/impact_snow_draft.png');
     final glow = await loadSprite('vfx/charge_glow_draft.png');
     Sprite? heart;
+    Sprite? heartEmpty;
     try {
       heart = await loadSprite('ui/heart_draft.png');
     } catch (_) {
       heart = null;
+    }
+    try {
+      heartEmpty = await loadSprite('ui/heart_empty_draft.png');
+    } catch (_) {
+      heartEmpty = null;
     }
 
     world.add(
@@ -82,6 +99,9 @@ class BackyardBarrageGame extends FlameGame {
       side: KidSide.player,
       idleSprite: playerIdle,
       throwSprite: playerThrow,
+      chargeSprite: playerCharge,
+      hitSprite: playerHit,
+      koSprite: playerKo,
       position: Vector2(240, 560),
       size: Vector2.all(kidSize),
       maxHp: 2,
@@ -90,6 +110,9 @@ class BackyardBarrageGame extends FlameGame {
       side: KidSide.enemy,
       idleSprite: enemyIdle,
       throwSprite: enemyThrow,
+      chargeSprite: enemyCharge,
+      hitSprite: enemyHit,
+      koSprite: enemyKo,
       position: Vector2(1040, 560),
       size: Vector2.all(kidSize),
       maxHp: 2,
@@ -99,7 +122,13 @@ class BackyardBarrageGame extends FlameGame {
 
     chargeHud = ChargeIndicator(glowSprite: glow);
     world.add(chargeHud);
-    world.add(HudHearts(target: enemy, heartSprite: heart));
+    world.add(
+      HudHearts(
+        target: enemy,
+        heartSprite: heart,
+        emptyHeartSprite: heartEmpty,
+      ),
+    );
 
     // Full-arena drag catcher for charge/aim/release.
     world.add(
@@ -136,6 +165,7 @@ class BackyardBarrageGame extends FlameGame {
     _charge = 0.12;
     _dragStart = worldPos.clone();
     _aimDir = ThrowPhysics.defaultAim(player.throwOrigin, enemy.hitCenter);
+    player.showChargePose();
     chargeHud.visibleCharge = true;
     chargeHud.charge = _charge;
     chargeHud.aimDir = _aimDir;
@@ -168,6 +198,7 @@ class BackyardBarrageGame extends FlameGame {
     final charge = _charge.clamp(0.15, 1.0);
     _charge = 0;
     _dragStart = null;
+    player.clearChargePose();
     _fireSnowball(charge);
   }
 
@@ -232,6 +263,7 @@ class BackyardBarrageGame extends FlameGame {
     super.update(dt);
     if (_charging) {
       _charge = (_charge + dt / chargeSeconds).clamp(0.0, 1.0);
+      player.showChargePose();
       chargeHud.charge = _charge;
       chargeHud.anchorWorld = player.throwOrigin;
     }

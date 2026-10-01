@@ -1,87 +1,145 @@
 # Backyard Barrage — Art Pack Status
 
-**Updated:** 2026-10-01 (CT)  
-**Pack:** MVP draft visual assets  
-**Style source:** `docs/STYLE.md` (followed; not contradicted)  
-**Generator note:** Cursor `GenerateImage` / `CallDynamicTool` was **not available** in this executor toolset (MCP server `cursor` unreachable; no dynamic GenerateImage bridge). Assets were produced as **original procedural drafts** via Pillow (`scripts/generate_mvp_drafts.py`) using the STYLE.md palette exactly. Treat as draft until Ethan/CEO approve; a later pass can re-author with GenerateImage or a human illustrator using these as composition guides.
+**Updated:** 2026-10-01 ~3:05 PM CT  
+**Pack:** MVP draft + character pose polish + **UI kit pass**  
+**Style source:** `docs/STYLE.md` (followed)  
+**Generators:**
+- `scripts/generate_mvp_drafts.py` — world/forts/VFX/UI basics + shared character import
+- `scripts/generate_poses_polish.py` — full pose sheet (idle/walk/charge/throw/hit/KO × winter/summer × player/enemy)
+- `scripts/generate_ui_kit.py` — HUD/shop UI kit (bars, chips, frames, buttons, hearts, modal)
 
-**Alpha:** Characters, forts, projectiles, VFX, UI sprites use true transparent PNG (RGBA, corner alpha 0). World backgrounds are opaque full-bleed landscapes (correct for BG layers). No cream/`#FFF8F0` or green-screen fill required for sprites.
+**Alpha:** Characters, forts, projectiles, VFX, UI sprites use true transparent PNG (RGBA, corner alpha 0). World backgrounds are opaque full-bleed landscapes. Shop card frames have transparent art wells. No cream/`#FFF8F0` or green-screen fill on sprites (cream is intentional UI panel fill).
 
----
-
-## Delivered MVP draft set (20/20)
-
-| # | Path | Status | Notes |
-|---|------|--------|-------|
-| 1 | `assets/images/characters/player/player_idle_winter_draft.png` | **draft** | 512×512, blue coat `#3D7CFF`, sandy hair, 3/4 facing right |
-| 2 | `assets/images/characters/player/player_throw_winter_draft.png` | **draft** | Same kid mid-throw snowball, facing right |
-| 3 | `assets/images/characters/player/player_idle_summer_draft.png` | **draft** | Blue tee summer variant |
-| 4 | `assets/images/characters/enemy/enemy_idle_winter_draft.png` | **draft** | Violet coat `#9B59B6`, facing left |
-| 5 | `assets/images/characters/enemy/enemy_throw_winter_draft.png` | **draft** | Enemy throw, facing left |
-| 6 | `assets/images/world/backyard_bg_winter_draft.png` | **draft** | 1280×720, snow backyard, fence/bushes, empty mid, no characters |
-| 7 | `assets/images/world/backyard_bg_summer_draft.png` | **draft** | Same layout, grass + subtle hose/pool hint |
-| 8 | `assets/images/forts/fort_stage_1_draft.png` | **draft** | Left-side wood fort, small |
-| 9 | `assets/images/forts/fort_stage_2_draft.png` | **draft** | +crates/sandbags |
-| 10 | `assets/images/forts/fort_stage_3_draft.png` | **draft** | Battlements + blue pennant |
-| 11 | `assets/images/projectiles/snowball_draft.png` | **draft** | White + `#5B7C99` rim |
-| 12 | `assets/images/projectiles/water_balloon_draft.png` | **draft** | Pink `#FF6B9D` + cyan sheen |
-| 13 | `assets/images/vfx/impact_snow_draft.png` | **draft** | White poof + spark stars |
-| 14 | `assets/images/vfx/impact_splash_draft.png` | **draft** | Cyan/pink splash |
-| 15 | `assets/images/vfx/charge_glow_draft.png` | **draft** | Yellow `#FFE66D` ring |
-| 16 | `assets/images/ui/wordmark_backyard_barrage_draft.png` | **draft** | “Backyard Barrage” bold rounded on cream plate |
-| 17 | `assets/images/ui/btn_primary_draft.png` | **draft** | Cream + navy outline + 3D lip |
-| 18 | `assets/images/ui/heart_draft.png` | **draft** | HP `#E74C3C` |
-| 19 | `assets/images/ui/coin_draft.png` | **draft** | Currency `#F1C40F` |
-| 20 | `assets/images/ui/app_icon_1024_draft.png` | **draft** | 1024×1024 rounded icon, kid + backyard motif |
-
-**Intended-final:** none yet — all filenames carry `_draft`. Finals should drop `_draft` after approval and optional polish pass.
+**GenerateImage:** Not used this pass — Cursor GenerateImage bridge unavailable; consistency prioritized via shared Pillow draw pipeline.
 
 ---
 
-## Missing (not in this MVP draft pack)
+## UI kit (MVP) — 2026-10-01
 
-### Character poses / variants
-- Player: walk, charge, hit, KO (winter + summer)
-- Enemy: idle/throw summer; walk, charge, hit, KO (winter + summer)
-- Shared pose sheet completeness for both seasons
+All under `assets/images/ui/`. Shared language: ink `#2C3E50` ~4–6px outline, cream `#FFF8F0`, wood `#8B5E3C` / `#C4A484`, button lip, radii aligned (btn 28 / chip 20 / card 36 / panel 48).
+
+| File | Size | Status | Notes |
+|------|------|--------|-------|
+| `wordmark_backyard_barrage_draft.png` | 1024×384 | draft (kept) | Existing wordmark |
+| `app_icon_1024_draft.png` | 1024×1024 | draft (kept) | Existing app icon |
+| `btn_primary_draft.png` | 512×160 | **improved draft** | Cream + ink + 3D lip; re-exported |
+| `btn_primary_pressed_draft.png` | 512×160 | **new draft** | Sunk / dim cream pressed |
+| `btn_secondary_draft.png` | 512×160 | **new draft** | Quieter lip + inner hairline |
+| `fort_bar_empty_draft.png` | 512×64 | **new draft** | Wood/cream trough |
+| `fort_bar_fill_draft.png` | 512×64 | **new draft** | Grass fill layer (scale width by HP%) |
+| `chip_season_winter_draft.png` | 256×96 | **new draft** | Selected + snowflake |
+| `chip_season_summer_draft.png` | 256×96 | **new draft** | Selected + sun |
+| `chip_season_winter_off_draft.png` | 256×96 | **new draft** | Dim unselected |
+| `chip_season_summer_off_draft.png` | 256×96 | **new draft** | Dim unselected |
+| `shop_card_frame_draft.png` | 512×640 | **new draft** | Wood border, transparent art well |
+| `shop_card_frame_wide_draft.png` | 768×512 | **new draft** | Wide landscape variant |
+| `heart_draft.png` | 256×256 | **improved draft** | Unified geometry; re-exported |
+| `heart_empty_draft.png` | 256×256 | **new draft** | Cream fill + ink outline |
+| `coin_draft.png` | 256×256 | **improved draft** | Same outline weight; re-exported |
+| `panel_modal_draft.png` | 1024×768 | **new draft** | Cream modal, 9-slice friendly |
+
+**Intended-final:** none yet — all filenames still `_draft`.
+
+---
+
+## Character pose pack (24/24) — polish pass 2026-10-01
+
+All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet `#9B59B6`). Outline `#2C3E50` ~3–4px. Winter = coat+beanie+pom; summer = tee (balloon projectile on charge/throw). Soft ground contact shadow + 1 soft body shade plane.
+
+### Player (`assets/images/characters/player/`)
+
+| File | Status | Notes |
+|------|--------|-------|
+| `player_idle_winter_draft.png` | **improved draft** | Re-exported; proportions locked to shared pipeline |
+| `player_idle_summer_draft.png` | **improved draft** | Tee variant; re-exported |
+| `player_walk_winter_draft.png` | **new draft** | Mid-stride, opposite arm/leg |
+| `player_walk_summer_draft.png` | **new draft** | Same arc, summer tee |
+| `player_charge_winter_draft.png` | **new draft** | Lean back, snowball + yellow charge glow |
+| `player_charge_summer_draft.png` | **new draft** | Lean back, water balloon + glow |
+| `player_throw_winter_draft.png` | **improved draft** | Follow-through forward; re-exported |
+| `player_throw_summer_draft.png` | **new draft** | Follow-through + balloon |
+| `player_hit_winter_draft.png` | **new draft** | Recoil, X-eye, impact stars |
+| `player_hit_summer_draft.png` | **new draft** | Same arc, tee |
+| `player_ko_winter_draft.png` | **new draft** | Slump + swirl + stars |
+| `player_ko_summer_draft.png` | **new draft** | Slump + swirl + stars, tee |
+
+### Enemy (`assets/images/characters/enemy/`)
+
+| File | Status | Notes |
+|------|--------|-------|
+| `enemy_idle_winter_draft.png` | **improved draft** | Violet coat; facing left; re-exported |
+| `enemy_idle_summer_draft.png` | **new draft** | Violet tee |
+| `enemy_walk_winter_draft.png` | **new draft** | Mid-stride mirror |
+| `enemy_walk_summer_draft.png` | **new draft** | Mid-stride, summer |
+| `enemy_charge_winter_draft.png` | **new draft** | Lean back + snowball + glow |
+| `enemy_charge_summer_draft.png` | **new draft** | Lean back + balloon + glow |
+| `enemy_throw_winter_draft.png` | **improved draft** | Follow-through; re-exported |
+| `enemy_throw_summer_draft.png` | **new draft** | Follow-through + balloon |
+| `enemy_hit_winter_draft.png` | **new draft** | Recoil + stars |
+| `enemy_hit_summer_draft.png` | **new draft** | Recoil + stars, tee |
+| `enemy_ko_winter_draft.png` | **new draft** | Slump + swirl |
+| `enemy_ko_summer_draft.png` | **new draft** | Slump + swirl, tee |
+
+---
+
+## Non-character MVP (world / forts / VFX)
+
+| Path | Status |
+|------|--------|
+| `assets/images/world/backyard_bg_winter_draft.png` | draft |
+| `assets/images/world/backyard_bg_summer_draft.png` | draft |
+| `assets/images/forts/fort_stage_{1,2,3}_draft.png` | draft |
+| `assets/images/projectiles/snowball_draft.png` | draft |
+| `assets/images/projectiles/water_balloon_draft.png` | draft |
+| `assets/images/vfx/impact_snow_draft.png` | draft |
+| `assets/images/vfx/impact_splash_draft.png` | draft |
+| `assets/images/vfx/charge_glow_draft.png` | draft |
+
+---
+
+## Still missing (gaps)
+
+### Characters
+- Multi-frame walk/throw cycles (currently single keyframe per pose)
+- Alternate enemy variants / boss kid
+- Hurt tint / flash overlays (engine-side OK)
 
 ### World / props
-- Parallax layers (sky / fence / ground split)
-- Prop packs under `assets/images/props/winter/` and `.../summer/` (empty folders only)
+- Parallax layers; prop packs under `props/winter/` and `props/summer/`
 
-### Forts / combat UI
-- Fort HP / fort bar UI chrome
-- Mirrored right-side fort variants (or document flip-in-engine)
+### Forts / UI
+- Mirrored right-side forts (or flip-in-engine)
+- Win/lose banners; optional season chip labels localization
 
-### UI still needed
-- Season chips (snowflake / sun)
-- Shop card frames (cream + wood border)
-- Secondary / disabled / pressed button states
-- Settings / pause icons
-- Win / lose banners
-
-### VFX / projectiles
-- KO swirl + stars
-- Charge stages (1–3 intensity)
-- Trail / afterimage sprites
+### VFX
+- Standalone KO swirl sprite; charge intensity stages 1–3; trails
 
 ### Audio
-- Studio does **not** generate final SFX here — see `docs/AUDIO_HANDOFF.md`
-- `assets/audio/music/` and `assets/audio/sfx/` empty
+- Studio does **not** generate final SFX — see `docs/AUDIO_HANDOFF.md`
 
 ---
 
-## Showcase absolute paths
+## Showcase absolute paths (UI kit)
 
-- App icon: `/workspace/backyard-barrage/assets/images/ui/app_icon_1024_draft.png`
-- Winter BG: `/workspace/backyard-barrage/assets/images/world/backyard_bg_winter_draft.png`
-- Player idle: `/workspace/backyard-barrage/assets/images/characters/player/player_idle_winter_draft.png`
-- Wordmark: `/workspace/backyard-barrage/assets/images/ui/wordmark_backyard_barrage_draft.png`
+- Fort bar composite (empty + 70% fill): layer `fort_bar_empty_draft.png` + `fort_bar_fill_draft.png`
+  - `/workspace/backyard-barrage/assets/images/ui/fort_bar_empty_draft.png`
+  - `/workspace/backyard-barrage/assets/images/ui/fort_bar_fill_draft.png`
+- Season winter on: `/workspace/backyard-barrage/assets/images/ui/chip_season_winter_draft.png`
+- Season summer on: `/workspace/backyard-barrage/assets/images/ui/chip_season_summer_draft.png`
+- Shop card frame: `/workspace/backyard-barrage/assets/images/ui/shop_card_frame_draft.png`
+- Primary button: `/workspace/backyard-barrage/assets/images/ui/btn_primary_draft.png`
 
 ---
 
 ## Regen
 
 ```bash
+# UI kit (HUD/shop)
+/workspace/.venv-art/bin/python /workspace/backyard-barrage/scripts/generate_ui_kit.py
+
+# Full character pose sheet (24 PNGs)
+/workspace/.venv-art/bin/python /workspace/backyard-barrage/scripts/generate_poses_polish.py
+
+# Full MVP pack (world/forts/VFX/UI basics + core character sheets via shared draw_kid)
 /workspace/.venv-art/bin/python /workspace/backyard-barrage/scripts/generate_mvp_drafts.py
 ```

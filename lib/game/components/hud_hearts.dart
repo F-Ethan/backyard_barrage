@@ -8,7 +8,9 @@ class HudHearts extends PositionComponent {
   HudHearts({
     required this.target,
     Sprite? heartSprite,
+    Sprite? emptyHeartSprite,
   }) : _heartSprite = heartSprite,
+       _emptyHeartSprite = emptyHeartSprite,
        super(
          position: Vector2(1100, 28),
          size: Vector2(150, 40),
@@ -17,6 +19,7 @@ class HudHearts extends PositionComponent {
 
   final KidComponent target;
   final Sprite? _heartSprite;
+  final Sprite? _emptyHeartSprite;
 
   @override
   void render(Canvas canvas) {
@@ -37,17 +40,22 @@ class HudHearts extends PositionComponent {
     painter.paint(canvas, const Offset(0, 0));
 
     final heart = _heartSprite;
+    final empty = _emptyHeartSprite;
     for (var i = 0; i < target.maxHp; i++) {
       final filled = i < target.hp;
       final x = i * 36.0;
       if (heart != null) {
-        final opacity = filled ? 1.0 : 0.25;
-        canvas.saveLayer(
-          Rect.fromLTWH(x, 16, 28, 28),
-          Paint()..color = Color.fromRGBO(255, 255, 255, opacity),
-        );
-        heart.render(canvas, position: Vector2(x, 16), size: Vector2(28, 28));
-        canvas.restore();
+        final sprite = filled ? heart : (empty ?? heart);
+        if (!filled && empty == null) {
+          canvas.saveLayer(
+            Rect.fromLTWH(x, 16, 28, 28),
+            Paint()..color = const Color.fromRGBO(255, 255, 255, 0.25),
+          );
+          heart.render(canvas, position: Vector2(x, 16), size: Vector2(28, 28));
+          canvas.restore();
+        } else {
+          sprite.render(canvas, position: Vector2(x, 16), size: Vector2(28, 28));
+        }
       } else {
         final p = Paint()
           ..color = filled ? const Color(0xFFE74C3C) : const Color(0x55333333);

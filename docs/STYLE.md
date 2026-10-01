@@ -1,6 +1,6 @@
 # Backyard Barrage — Style Sheet (MVP)
 
-**Status:** Draft v1 — original IP look (NOT SnowCraft / classic red-vs-green war)
+**Status:** Draft v1.1 — original IP look (NOT SnowCraft / classic red-vs-green war); pose arcs documented
 
 ## Name
 Backyard Barrage
@@ -42,6 +42,17 @@ Playful, cozy backyard, kid-safe. Big readable silhouettes for phone **landscape
 - **Enemy kids:** Violet hoodie / tee; darker hair; same pose sheet as player
 - Pose set: idle, walk, charge, throw, hit, KO
 - Face toward camera-ish 3/4 view facing opponent (player faces right; enemy faces left)
+
+### Pose arcs (polish pass — keep readable at phone landscape)
+- **idle:** feet planted, arms soft at sides
+- **walk:** mid-stride; leading leg forward + trailing leg back; **opposite** arm swing
+- **charge:** lean **back**, both arms pulled with snowball (winter) or water balloon (summer); optional yellow `#FFE66D` charge glow rings
+- **throw:** follow-through **forward** (arm + projectile toward facing)
+- **hit:** recoil lean back; flinch arms up; X-eye + impact stars OK
+- **KO:** slumped / seated; swirl + stars above head (no gore)
+- Winter vs summer = clothing + projectile only; **same body proportions / outline weight**
+- Soft ground contact shadow on every sheet; max one soft body shade plane
+- Master canvas: 512×512 transparent PNG; regenerate via `scripts/generate_poses_polish.py`
 
 ## World
 - Wide landscape backyard: house edge optional left, fence mid, bushes

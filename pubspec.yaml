@@ -23,4 +23,15 @@ flutter:
   assets:
     - assets/images/
     - assets/audio/
+    - assets/images/characters/
+    - assets/images/characters/enemy/
+    - assets/images/characters/player/
+    - assets/images/forts/
+    - assets/images/projectiles/
+    - assets/images/props/
+    - assets/images/props/summer/
+    - assets/images/props/winter/
+    - assets/images/ui/
+    - assets/images/vfx/
+    - assets/images/world/
 

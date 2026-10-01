@@ -160,13 +160,7 @@ class GameAudio {
     return _fileFor(cue);
   }
 
-  String? _fileFor(String cue) {
-    final direct = _resolved[cue];
-    if (direct != null) return direct;
-    // No summer bed in the Studio pack yet. Reuse the winter loop.
-    if (cue == AudioCues.battleSummer) return _resolved[AudioCues.battleWinter];
-    return null;
-  }
+  String? _fileFor(String cue) => _resolved[cue];
 
   Future<void> playSfx(String cue) async {
     if (!sfxEnabled) return;

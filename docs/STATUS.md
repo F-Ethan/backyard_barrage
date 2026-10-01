@@ -117,7 +117,7 @@ All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet
 - Standalone KO swirl sprite; charge intensity stages 1–3; trails
 
 ### Audio
-- Studio does **not** generate final SFX — see `docs/AUDIO_HANDOFF.md`
+- Procedural MVP pack is in `assets/audio/` (SFX, menu loop, winter and summer battle loops). Finals can replace those files in place. See `docs/AUDIO_HANDOFF.md`.
 
 ---
 

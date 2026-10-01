@@ -202,17 +202,18 @@ class KidComponent extends SpriteComponent {
   void render(Canvas canvas) {
     super.render(canvas);
     if (!selected || isKo) return;
-    final ring = Paint()
-      ..color = const Color(0xCCFFE66D)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
+    final oval = Rect.fromCenter(
+      center: Offset(size.x / 2, size.y - 8),
+      width: size.x * 0.62,
+      height: 18,
+    );
+    canvas.drawOval(oval, Paint()..color = const Color(0x883D7CFF));
     canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(size.x / 2, size.y - 8),
-        width: size.x * 0.5,
-        height: 14,
-      ),
-      ring,
+      oval,
+      Paint()
+        ..color = const Color(0xFFFFE66D)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3,
     );
   }
 }

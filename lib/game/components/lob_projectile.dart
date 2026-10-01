@@ -1,21 +1,24 @@
 import 'package:flame/components.dart';
 
+import '../combat_rules.dart';
 import '../throw_physics.dart';
+import 'fort_component.dart';
 import 'kid_component.dart';
 
-typedef SnowballHitCallback = void Function(
-  SnowballProjectile ball,
-  KidComponent target,
-);
+typedef ProjectileHit = void Function(LobProjectile shot, KidComponent target);
+typedef FortBlocked = void Function(LobProjectile shot);
 
-/// Gravity-arc snowball with circle hit vs kids.
-class SnowballProjectile extends SpriteComponent {
-  SnowballProjectile({
+/// Gravity-arc snowball or water balloon.
+class LobProjectile extends SpriteComponent {
+  LobProjectile({
     required Sprite sprite,
     required Vector2 position,
     required this.velocity,
     required this.targets,
     required this.onHit,
+    this.fort,
+    this.onFortHit,
+    this.blockedByFort = false,
     this.radius = 22,
     this.owner,
   }) : super(
@@ -28,7 +31,10 @@ class SnowballProjectile extends SpriteComponent {
 
   Vector2 velocity;
   final List<KidComponent> targets;
-  final SnowballHitCallback onHit;
+  final ProjectileHit onHit;
+  final FortComponent? fort;
+  final FortBlocked? onFortHit;
+  final bool blockedByFort;
   final double radius;
   final KidComponent? owner;
   bool _spent = false;
@@ -41,7 +47,23 @@ class SnowballProjectile extends SpriteComponent {
     velocity.y += ThrowPhysics.gravity * dt;
     position += velocity * dt;
 
-    for (final target in targets) {
+    final cover = fort;
+    if (blockedByFort &&
+        cover != null &&
+        CombatRules.fortAbsorbsShot(
+          fortHp: cover.hp,
+          fromEnemy: true,
+          fortRect: cover.hitRect,
+          center: position,
+          radius: radius,
+        )) {
+      _spent = true;
+      onFortHit?.call(this);
+      removeFromParent();
+      return;
+    }
+
+    for (final target in List<KidComponent>.of(targets)) {
       if (identical(target, owner) || target.isKo) continue;
       if (ThrowPhysics.circlesOverlap(
         position,

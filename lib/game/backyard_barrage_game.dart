@@ -1,45 +1,90 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/painting.dart';
 
+import '../meta/meta_state.dart';
+import '../meta/save_store.dart';
+import '../seasons/season.dart';
+import '../seasons/season_kit.dart';
+import 'combat_rules.dart';
 import 'components/charge_indicator.dart';
-import 'components/hud_hearts.dart';
+import 'components/coin_readout.dart';
+import 'components/crew_hearts.dart';
+import 'components/enemy_controller.dart';
+import 'components/fort_bar.dart';
+import 'components/fort_component.dart';
 import 'components/impact_burst.dart';
 import 'components/kid_component.dart';
+import 'components/lob_projectile.dart';
 import 'components/overlay_banner.dart';
-import 'components/snowball_projectile.dart';
 import 'throw_physics.dart';
 
-/// Winter arena MVP: charge → aim → lob snowball, 2-hit KO, wave-clear stub.
+enum MatchPhase { fight, clearing, defeat, shop }
+
+enum _Gesture { idle, undecided, move, charge, suppressed }
+
+enum _Banner { none, waveKo, waveDone, defeatKo }
+
+/// Landscape backyard arena: charge, aim, lob, then shop between waves.
 class BackyardBarrageGame extends FlameGame {
-  BackyardBarrageGame()
-      : super(
-          camera: CameraComponent.withFixedResolution(
-            width: worldWidth,
-            height: worldHeight,
-          ),
-        );
+  BackyardBarrageGame({
+    required this.meta,
+    SaveStore? saveStore,
+    math.Random? random,
+    this.onExitToMenu,
+  }) : _save = saveStore ?? SaveStore(),
+       _rng = random ?? math.Random();
 
   static const double worldWidth = 1280;
   static const double worldHeight = 720;
-  static const double chargeSeconds = 0.85;
+  static const double _kidSize = 152;
+  static const double _playerLaneMin = 120;
+  static const double _playerLaneMax = 470;
+  static const double _enemyLaneMin = 860;
+  static const double _enemyLaneMax = 1180;
 
-  late final KidComponent player;
-  late final KidComponent enemy;
-  late final ChargeIndicator chargeHud;
-  late Sprite snowballSprite;
-  late Sprite impactSprite;
+  final MetaState meta;
+  final VoidCallback? onExitToMenu;
+  final SaveStore _save;
+  final math.Random _rng;
+  final Map<Season, SeasonKit> _kits = {};
+  final Map<int, Sprite> _fortSprites = {};
 
+  final List<KidComponent> players = [];
+  final List<KidComponent> enemies = [];
+
+  late FortComponent fort;
+  late ChargeIndicator chargeHud;
+  late SeasonKit _kit;
+  late SpriteComponent _bg;
+  late TextComponent _waveLabel;
+
+  MatchPhase phase = MatchPhase.fight;
+  int wave = 1;
+  int lastReward = 0;
+
+  bool _pointerDown = false;
   bool _charging = false;
+  bool _aimAdjusted = false;
   double _charge = 0;
+  double _held = 0;
   Vector2 _aimDir = Vector2(1, -0.55);
   Vector2? _dragStart;
-  bool _waveCleared = false;
+  Vector2? _lastDrag;
+  _Gesture _gesture = _Gesture.idle;
+  _Banner _pendingBanner = _Banner.none;
+  double _bannerTime = 0;
   OverlayBanner? _banner;
+  KidComponent? _selected;
 
   @override
-  Color backgroundColor() => const Color(0xFFA8D4F0);
+  Color backgroundColor() => meta.season == Season.summer
+      ? const Color(0xFF87CEEB)
+      : const Color(0xFFA8D4F0);
 
   @override
   Future<void> onLoad() async {
@@ -48,270 +93,619 @@ class BackyardBarrageGame extends FlameGame {
     camera.viewfinder.anchor = Anchor.topLeft;
     camera.viewfinder.position = Vector2.zero();
 
-    final bg = await loadSprite('world/backyard_bg_winter_draft.png');
-    final playerIdle =
-        await loadSprite('characters/player/player_idle_winter_draft.png');
-    final playerThrow =
-        await loadSprite('characters/player/player_throw_winter_draft.png');
-    final playerCharge =
-        await loadSprite('characters/player/player_charge_winter_draft.png');
-    final playerHit =
-        await loadSprite('characters/player/player_hit_winter_draft.png');
-    final playerKo =
-        await loadSprite('characters/player/player_ko_winter_draft.png');
-    final enemyIdle =
-        await loadSprite('characters/enemy/enemy_idle_winter_draft.png');
-    final enemyThrow =
-        await loadSprite('characters/enemy/enemy_throw_winter_draft.png');
-    final enemyCharge =
-        await loadSprite('characters/enemy/enemy_charge_winter_draft.png');
-    final enemyHit =
-        await loadSprite('characters/enemy/enemy_hit_winter_draft.png');
-    final enemyKo =
-        await loadSprite('characters/enemy/enemy_ko_winter_draft.png');
-    snowballSprite = await loadSprite('projectiles/snowball_draft.png');
-    impactSprite = await loadSprite('vfx/impact_snow_draft.png');
+    for (final season in Season.values) {
+      _kits[season] = await loadSeasonKit(this, season);
+    }
+    _kit = _kits[meta.season]!;
+
+    for (final stage in [1, 2, 3]) {
+      _fortSprites[stage] = await loadSprite(
+        'forts/fort_stage_${stage}_draft.png',
+      );
+    }
+
     final glow = await loadSprite('vfx/charge_glow_draft.png');
-    Sprite? heart;
-    Sprite? heartEmpty;
-    try {
-      heart = await loadSprite('ui/heart_draft.png');
-    } catch (_) {
-      heart = null;
-    }
-    try {
-      heartEmpty = await loadSprite('ui/heart_empty_draft.png');
-    } catch (_) {
-      heartEmpty = null;
-    }
+    final heart = await loadSprite('ui/heart_draft.png');
+    final heartEmpty = await loadSprite('ui/heart_empty_draft.png');
+    final coin = await loadSprite('ui/coin_draft.png');
+    final fortEmpty = await loadSprite('ui/fort_bar_empty_draft.png');
+    final fortFill = await loadSprite('ui/fort_bar_fill_draft.png');
 
-    world.add(
-      SpriteComponent(
-        sprite: bg,
-        size: Vector2(worldWidth, worldHeight),
-        position: Vector2.zero(),
-        priority: 0,
-      ),
+    _bg = SpriteComponent(
+      sprite: _kit.background,
+      size: Vector2(worldWidth, worldHeight),
+      position: Vector2.zero(),
+      priority: 0,
     );
+    world.add(_bg);
 
-    const kidSize = 168.0;
-    player = KidComponent(
-      side: KidSide.player,
-      idleSprite: playerIdle,
-      throwSprite: playerThrow,
-      chargeSprite: playerCharge,
-      hitSprite: playerHit,
-      koSprite: playerKo,
-      position: Vector2(240, 560),
-      size: Vector2.all(kidSize),
-      maxHp: 2,
+    fort = FortComponent(
+      sprite: _fortSprites[meta.fortStage]!,
+      position: Vector2(280, 670),
+      size: Vector2.all(360),
     );
-    enemy = KidComponent(
-      side: KidSide.enemy,
-      idleSprite: enemyIdle,
-      throwSprite: enemyThrow,
-      chargeSprite: enemyCharge,
-      hitSprite: enemyHit,
-      koSprite: enemyKo,
-      position: Vector2(1040, 560),
-      size: Vector2.all(kidSize),
-      maxHp: 2,
-    );
-    world.add(player);
-    world.add(enemy);
+    world.add(fort);
 
     chargeHud = ChargeIndicator(glowSprite: glow);
     world.add(chargeHud);
     world.add(
-      HudHearts(
-        target: enemy,
+      CrewHearts(
+        kids: players,
+        label: 'Crew',
+        position: Vector2(16, 16),
         heartSprite: heart,
         emptyHeartSprite: heartEmpty,
       ),
     );
-
-    // Full-arena drag catcher for charge/aim/release.
     world.add(
-      _ArenaInput(
-        size: Vector2(worldWidth, worldHeight),
-        onChargeStart: _onChargeStart,
-        onChargeUpdate: _onChargeUpdate,
-        onChargeEnd: _onChargeEnd,
+      CrewHearts(
+        kids: enemies,
+        label: 'Rivals',
+        position: Vector2(worldWidth - 136, 16),
+        heartSprite: heart,
+        emptyHeartSprite: heartEmpty,
       ),
     );
+    world.add(FortBar(fort: fort, empty: fortEmpty, fill: fortFill));
+    world.add(CoinReadout(meta: meta, coin: coin));
 
-    // Hint banner
+    _waveLabel = TextComponent(
+      text: 'Wave $wave',
+      position: Vector2(worldWidth / 2, 66),
+      anchor: Anchor.topCenter,
+      priority: 90,
+      textRenderer: TextPaint(
+        style: const TextStyle(
+          color: Color(0xFFFFF8F0),
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+          shadows: [Shadow(color: Color(0xAA2C3E50), blurRadius: 3)],
+        ),
+      ),
+    );
+    world.add(_waveLabel);
     world.add(
       TextComponent(
-        text: 'Hold & drag to charge/aim · release to throw',
-        position: Vector2(worldWidth / 2, 24),
-        anchor: Anchor.topCenter,
+        text: 'Drag sideways to move · hold to aim · release to throw',
+        position: Vector2(worldWidth / 2, worldHeight - 16),
+        anchor: Anchor.bottomCenter,
         priority: 80,
         textRenderer: TextPaint(
           style: const TextStyle(
             color: Color(0xEEFFF8F0),
-            fontSize: 16,
+            fontSize: 15,
             fontWeight: FontWeight.w600,
             shadows: [Shadow(color: Color(0xAA2C3E50), blurRadius: 3)],
           ),
         ),
       ),
     );
+    world.add(_ArenaInput(this));
+    startWave();
   }
 
-  void _onChargeStart(Vector2 worldPos) {
-    if (_waveCleared || player.isKo) return;
-    _charging = true;
-    _charge = 0.12;
-    _dragStart = worldPos.clone();
-    _aimDir = ThrowPhysics.defaultAim(player.throwOrigin, enemy.hitCenter);
-    player.showChargePose();
-    chargeHud.visibleCharge = true;
-    chargeHud.charge = _charge;
-    chargeHud.aimDir = _aimDir;
-    chargeHud.anchorWorld = player.throwOrigin;
+  Future<void> persist() => _save.save(meta);
+
+  Future<void> setSeason(Season season) async {
+    if (meta.season == season) return;
+    meta.season = season;
+    final kit = _kits[season];
+    if (kit != null && isLoaded) _applyKit(kit);
+    await persist();
   }
 
-  void _onChargeUpdate(Vector2 worldPos) {
-    if (!_charging) return;
-    final start = _dragStart;
-    if (start != null) {
-      final delta = worldPos - start;
-      // Prefer aim relative to player throw origin if drag is small.
-      if (delta.length > 18) {
-        _aimDir = delta.clone();
-        if (_aimDir.x < 0.15) {
-          _aimDir.x = 0.15; // keep lob toward enemy side
-        }
-      } else {
-        _aimDir = ThrowPhysics.defaultAim(player.throwOrigin, enemy.hitCenter);
-      }
+  void _applyKit(SeasonKit kit) {
+    _kit = kit;
+    _bg.sprite = kit.background;
+    for (final kid in players) {
+      kid.applyPoses(kit.playerPoses);
     }
-    chargeHud.aimDir = _aimDir;
-    chargeHud.anchorWorld = player.throwOrigin;
+    for (final kid in enemies) {
+      kid.applyPoses(kit.enemyPoses);
+    }
   }
 
-  void _onChargeEnd() {
-    if (!_charging) return;
+  void startWave() {
+    _pendingBanner = _Banner.none;
+    _bannerTime = 0;
+    _clearBanner();
+    _endActiveThrow();
+    _clearShots();
+    _clearEnemies();
+    phase = MatchPhase.fight;
+
+    while (players.length < meta.crewSize) {
+      final kid = _makeKid(KidSide.player, players.length);
+      players.add(kid);
+      world.add(kid);
+    }
+    for (var i = 0; i < players.length; i++) {
+      final kid = players[i];
+      kid.position = _playerSlot(i);
+      kid.revive();
+    }
+    _setSelected(_firstLiving(players));
+
+    final count = CombatRules.enemyCountForWave(wave);
+    for (var i = 0; i < count; i++) {
+      final kid = _makeKid(KidSide.enemy, i);
+      enemies.add(kid);
+      world.add(kid);
+      kid.add(
+        EnemyController(
+          host: kid,
+          players: players,
+          wave: wave,
+          rng: _rng,
+          laneMin: _enemyLaneMin,
+          laneMax: _enemyLaneMax,
+          initialDelay: 0.35 + i * 0.5 + _rng.nextDouble() * 0.35,
+          onFire: _onEnemyFire,
+          isFighting: () => phase == MatchPhase.fight,
+        ),
+      );
+    }
+
+    fort.applyStage(meta.fortStage, _fortSprites[meta.fortStage]!);
+    _waveLabel.text = 'Wave $wave';
+  }
+
+  KidComponent _makeKid(KidSide side, int slot) {
+    final player = side == KidSide.player;
+    return KidComponent(
+      side: side,
+      poses: player ? _kit.playerPoses : _kit.enemyPoses,
+      position: player ? _playerSlot(slot) : _enemySlot(slot),
+      size: Vector2.all(_kidSize),
+      maxHp: CombatRules.hitsToKo,
+    );
+  }
+
+  Vector2 _playerSlot(int index) {
+    return switch (index) {
+      0 => Vector2(240, 648),
+      1 => Vector2(150, 600),
+      _ => Vector2(330, 610),
+    };
+  }
+
+  Vector2 _enemySlot(int index) {
+    return switch (index) {
+      0 => Vector2(1040, 648),
+      1 => Vector2(900, 600),
+      _ => Vector2(1160, 615),
+    };
+  }
+
+  void _clearEnemies() {
+    for (final enemy in List<KidComponent>.of(enemies)) {
+      enemy.removeFromParent();
+    }
+    enemies.clear();
+  }
+
+  void _clearShots() {
+    for (final shot in world.children.whereType<LobProjectile>().toList()) {
+      shot.removeFromParent();
+    }
+  }
+
+  void continueFromShop() {
+    if (phase != MatchPhase.shop) return;
+    if (overlays.isActive('shop')) overlays.remove('shop');
+    if (paused) resumeEngine();
+    wave += 1;
+    startWave();
+  }
+
+  void retryFromDefeat() {
+    if (overlays.isActive('defeat')) overlays.remove('defeat');
+    if (paused) resumeEngine();
+    wave = 1;
+    startWave();
+  }
+
+  void exitToMenu() {
+    overlays.clear();
+    if (paused) resumeEngine();
+    unawaited(persist());
+    onExitToMenu?.call();
+  }
+
+  void resolveKnockouts() {
+    if (phase != MatchPhase.fight) return;
+    final livingPlayers = players.where((kid) => !kid.isKo).length;
+    final livingEnemies = enemies.where((kid) => !kid.isKo).length;
+    switch (CombatRules.roundOutcome(
+      livingPlayers: livingPlayers,
+      livingEnemies: livingEnemies,
+    )) {
+      case RoundOutcome.defeat:
+        _beginDefeat();
+      case RoundOutcome.waveClear:
+        _beginWaveClear();
+      case RoundOutcome.ongoing:
+        break;
+    }
+  }
+
+  void _beginWaveClear() {
+    if (phase != MatchPhase.fight) return;
+    phase = MatchPhase.clearing;
+    _endActiveThrow();
+    _clearShots();
+    lastReward = MetaState.coinsForWave(wave);
+    meta.coins += lastReward;
+    meta.noteWaveCleared(wave);
+    unawaited(persist());
+    _showBanner('KO!', fontSize: 56, color: const Color(0xFFFFE66D));
+    _pendingBanner = _Banner.waveKo;
+    _bannerTime = 0.65;
+  }
+
+  void _beginDefeat() {
+    if (phase == MatchPhase.defeat || phase == MatchPhase.shop) return;
+    phase = MatchPhase.defeat;
+    _endActiveThrow();
+    _clearShots();
+    _showBanner('KO!', fontSize: 56, color: const Color(0xFFFFE66D));
+    _pendingBanner = _Banner.defeatKo;
+    _bannerTime = 0.6;
+  }
+
+  void _advanceBanner() {
+    switch (_pendingBanner) {
+      case _Banner.waveKo:
+        _showBanner(
+          'Wave clear!',
+          fontSize: 44,
+          color: const Color(0xFFFFF8F0),
+        );
+        _pendingBanner = _Banner.waveDone;
+        _bannerTime = 0.55;
+      case _Banner.waveDone:
+        _pendingBanner = _Banner.none;
+        _clearBanner();
+        phase = MatchPhase.shop;
+        overlays.add('shop');
+        pauseEngine();
+      case _Banner.defeatKo:
+        _pendingBanner = _Banner.none;
+        _clearBanner();
+        overlays.add('defeat');
+        pauseEngine();
+      case _Banner.none:
+        break;
+    }
+  }
+
+  void _showBanner(String label, {required double fontSize, required Color color}) {
+    _clearBanner();
+    _banner = OverlayBanner(
+      label: label,
+      position: Vector2(worldWidth / 2, worldHeight / 2 - 30),
+      fontSize: fontSize,
+      color: color,
+    );
+    world.add(_banner!);
+  }
+
+  void _clearBanner() {
+    _banner?.removeFromParent();
+    _banner = null;
+  }
+
+  void _onEnemyFire(KidComponent enemy, Vector2 aim, double charge) {
+    if (phase != MatchPhase.fight || enemy.isKo) return;
+    final velocity = ThrowPhysics.launchVelocity(
+      charge: charge,
+      aimDirection: aim,
+    );
+    _spawnShot(
+      owner: enemy,
+      velocity: velocity,
+      targets: players,
+      blockedByFort: true,
+    );
+  }
+
+  void _releaseThrow() {
+    final kid = _selected;
+    final charge = _charge < 0.15 ? 0.15 : (_charge > 1 ? 1.0 : _charge);
     _charging = false;
-    chargeHud.visibleCharge = false;
-    final charge = _charge.clamp(0.15, 1.0);
     _charge = 0;
-    _dragStart = null;
-    player.clearChargePose();
-    _fireSnowball(charge);
-  }
-
-  void _fireSnowball(double charge) {
-    if (_waveCleared) return;
-
+    chargeHud.visibleCharge = false;
+    if (kid == null || kid.isKo || phase != MatchPhase.fight) {
+      kid?.clearChargePose();
+      return;
+    }
     final velocity = ThrowPhysics.launchVelocity(
       charge: charge,
       aimDirection: _aimDir,
+      speedScale: CombatRules.projectileSpeedScale(meta.throwRank),
     );
-    player.showThrowPose();
+    kid.showThrowPose();
+    _spawnShot(
+      owner: kid,
+      velocity: velocity,
+      targets: enemies,
+      blockedByFort: false,
+    );
+  }
 
+  void _spawnShot({
+    required KidComponent owner,
+    required Vector2 velocity,
+    required List<KidComponent> targets,
+    required bool blockedByFort,
+  }) {
     world.add(
-      SnowballProjectile(
-        sprite: snowballSprite,
-        position: player.throwOrigin.clone(),
+      LobProjectile(
+        sprite: _kit.projectile,
+        position: owner.throwOrigin.clone(),
         velocity: velocity,
-        targets: [enemy],
-        owner: player,
-        onHit: _onSnowballHit,
+        targets: targets,
+        owner: owner,
+        blockedByFort: blockedByFort,
+        fort: blockedByFort ? fort : null,
+        onHit: _onKidHit,
+        onFortHit: _onFortHit,
       ),
     );
   }
 
-  void _onSnowballHit(SnowballProjectile ball, KidComponent target) {
-    world.add(
-      ImpactBurst(
-        sprite: impactSprite,
-        position: ball.position.clone(),
-      ),
-    );
+  void _onKidHit(LobProjectile shot, KidComponent target) {
+    _burst(shot.position);
+    if (phase != MatchPhase.fight) return;
+    final selectedHit = identical(target, _selected);
     target.takeHit();
-    if (target.isKo && !_waveCleared) {
-      _showKoThenWaveClear();
+    if (selectedHit) {
+      _endActiveThrow();
+      if (target.isKo) _setSelected(_firstLiving(players));
+    }
+    resolveKnockouts();
+  }
+
+  void _onFortHit(LobProjectile shot) {
+    _burst(shot.position);
+    if (phase != MatchPhase.fight) return;
+    fort.takeHit();
+  }
+
+  void _burst(Vector2 at) {
+    world.add(ImpactBurst(sprite: _kit.impact, position: at.clone()));
+  }
+
+  void _onPointerDown(Vector2 point) {
+    if (phase != MatchPhase.fight) return;
+    _pointerDown = true;
+    _held = 0;
+    _dragStart = point.clone();
+    _lastDrag = point.clone();
+    _gesture = _Gesture.undecided;
+    _aimAdjusted = false;
+    final near = _nearestLiving(players, point, maxDistance: 150);
+    if (near != null) _setSelected(near);
+    _selected ??= _firstLiving(players);
+  }
+
+  void _onPointerMove(Vector2 point) {
+    if (!_pointerDown || phase != MatchPhase.fight) return;
+    if (_gesture == _Gesture.suppressed) return;
+    final start = _dragStart;
+    if (start == null) return;
+    final total = point - start;
+    if (_gesture == _Gesture.undecided) {
+      if (total.length < 18) return;
+      final horizontal =
+          total.x.abs() > total.y.abs() * 1.2 && total.y.abs() < 110;
+      if (horizontal) {
+        _gesture = _Gesture.move;
+        _selected?.setWalking(true);
+      } else {
+        _aimDir = _aimFromDrag(total);
+        _aimAdjusted = true;
+        _beginCharge();
+      }
+    }
+    if (_gesture == _Gesture.move) {
+      final kid = _selected;
+      final last = _lastDrag;
+      if (kid != null && !kid.isKo && last != null) {
+        final next = kid.position.x + (point.x - last.x);
+        if (next < _playerLaneMin) {
+          kid.position.x = _playerLaneMin;
+        } else if (next > _playerLaneMax) {
+          kid.position.x = _playerLaneMax;
+        } else {
+          kid.position.x = next;
+        }
+        kid.setWalking(true);
+      }
+    } else if (_gesture == _Gesture.charge && total.length > 18) {
+      _aimDir = _aimFromDrag(total);
+      _aimAdjusted = true;
+      chargeHud.aimDir = _aimDir;
+    }
+    _lastDrag = point.clone();
+  }
+
+  void _onPointerUp() {
+    if (!_pointerDown && !_charging) return;
+    final fire = _pointerDown &&
+        _gesture == _Gesture.charge &&
+        _charging &&
+        phase == MatchPhase.fight;
+    _pointerDown = false;
+    _gesture = _Gesture.idle;
+    _aimAdjusted = false;
+    _dragStart = null;
+    _lastDrag = null;
+    _held = 0;
+    if (fire) {
+      _releaseThrow();
+      return;
+    }
+    _charging = false;
+    _charge = 0;
+    chargeHud.visibleCharge = false;
+    final kid = _selected;
+    if (kid != null && !kid.isKo) {
+      kid.setWalking(false);
+      kid.clearChargePose();
     }
   }
 
-  Future<void> _showKoThenWaveClear() async {
-    _waveCleared = true;
-    _banner?.removeFromParent();
-    _banner = OverlayBanner(
-      label: 'KO!',
-      position: Vector2(worldWidth / 2, worldHeight / 2 - 40),
-      fontSize: 56,
-      color: const Color(0xFFFFE66D),
-    );
-    world.add(_banner!);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (!isMounted) return;
-    _banner?.removeFromParent();
-    _banner = OverlayBanner(
-      label: 'Wave clear!',
-      position: Vector2(worldWidth / 2, worldHeight / 2 - 20),
-      fontSize: 44,
-      color: const Color(0xFFFFF8F0),
-    );
-    world.add(_banner!);
+  void _beginCharge() {
+    if (_charging ||
+        _gesture == _Gesture.move ||
+        _gesture == _Gesture.suppressed) {
+      return;
+    }
+    final kid = _selected;
+    if (kid == null || kid.isKo || phase != MatchPhase.fight) return;
+    _gesture = _Gesture.charge;
+    _charging = true;
+    if (_charge < 0.12) _charge = 0.12;
+    if (!_aimAdjusted) {
+      final target = _nearestLiving(enemies, kid.throwOrigin);
+      _aimDir = target == null
+          ? Vector2(1, -0.55)
+          : ThrowPhysics.defaultAim(kid.throwOrigin, target.hitCenter);
+    }
+    kid.showChargePose();
+    _syncChargeHud();
+  }
+
+  Vector2 _aimFromDrag(Vector2 delta) {
+    final aim = delta.clone();
+    if (aim.x < 0.2) aim.x = 0.2;
+    return aim;
+  }
+
+  void _syncChargeHud() {
+    final kid = _selected;
+    if (kid == null) return;
+    chargeHud.visibleCharge = true;
+    chargeHud.charge = _charge;
+    chargeHud.aimDir = _aimDir;
+    chargeHud.anchorWorld = kid.throwOrigin;
+  }
+
+  void _endActiveThrow() {
+    _pointerDown = false;
+    _charging = false;
+    _charge = 0;
+    _held = 0;
+    _gesture = _Gesture.idle;
+    _aimAdjusted = false;
+    _dragStart = null;
+    _lastDrag = null;
+    chargeHud.visibleCharge = false;
+    final kid = _selected;
+    if (kid != null && !kid.isKo) {
+      kid.setWalking(false);
+      kid.clearChargePose();
+    }
+  }
+
+  void _setSelected(KidComponent? kid) {
+    _selected = kid;
+    for (final player in players) {
+      player.selected = identical(player, kid);
+    }
+  }
+
+  KidComponent? _firstLiving(List<KidComponent> kids) {
+    for (final kid in kids) {
+      if (!kid.isKo) return kid;
+    }
+    return null;
+  }
+
+  KidComponent? _nearestLiving(
+    List<KidComponent> kids,
+    Vector2 point, {
+    double? maxDistance,
+  }) {
+    KidComponent? best;
+    var bestDistance = maxDistance == null
+        ? double.infinity
+        : maxDistance * maxDistance;
+    for (final kid in kids) {
+      if (kid.isKo) continue;
+      final distance = kid.hitCenter.distanceToSquared(point);
+      if (distance <= bestDistance) {
+        bestDistance = distance;
+        best = kid;
+      }
+    }
+    return best;
   }
 
   @override
   void update(double dt) {
     super.update(dt);
+    if (_pointerDown &&
+        _gesture == _Gesture.undecided &&
+        phase == MatchPhase.fight) {
+      _held += dt;
+      if (_held >= 0.16) _beginCharge();
+    }
     if (_charging) {
-      _charge = (_charge + dt / chargeSeconds).clamp(0.0, 1.0);
-      player.showChargePose();
-      chargeHud.charge = _charge;
-      chargeHud.anchorWorld = player.throwOrigin;
+      final kid = _selected;
+      if (kid == null || kid.isKo || phase != MatchPhase.fight) {
+        _endActiveThrow();
+      } else {
+        final next = _charge + dt / CombatRules.playerChargeSeconds(meta.throwRank);
+        _charge = next > 1 ? 1 : next;
+        kid.showChargePose();
+        _syncChargeHud();
+      }
+    }
+    if (_pendingBanner != _Banner.none) {
+      _bannerTime -= dt;
+      if (_bannerTime <= 0) _advanceBanner();
     }
   }
 }
 
-typedef _ChargeStart = void Function(Vector2 worldPos);
-typedef _ChargeUpdate = void Function(Vector2 worldPos);
-typedef _ChargeEnd = void Function();
-
-/// Full-screen invisible drag surface in world space.
 class _ArenaInput extends PositionComponent with DragCallbacks {
-  _ArenaInput({
-    required Vector2 size,
-    required this.onChargeStart,
-    required this.onChargeUpdate,
-    required this.onChargeEnd,
-  }) : super(size: size, position: Vector2.zero(), priority: 50);
+  _ArenaInput(this.game)
+      : super(
+          size: Vector2(
+            BackyardBarrageGame.worldWidth,
+            BackyardBarrageGame.worldHeight,
+          ),
+          position: Vector2.zero(),
+          priority: 40,
+        );
 
-  final _ChargeStart onChargeStart;
-  final _ChargeUpdate onChargeUpdate;
-  final _ChargeEnd onChargeEnd;
+  final BackyardBarrageGame game;
 
   @override
   void onDragStart(DragStartEvent event) {
     super.onDragStart(event);
-    onChargeStart(event.localPosition);
+    game._onPointerDown(event.localPosition);
   }
 
   @override
   void onDragUpdate(DragUpdateEvent event) {
-    onChargeUpdate(event.localEndPosition);
+    game._onPointerMove(event.localEndPosition);
   }
 
   @override
   void onDragEnd(DragEndEvent event) {
     super.onDragEnd(event);
-    onChargeEnd();
+    game._onPointerUp();
   }
 
   @override
   void onDragCancel(DragCancelEvent event) {
     super.onDragCancel(event);
-    onChargeEnd();
+    game._onPointerUp();
   }
 
   @override
-  void render(Canvas canvas) {
-    // Invisible hit target.
-  }
+  void render(Canvas canvas) {}
 }

@@ -23,7 +23,8 @@ All under `assets/images/ui/`. Shared language: ink `#2C3E50` ~4–6px outline, 
 | File | Size | Status | Notes |
 |------|------|--------|-------|
 | `wordmark_backyard_barrage_draft.png` | 1024×384 | draft (kept) | Existing wordmark |
-| `app_icon_1024_draft.png` | 1024×1024 | draft (kept) | Existing app icon |
+| `app_icon_1024.png` | 1024×1024 | locked E2b | Half snowball / half water balloon, winter/summer split. Opaque. |
+| `app_icon_1024_draft.png` | 1024×1024 | locked E2b (same pixels) | Draft filename kept for Studio pipeline continuity. |
 | `btn_primary_draft.png` | 512×160 | **improved draft** | Cream + ink + 3D lip; re-exported |
 | `btn_primary_pressed_draft.png` | 512×160 | **new draft** | Sunk / dim cream pressed |
 | `btn_secondary_draft.png` | 512×160 | **new draft** | Quieter lip + inner hairline |

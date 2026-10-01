@@ -44,5 +44,27 @@ void main() {
       expect(aim.x, greaterThan(0));
       expect(aim.y, lessThan(0));
     });
+
+    test('enemy lobs keep a leftward upward arc', () {
+      final velocity = ThrowPhysics.launchVelocity(
+        charge: 1,
+        aimDirection: Vector2(-1, 0.2),
+      );
+      expect(velocity.x, lessThan(0));
+      expect(velocity.y, lessThan(0));
+    });
+
+    test('speedScale multiplies launch speed', () {
+      final slow = ThrowPhysics.launchVelocity(
+        charge: 0.5,
+        aimDirection: Vector2(1, -0.4),
+      );
+      final fast = ThrowPhysics.launchVelocity(
+        charge: 0.5,
+        aimDirection: Vector2(1, -0.4),
+        speedScale: 2,
+      );
+      expect(fast.length, closeTo(slow.length * 2, 0.001));
+    });
   });
 }

@@ -14,7 +14,7 @@ Playable MVP loop on the gameplay branch:
 - **Pause.** Arena Pause button freezes the fight, including the short KO / wave-clear banner timer. Resume continues. Pause also opens Settings or returns to the menu.
 - **Settings.** SFX, music, and haptics toggles plus a GameLogic / Ethan credits stub. Stored in `backyard_barrage_settings_v1`, beside the meta save key. Menu and pause both open it.
 - **Haptics.** Charge release, hit, KO, and a successful purchase. Flutter `HapticFeedback`, no-op when the toggle is off or the platform has no vibrator.
-- **UI kit.** Wordmark on the title. Coin icon in the HUD, shop, and defeat. Primary, pressed, and secondary buttons. Shop portrait frames on the upgrade cards and the wide frame on the wave-clear header. `panel_modal` behind shop, pause, settings, and defeat.
+- **UI kit v2.** Menus, shop, pause, settings, and the fight HUD use `assets/images/ui_modern/` (pill buttons, soft sheet, season chips, glass HUD, image toggles). Hearts, coins, the fort meter, the wave label, and Pause are Flutter overlays so they stay screen-sized on the letterboxed yard. The legacy wood kit in `assets/images/ui/` is unchanged on disk.
 - **Audio.** Studio procedural pack is wired through `flame_audio` (not stubbed): throw whoosh, seasonal impact (snow / wet), hit, KO, win / lose stingers, UI tap, purchase coin, menu loop, `battle_loop_winter.wav` in winter, and `battle_loop_summer.wav` in summer. Toggles gate playback. Music beds were refreshed in place (menu ~7.83s, winter battle ~6.92s, summer battle ~6.67s). Filenames and playback paths are unchanged. All 12 files are present (9 sfx, 3 music).
 - **App icon E2b.** Studio master (908081 bytes, identical pixels) at `assets/images/ui/app_icon_1024.png` and `app_icon_1024_draft.png`. Half snowball | half water balloon on a winter/summer split. iOS AppIcon, Android `ic_launcher` mipmaps, and macOS AppIcon are resized from that file. The 1024 platform slots are the same bytes.
 
@@ -22,7 +22,8 @@ Playable MVP loop on the gameplay branch:
 
 Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you notice something you are not fixing in the current PR. Remove or rewrite a row when it is actually fixed.
 
-- **World-space HUD scales with the yard.** Hearts, fort bar, coin count, wave label, and the drag hint live in the 1280×720 world, so on a short phone they shrink with the letterboxed backyard. The Flutter Pause button stays screen-sized. A later pass can move that HUD onto the camera viewport if it feels too small in playtest.
+- **KO and wave-clear banners still scale with the yard.** The short center banner is drawn in the 1280×720 world, so it shrinks with the letterbox. Hearts, coins, fort, wave, hint, and Pause are screen-space.
+- **Legacy UI kit is unused by screens.** `assets/images/ui/` draft buttons, wood panels, season chips, and the wood fort bar stay in the pack. Live UI is `assets/images/ui_modern/`. The app icon still lives under `assets/images/ui/`.
 - **Props folders are empty.** `assets/images/props/winter/` and `props/summer/` exist so the asset list analyzes, but they have no sprites yet.
 - **App icon is unused inside the game UI.** E2b is the store/launcher icon only. `web/favicon.png` and `web/icons/` are still the Flutter defaults.
 - **Walk and throw are single frames.** No multi-frame cycles yet (`docs/STATUS.md`).

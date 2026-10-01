@@ -3,7 +3,7 @@
 **Updated:** 2026-10-01  
 **Pack:** MVP draft + character pose polish + **UI kit pass**
 
-**Game wiring:** The arena now loads both seasons (backgrounds, idle/walk/charge/throw/hit/KO poses, snowball vs water balloon, snow vs splash), fort stages 1–3, and the HUD pieces for hearts, the fort bar, coins, season chips, and buttons. Shop card frames, the modal panel, and the pressed primary button are still unused. Audio and prop sprites are still absent.  
+**Game wiring:** The arena loads both seasons (backgrounds, idle/walk/charge/throw/hit/KO poses, snowball vs water balloon, snow vs splash) and fort stages 1–3. Flutter menus, shop, pause, settings, and the screen-space HUD use **`assets/images/ui_modern/`** (see `docs/UI_MODERN.md`). The legacy wood/comic kit under `assets/images/ui/` is kept, including the E2b app icon; those draft buttons, chips, and frames are no longer on the live screens.  
 **Style source:** `docs/STYLE.md` (followed)  
 **Generators:**
 - `scripts/generate_mvp_drafts.py` — world/forts/VFX/UI basics + shared character import

@@ -4,16 +4,20 @@ import '../feel/feel_bus.dart';
 import 'barrage_colors.dart';
 import 'ui_assets.dart';
 
+/// Pill CTA from the v2 kit. Primary art is blue, so its label is cream.
 class DraftImageButton extends StatefulWidget {
   const DraftImageButton({
     super.key,
     required this.label,
     required this.onPressed,
     this.enabled = true,
-    this.width = 220,
-    this.height = 52,
+    this.width = 224,
+    this.height = 70,
     this.asset = UiAssets.primary,
     this.feel,
+    this.expand = false,
+    this.leading,
+    this.fontSize = 16,
   });
 
   final String label;
@@ -23,6 +27,9 @@ class DraftImageButton extends StatefulWidget {
   final double height;
   final String asset;
   final FeelBus? feel;
+  final bool expand;
+  final String? leading;
+  final double fontSize;
 
   @override
   State<DraftImageButton> createState() => _DraftImageButtonState();
@@ -33,6 +40,8 @@ class _DraftImageButtonState extends State<DraftImageButton> {
 
   bool get _canTap => widget.enabled && widget.onPressed != null;
 
+  bool get _primary => widget.asset == UiAssets.primary;
+
   void _setDown(bool value) {
     if (_down == value) return;
     setState(() => _down = value);
@@ -40,9 +49,10 @@ class _DraftImageButtonState extends State<DraftImageButton> {
 
   @override
   Widget build(BuildContext context) {
-    final pressedArt = widget.asset == UiAssets.primary && _down && _canTap;
-    final scale = _down && _canTap && !pressedArt ? 0.97 : 1.0;
-    return Opacity(
+    final pressedArt = _primary && _down && _canTap;
+    final scale = _down && _canTap && !pressedArt ? 0.98 : 1.0;
+    final labelColor = _primary ? BarrageColors.onPrimary : BarrageColors.ink;
+    final button = Opacity(
       opacity: _canTap ? 1 : 0.45,
       child: GestureDetector(
         onTapDown: _canTap ? (_) => _setDown(true) : null,
@@ -57,8 +67,8 @@ class _DraftImageButtonState extends State<DraftImageButton> {
         child: Transform.scale(
           scale: scale,
           child: SizedBox(
-            width: widget.width,
-            height: widget.height,
+            width: widget.expand ? null : widget.width,
+            height: widget.expand ? null : widget.height,
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -68,18 +78,68 @@ class _DraftImageButtonState extends State<DraftImageButton> {
                     fit: BoxFit.fill,
                   ),
                 ),
-                Text(
-                  widget.label,
-                  style: const TextStyle(
-                    color: BarrageColors.ink,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.leading != null) ...[
+                        Image.asset(widget.leading!, width: 28, height: 28),
+                        const SizedBox(width: 8),
+                      ],
+                      Flexible(
+                        child: Text(
+                          widget.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: BarrageType.button.copyWith(
+                            color: labelColor,
+                            fontSize: widget.fontSize,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+    if (!widget.expand) return button;
+    return SizedBox.expand(child: button);
+  }
+}
+
+/// Circular kit icon (`icon_pause_v2`, `icon_settings_v2`, `icon_close_v2`).
+class KitIconButton extends StatelessWidget {
+  const KitIconButton({
+    super.key,
+    required this.asset,
+    required this.onPressed,
+    this.feel,
+    this.size = 56,
+    this.semanticLabel,
+  });
+
+  final String asset;
+  final VoidCallback onPressed;
+  final FeelBus? feel;
+  final double size;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: GestureDetector(
+        onTap: () {
+          feel?.uiTap();
+          onPressed();
+        },
+        child: Image.asset(asset, width: size, height: size),
       ),
     );
   }

@@ -44,104 +44,120 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final width = (size.width - 32).clamp(280.0, 560.0).toDouble();
+    final height = (size.height - 24).clamp(220.0, 420.0).toDouble();
     return Material(
-      color: const Color(0xCC2C3E50),
+      color: BarrageColors.scrim,
       child: SafeArea(
         child: Center(
           child: SizedBox(
-            width: 560,
-            height: 400,
+            width: width,
+            height: height,
             child: KitPanel(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    const Text(
-                      'Settings',
-                      style: TextStyle(
-                        color: BarrageColors.ink,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
+              padding: const EdgeInsets.fromLTRB(36, 28, 28, 20),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('Settings', style: BarrageType.title),
+                      ),
+                      KitIconButton(
+                        key: const Key('settings-back'),
+                        asset: UiAssets.iconClose,
+                        semanticLabel: 'Back',
+                        size: 48,
+                        feel: widget.feel,
+                        onPressed: widget.onClose,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          _ToggleRow(
+                            label: 'Sound effects',
+                            value: _settings.sfxEnabled,
+                            switchKey: const Key('sfx-toggle'),
+                            onChanged: (value) =>
+                                _set(_settings.copyWith(sfxEnabled: value)),
+                          ),
+                          _ToggleRow(
+                            label: 'Music',
+                            value: _settings.musicEnabled,
+                            switchKey: const Key('music-toggle'),
+                            onChanged: (value) =>
+                                _set(_settings.copyWith(musicEnabled: value)),
+                          ),
+                          _ToggleRow(
+                            label: 'Haptics',
+                            value: _settings.hapticsEnabled,
+                            switchKey: const Key('haptics-toggle'),
+                            onChanged: (value) =>
+                                _set(_settings.copyWith(hapticsEnabled: value)),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Sound, music, and haptics for this device.',
+                            textAlign: TextAlign.center,
+                            style: BarrageType.muted,
+                          ),
+                          const SizedBox(height: 12),
+                          const Text('Credits', style: BarrageType.heading),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'GameLogic',
+                            style: BarrageType.body,
+                          ),
+                          const Text('Ethan', style: BarrageType.muted),
+                          const Text(
+                            'Snowballs and water balloons.',
+                            textAlign: TextAlign.center,
+                            style: BarrageType.muted,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    _ToggleRow(
-                      label: 'Sound effects',
-                      value: _settings.sfxEnabled,
-                      switchKey: const Key('sfx-toggle'),
-                      onChanged: (value) =>
-                          _set(_settings.copyWith(sfxEnabled: value)),
-                    ),
-                    _ToggleRow(
-                      label: 'Music',
-                      value: _settings.musicEnabled,
-                      switchKey: const Key('music-toggle'),
-                      onChanged: (value) =>
-                          _set(_settings.copyWith(musicEnabled: value)),
-                    ),
-                    _ToggleRow(
-                      label: 'Haptics',
-                      value: _settings.hapticsEnabled,
-                      switchKey: const Key('haptics-toggle'),
-                      onChanged: (value) =>
-                          _set(_settings.copyWith(hapticsEnabled: value)),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'SFX and music play when audio files are added.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: BarrageColors.ink,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Credits',
-                      style: TextStyle(
-                        color: BarrageColors.ink,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const Text(
-                      'GameLogic',
-                      style: TextStyle(
-                        color: BarrageColors.ink,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const Text(
-                      'Ethan',
-                      style: TextStyle(
-                        color: BarrageColors.ink,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Text(
-                      'Snowballs and water balloons.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: BarrageColors.ink,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    DraftImageButton(
-                      key: const Key('settings-back'),
-                      label: 'Back',
-                      asset: UiAssets.secondary,
-                      width: 160,
-                      height: 44,
-                      feel: widget.feel,
-                      onPressed: widget.onClose,
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Image toggle from `toggle_on_v2` / `toggle_off_v2`.
+class BarrageToggle extends StatelessWidget {
+  const BarrageToggle({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      toggled: value,
+      child: GestureDetector(
+        onTap: () => onChanged(!value),
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: 84,
+          height: 48,
+          child: Center(
+            child: Image.asset(
+              value ? UiAssets.toggleOn : UiAssets.toggleOff,
+              width: 76,
+              height: 38,
             ),
           ),
         ),
@@ -165,26 +181,18 @@ class _ToggleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: BarrageColors.ink,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
+    return SizedBox(
+      height: 52,
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: BarrageType.body)),
+          BarrageToggle(
+            key: switchKey,
+            value: value,
+            onChanged: onChanged,
           ),
-        ),
-        Switch(
-          key: switchKey,
-          value: value,
-          activeThumbColor: const Color(0xFF3D7CFF),
-          activeTrackColor: const Color(0x733D7CFF),
-          onChanged: onChanged,
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

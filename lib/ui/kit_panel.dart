@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'ui_assets.dart';
 
-/// Cream modal from `panel_modal_draft.png`.
+/// Frosted cream sheet from `panel_modal_v2.png`.
 class KitPanel extends StatelessWidget {
   const KitPanel({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.fromLTRB(28, 22, 28, 18),
+    this.padding = const EdgeInsets.fromLTRB(40, 36, 40, 28),
   });
 
   final Widget child;

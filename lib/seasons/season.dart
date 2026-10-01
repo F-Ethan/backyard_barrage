@@ -46,9 +46,9 @@ class SeasonAssets {
     return 'characters/$who/${who}_${pose}_${season.name}_draft.png';
   }
 
-  /// Flutter [Image.asset] path for a season chip.
+  /// Flutter [Image.asset] path for a modern season chip.
   static String chipAsset(Season season, {required bool selected}) {
     final suffix = selected ? '' : '_off';
-    return 'assets/images/ui/chip_season_${season.name}${suffix}_draft.png';
+    return 'assets/images/ui_modern/chip_season_${season.name}${suffix}_v2.png';
   }
 }

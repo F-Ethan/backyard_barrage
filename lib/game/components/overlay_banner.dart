@@ -8,7 +8,7 @@ class OverlayBanner extends PositionComponent {
     required Vector2 position,
     this.subtitle,
     this.fontSize = 42,
-    this.color = const Color(0xFF2C3E50),
+    this.color = const Color(0xFF1A2332),
   }) : super(
          position: position,
          size: Vector2(760, subtitle == null ? 108 : 140),
@@ -24,19 +24,16 @@ class OverlayBanner extends PositionComponent {
   @override
   void render(Canvas canvas) {
     final rect = size.toRect();
-    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(22));
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(28));
+    canvas.drawRRect(
+      rrect.shift(const Offset(0, 6)),
+      Paint()..color = const Color(0x241A2332),
+    );
     canvas.drawRRect(rrect, Paint()..color = const Color(0xFFFFF8F0));
     canvas.drawRRect(
       rrect,
       Paint()
-        ..color = const Color(0xFF2C3E50)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 5,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.deflate(8), const Radius.circular(16)),
-      Paint()
-        ..color = const Color(0xFF3D7CFF)
+        ..color = const Color(0x2E1A2332)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
@@ -51,7 +48,7 @@ class OverlayBanner extends PositionComponent {
         subtitle,
         top: top + 8,
         fontSize: 22,
-        color: const Color(0xFF2C3E50),
+        color: const Color(0xFF1A2332),
       );
     }
   }

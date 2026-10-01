@@ -104,7 +104,7 @@ void main() {
     );
     expect(
       await audio.resolvedFile(AudioCues.battleSummer),
-      'music/battle_loop_winter.wav',
+      'music/battle_loop_summer.wav',
     );
 
     final feel = FeelBus(
@@ -134,7 +134,7 @@ void main() {
     );
     expect(playback.loops, [
       'music/menu_loop.wav',
-      'music/battle_loop_winter.wav',
+      'music/battle_loop_summer.wav',
     ]);
 
     playback.sfx.clear();

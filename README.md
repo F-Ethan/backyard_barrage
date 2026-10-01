@@ -2,7 +2,7 @@
 
 Flutter + Flame **landscape** arena game: kids lob **snowballs** (winter) and **water balloons** (summer). Charge-hold → aim → lob. Publisher: **GameLogic / Ethan**.
 
-- GitHub: https://github.com/F-Ethan/backyard_-barrage
+- GitHub: https://github.com/F-Ethan/backyard_barrage
 - Agent contract: [`CLAUDE.md`](CLAUDE.md) (see also [`AGENTS.md`](AGENTS.md))
 - Leftovers: [`PROGRESS.md`](PROGRESS.md)
 - Plan / art: [`docs/MVP_PLAN.md`](docs/MVP_PLAN.md) · [`docs/STYLE.md`](docs/STYLE.md) · [`docs/STATUS.md`](docs/STATUS.md)

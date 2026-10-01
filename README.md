@@ -1,70 +1,30 @@
-# Backyard Barrage — MVP Art Pack
+# Backyard Barrage
 
-Original cozy backyard snowball / water-balloon game art for Ethan’s Flutter + Flame title.  
-**Not** SnowCraft / classic red-vs-green soldier aesthetic — player is blue (`#3D7CFF`), enemy is violet (`#9B59B6`).
+Flutter + Flame **landscape** arena game: kids lob **snowballs** (winter) and **water balloons** (summer). Charge-hold → aim → lob. Publisher: **GameLogic / Ethan**.
 
-Style bible: [`docs/STYLE.md`](docs/STYLE.md)  
-Pack status: [`docs/STATUS.md`](docs/STATUS.md)  
-Audio handoff: [`docs/AUDIO_HANDOFF.md`](docs/AUDIO_HANDOFF.md)
+- GitHub: https://github.com/F-Ethan/backyard_-barrage
+- Agent contract: [`CLAUDE.md`](CLAUDE.md) (see also [`AGENTS.md`](AGENTS.md))
+- Leftovers: [`PROGRESS.md`](PROGRESS.md)
+- Plan / art: [`docs/MVP_PLAN.md`](docs/MVP_PLAN.md) · [`docs/STYLE.md`](docs/STYLE.md) · [`docs/STATUS.md`](docs/STATUS.md)
+- Audio needs: [`docs/AUDIO_HANDOFF.md`](docs/AUDIO_HANDOFF.md)
 
-## Layout
+Kid-safe: snowballs and water balloons only — no blood or gore. Camera is **3/4 side-arena** (not pure top-down). Player blue `#3D7CFF`, enemy violet `#9B59B6`.
 
-```
-backyard-barrage/
-  assets/images/
-    characters/player/   # idle / throw (winter + summer idle)
-    characters/enemy/    # idle / throw winter
-    world/               # 16:9 backyard BGs
-    forts/               # stages 1–3
-    projectiles/         # snowball, water balloon
-    vfx/                 # impact + charge glow
-    ui/                  # wordmark, button, heart, coin, app icon
-  assets/audio/          # empty — see AUDIO_HANDOFF
-  docs/
-  scripts/generate_mvp_drafts.py
+## Run
+
+```bash
+flutter pub get
+flutter analyze
+flutter test
+flutter run -d macos    # or chrome / iOS / Android device
 ```
 
-All shipped PNGs are labeled `*_draft.png` until approved.
+Ship targets are **landscape iOS + Android**. macOS and Chrome are for local playtest.
 
-## Drop into Flutter
+## Assets
 
-1. Copy (or symlink) this pack’s `assets/images/` into your Flutter project, e.g.:
+Draft PNGs live under `assets/images/` (characters, world, forts, projectiles, VFX, UI). Filenames stay `*_draft.png` until approved. Props and audio folders are empty for now — see `docs/STATUS.md` and `docs/AUDIO_HANDOFF.md`. Nested folders are already listed in `pubspec.yaml`.
 
-   ```bash
-   # from your Flutter app root
-   mkdir -p assets/images
-   cp -R /workspace/backyard-barrage/assets/images/* assets/images/
-   ```
+## Working on the repo
 
-2. Declare folders (or globs) in `pubspec.yaml`:
-
-   ```yaml
-   flutter:
-     assets:
-       - assets/images/characters/player/
-       - assets/images/characters/enemy/
-       - assets/images/world/
-       - assets/images/forts/
-       - assets/images/projectiles/
-       - assets/images/vfx/
-       - assets/images/ui/
-   ```
-
-3. Load in Flame / Flutter, examples:
-
-   ```dart
-   // Flame
-   final player = await images.load('characters/player/player_idle_winter_draft.png');
-   final bg = await images.load('world/backyard_bg_winter_draft.png');
-
-   // Or with flutter AssetImage / Image.asset
-   Image.asset('assets/images/ui/app_icon_1024_draft.png');
-   ```
-
-4. Prefer sprites with transparent backgrounds (characters, forts, projectiles, VFX, UI). World BGs are opaque full-frame — draw them as the bottom layer.
-
-5. When finals replace drafts, rename without `_draft` and update load paths once.
-
-## Kid-safe
-
-No blood; projectiles are snowballs and water balloons only.
+Never commit feature work straight to `main`. Branch from `origin/main`, open a PR. Document out-of-scope issues in `PROGRESS.md` → **Known gaps**.

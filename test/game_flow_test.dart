@@ -7,10 +7,12 @@ import 'package:backyard_barrage/feel/feel_bus.dart';
 import 'package:backyard_barrage/feel/game_haptics.dart';
 import 'package:backyard_barrage/game/backyard_barrage_game.dart';
 import 'package:backyard_barrage/game/combat_rules.dart';
+import 'package:backyard_barrage/game/throw_physics.dart';
 import 'package:backyard_barrage/meta/meta_state.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
 import 'package:backyard_barrage/meta/settings_store.dart';
 import 'package:backyard_barrage/seasons/season.dart';
+import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -221,4 +223,102 @@ void main() {
     expect(booted.playback.sfx, contains('sfx/purchase_coin.wav'));
     expect(booted.playback.loops, contains('music/battle_loop_winter.wav'));
   });
+
+  testWidgets('a wide phone fits the full backyard instead of cropping it', (
+    tester,
+  ) async {
+    await _useSurface(tester, const Size(844, 390));
+    final game = (await boot(
+      tester,
+      MetaState(crewSize: 3, throwRank: 5),
+    )).game;
+    game.wave = 2;
+    game.startWave();
+    game.updateTree(0);
+    _expectFullBackyard(game);
+  });
+
+  testWidgets('a taller window still fits the backyard without vertical crop', (
+    tester,
+  ) async {
+    await _useSurface(tester, const Size(900, 600));
+    final game = (await boot(
+      tester,
+      MetaState(crewSize: 3, throwRank: 5),
+    )).game;
+    game.wave = 2;
+    game.startWave();
+    game.updateTree(0);
+    _expectFullBackyard(game);
+  });
+
+  testWidgets('the design resolution fills a 1280x720 window', (tester) async {
+    await _useSurface(tester, const Size(1280, 720));
+    final game = (await boot(tester, MetaState())).game;
+    _expectFullBackyard(game);
+    expect(game.camera.viewport.size.x, closeTo(1280, 1));
+    expect(game.camera.viewport.size.y, closeTo(720, 1));
+  });
+}
+
+Future<void> _useSurface(WidgetTester tester, Size size) async {
+  await tester.binding.setSurfaceSize(size);
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+}
+
+void _expectFullBackyard(BackyardBarrageGame game) {
+  final visible = game.camera.visibleWorldRect;
+  expect(visible.left, closeTo(0, 0.5));
+  expect(visible.top, closeTo(0, 0.5));
+  expect(visible.right, closeTo(BackyardBarrageGame.worldWidth, 0.5));
+  expect(visible.bottom, closeTo(BackyardBarrageGame.worldHeight, 0.5));
+
+  final canvas = game.canvasSize;
+  final scale = math.min(
+    canvas.x / BackyardBarrageGame.worldWidth,
+    canvas.y / BackyardBarrageGame.worldHeight,
+  );
+  final viewport = game.camera.viewport;
+  expect(viewport.size.x, closeTo(BackyardBarrageGame.worldWidth * scale, 1));
+  expect(viewport.size.y, closeTo(BackyardBarrageGame.worldHeight * scale, 1));
+
+  final barX = (canvas.x - viewport.size.x) / 2;
+  final barY = (canvas.y - viewport.size.y) / 2;
+  final worldOrigin = game.camera.globalToLocal(Vector2(barX, barY));
+  final worldCenter = game.camera.globalToLocal(
+    Vector2(canvas.x / 2, canvas.y / 2),
+  );
+  expect(worldOrigin.x, closeTo(0, 1.5));
+  expect(worldOrigin.y, closeTo(0, 1.5));
+  expect(worldCenter.x, closeTo(BackyardBarrageGame.worldWidth / 2, 1.5));
+  expect(worldCenter.y, closeTo(BackyardBarrageGame.worldHeight / 2, 1.5));
+
+  for (final kid in [...game.players, ...game.enemies]) {
+    expect(visible.inflate(1).contains(kid.toAbsoluteRect().topLeft), isTrue);
+    expect(
+      visible.inflate(1).contains(kid.toAbsoluteRect().bottomRight),
+      isTrue,
+    );
+    expect(game.camera.canSee(kid), isTrue);
+  }
+  final fort = game.fort.toAbsoluteRect();
+  expect(visible.inflate(1).contains(fort.topLeft), isTrue);
+  expect(visible.inflate(1).contains(fort.bottomRight), isTrue);
+
+  final kid = game.players.first;
+  final velocity = ThrowPhysics.launchVelocity(
+    charge: 1,
+    aimDirection: Vector2(1, -0.9),
+    speedScale: CombatRules.projectileSpeedScale(game.meta.throwRank),
+  );
+  final apexY =
+      kid.throwOrigin.y -
+      (velocity.y * velocity.y) / (2 * ThrowPhysics.gravity);
+  expect(apexY, greaterThan(visible.top));
+  expect(apexY, lessThan(kid.throwOrigin.y));
+  expect(visible.contains(Offset(kid.throwOrigin.x, apexY)), isTrue);
+  expect(
+    visible.contains(Offset(kid.throwOrigin.x, kid.throwOrigin.y)),
+    isTrue,
+  );
 }

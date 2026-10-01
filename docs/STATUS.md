@@ -1,7 +1,9 @@
 # Backyard Barrage — Art Pack Status
 
-**Updated:** 2026-10-01 ~3:05 PM CT  
-**Pack:** MVP draft + character pose polish + **UI kit pass**  
+**Updated:** 2026-10-01  
+**Pack:** MVP draft + character pose polish + **UI kit pass**
+
+**Game wiring:** The arena now loads both seasons (backgrounds, idle/walk/charge/throw/hit/KO poses, snowball vs water balloon, snow vs splash), fort stages 1–3, and the HUD pieces for hearts, the fort bar, coins, season chips, and buttons. Shop card frames, the modal panel, and the pressed primary button are still unused. Audio and prop sprites are still absent.  
 **Style source:** `docs/STYLE.md` (followed)  
 **Generators:**
 - `scripts/generate_mvp_drafts.py` — world/forts/VFX/UI basics + shared character import

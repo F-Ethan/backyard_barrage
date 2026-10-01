@@ -16,7 +16,7 @@ Playable MVP loop on the gameplay branch:
 - **Haptics.** Charge release, hit, KO, and a successful purchase. Flutter `HapticFeedback`, no-op when the toggle is off or the platform has no vibrator.
 - **UI kit.** Wordmark on the title. Coin icon in the HUD, shop, and defeat. Primary, pressed, and secondary buttons. Shop portrait frames on the upgrade cards and the wide frame on the wave-clear header. `panel_modal` behind shop, pause, settings, and defeat.
 - **Audio.** Studio procedural pack is wired through `flame_audio` (not stubbed): throw whoosh, seasonal impact (snow / wet), hit, KO, win / lose stingers, UI tap, purchase coin, menu loop, `battle_loop_winter.wav` in winter, and `battle_loop_summer.wav` in summer. Toggles gate playback. Music beds were refreshed in place (menu ~7.83s, winter battle ~6.92s, summer battle ~6.67s). Filenames and playback paths are unchanged. All 12 files are present (9 sfx, 3 music).
-- **App icon E2b.** Locked composition is half snowball | half water balloon on a winter/summer split. `assets/images/ui/app_icon_1024.png` and `app_icon_1024_draft.png` are the same pixels. iOS AppIcon, Android `ic_launcher` mipmaps, and macOS AppIcon are resized from that 1024.
+- **App icon E2b.** Studio master (908081 bytes, identical pixels) at `assets/images/ui/app_icon_1024.png` and `app_icon_1024_draft.png`. Half snowball | half water balloon on a winter/summer split. iOS AppIcon, Android `ic_launcher` mipmaps, and macOS AppIcon are resized from that file. The 1024 platform slots are the same bytes.
 
 ## Known gaps
 
@@ -24,7 +24,6 @@ Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you n
 
 - **Props folders are empty.** `assets/images/props/winter/` and `props/summer/` exist so the asset list analyzes, but they have no sprites yet.
 - **App icon is unused inside the game UI.** E2b is the store/launcher icon only. `web/favicon.png` and `web/icons/` are still the Flutter defaults.
-- **E2b master is a redraw.** The chat attachment PNGs were not on disk (the advertised paths were missing), so the 1024 was redrawn to the locked composition instead of copied byte-for-byte. GM should compare it to the Studio file before treating it as the master.
 - **Walk and throw are single frames.** No multi-frame cycles yet (`docs/STATUS.md`).
 - **No CI yet.** No `.github/workflows` — analyze/test are local (`flutter analyze`, `flutter test`).
 - **Draft art otherwise.** Other PNGs are still `*_draft.png` until approved finals replace them (`docs/STATUS.md`). The app icon final name is the exception above.

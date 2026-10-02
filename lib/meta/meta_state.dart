@@ -74,13 +74,13 @@ class MetaState {
   static int coinsForWave(int wave) => 12 + wave * 8;
 
   Map<String, Object> toJson() => {
-        'coins': coins,
-        'crewSize': crewSize,
-        'fortStage': fortStage,
-        'throwRank': throwRank,
-        'season': season.name,
-        'bestWave': bestWave,
-      };
+    'coins': coins,
+    'crewSize': crewSize,
+    'fortStage': fortStage,
+    'throwRank': throwRank,
+    'season': season.name,
+    'bestWave': bestWave,
+  };
 
   factory MetaState.fromJson(Map<String, dynamic> json) {
     return MetaState(

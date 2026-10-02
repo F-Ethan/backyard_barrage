@@ -50,16 +50,16 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | --- | --- |
 | Player starts with | 1 kid |
 | Hits to KO | 2 |
-| Throw | Press-hold charge, release to lob (arc + gravity) |
+| Throw | Right-thumb Throw button: hold to charge, release to lob |
 | Active thrower | One kid charging at a time |
 | Enemy count | Starts ~2–3, scales by wave |
 | Win | All enemies KO’d |
 | Lose | All player kids KO’d |
 
 ### 3.3 Controls (touch, landscape)
-- Tap-drag on own kid to select / move into position  
-- Hold on kid (or throw button) to charge; aim with drag; release to fire  
-- Left thumb: move/select · Right thumb: charge/aim (tune in playtest)  
+- Left thumb: select a kid and drag to move on your half of the grid. While Throw is held, the same thumb aims. Aim does not have to start on the kid.
+- Right thumb: Throw button. Hold to charge (the bar fills slower the longer you hold), release to lob.
+- Each side stays on its own half. The middle band is neutral.
 - Lock orientation: landscape left/right only  
 
 ### 3.4 AI (simple)
@@ -78,7 +78,7 @@ Spend soft currency earned from wins:
 | Fort | Cover + fort HP / stages | 3 stages |
 | (Optional) Balloon/snow size | Larger hit radius | 3 ranks |
 
-Fort provides partial cover on player side; projectiles can be blocked by fort HP until destroyed that wave (or regenerates between waves — pick one in build; recommend regenerate between waves for clarity).
+Fort cover shelters 1–2 player kids and absorbs enemy lobs. Enough hits collapse it and remove the cover for the rest of the wave. HP refills at the start of the next wave.
 
 ### 3.6 Seasons
 Same rules; swap:

@@ -15,6 +15,20 @@ class EnemyAi {
     return options[rng.nextInt(options.length)];
   }
 
+  /// Row-biased grid step. Most nudges change row; columns are rarer.
+  static ({int column, int row}) gridNudge(math.Random rng) {
+    final roll = rng.nextDouble();
+    if (roll < 0.12) return (column: 0, row: 0);
+    if (roll < 0.72) {
+      final sign = rng.nextBool() ? 1 : -1;
+      final row = rng.nextDouble() < 0.35 ? sign * 2 : sign;
+      return (column: 0, row: row);
+    }
+    final column = rng.nextBool() ? 1 : -1;
+    final row = rng.nextDouble() < 0.55 ? (rng.nextBool() ? 1 : -1) : 0;
+    return (column: column, row: row);
+  }
+
   /// Horizontal sidestep in pixels, or 0 when the rival holds still.
   static double sidestep(
     math.Random rng, {
@@ -23,7 +37,8 @@ class EnemyAi {
     double maxDistance = 90,
   }) {
     if (rng.nextDouble() > chance) return 0;
-    final distance = minDistance + rng.nextDouble() * (maxDistance - minDistance);
+    final distance =
+        minDistance + rng.nextDouble() * (maxDistance - minDistance);
     return rng.nextBool() ? distance : -distance;
   }
 

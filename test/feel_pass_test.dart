@@ -48,6 +48,7 @@ void main() {
     expect(loaded.sfxEnabled, isTrue);
     expect(loaded.musicEnabled, isTrue);
     expect(loaded.hapticsEnabled, isTrue);
+    expect(loaded.modernUi, isTrue);
   });
 
   test('haptics no-op when disabled and fire when enabled', () async {
@@ -196,6 +197,57 @@ void main() {
 
     final toggle = tester.widget<BarrageToggle>(
       find.byKey(const Key('haptics-toggle')),
+    );
+    expect(toggle.value, isFalse);
+  });
+
+  testWidgets('modern UI is the default and the classic kit persists', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final store = SaveStore(preferences: prefs);
+    final settings = SettingsStore(preferences: prefs);
+    FeelBus feel() => FeelBus(
+      audio: GameAudio(playback: RecordingPlayback()),
+      haptics: GameHaptics(pulse: RecordingPulse()),
+    );
+
+    await tester.pumpWidget(
+      BackyardBarrageApp(
+        saveStore: store,
+        settingsStore: settings,
+        feel: feel(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('menu-settings')));
+    await tester.pump();
+    expect(find.byKey(const Key('ui-kit-modern')), findsOneWidget);
+    expect(find.byKey(const Key('ui-style-toggle')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('ui-style-toggle')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
+    expect(find.byKey(const Key('ui-kit-classic')), findsOneWidget);
+    expect((await settings.load()).modernUi, isFalse);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(
+      BackyardBarrageApp(
+        saveStore: store,
+        settingsStore: settings,
+        feel: feel(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('menu-settings')));
+    await tester.pump();
+    expect(find.byKey(const Key('ui-kit-classic')), findsOneWidget);
+    final toggle = tester.widget<BarrageToggle>(
+      find.byKey(const Key('ui-style-toggle')),
     );
     expect(toggle.value, isFalse);
   });

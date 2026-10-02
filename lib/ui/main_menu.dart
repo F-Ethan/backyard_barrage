@@ -10,7 +10,7 @@ import 'barrage_colors.dart';
 import 'draft_button.dart';
 import 'season_chip.dart';
 import 'settings_panel.dart';
-import 'ui_assets.dart';
+import 'ui_kit.dart';
 
 class MainMenu extends StatefulWidget {
   const MainMenu({
@@ -87,101 +87,101 @@ class _MainMenuState extends State<MainMenu> {
           ),
         ),
         child: Stack(
-        children: [
-          SafeArea(
-            child: meta == null
-                ? const Center(child: CircularProgressIndicator())
-                : Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: SizedBox(
-                        width: 520,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Image.asset(
-                              UiAssets.wordmark,
-                              height: 112,
-                              fit: BoxFit.contain,
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Snowballs & water balloons',
-                              style: BarrageType.body,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Playing: ${meta.season.label}',
-                              key: const Key('season-label'),
-                              style: BarrageType.heading,
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SeasonChip(
-                                  key: const Key('season-winter'),
-                                  season: Season.winter,
-                                  selected: meta.season == Season.winter,
-                                  onTap: () => _setSeason(Season.winter),
-                                ),
-                                const SizedBox(width: 12),
-                                SeasonChip(
-                                  key: const Key('season-summer'),
-                                  season: Season.summer,
-                                  selected: meta.season == Season.summer,
-                                  onTap: () => _setSeason(Season.summer),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'Crew ${meta.crewSize}/${MetaState.maxCrew}'
-                              ' · Fort ${meta.fortStage}/${MetaState.maxFortStage}'
-                              ' · Throw ${meta.throwRank}/${MetaState.maxThrowRank}',
-                              style: BarrageType.muted.copyWith(
-                                color: BarrageColors.ink,
-                                fontSize: 14,
+          children: [
+            SafeArea(
+              child: meta == null
+                  ? const Center(child: CircularProgressIndicator())
+                  : Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: SizedBox(
+                          width: 520,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
+                                UiKitScope.of(context).wordmark,
+                                height: 112,
+                                fit: BoxFit.contain,
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Coins ${meta.coins} · Best wave ${meta.bestWave}',
-                              style: BarrageType.muted.copyWith(fontSize: 14),
-                            ),
-                            const SizedBox(height: 16),
-                            DraftImageButton(
-                              key: const Key('play-button'),
-                              label: 'Play',
-                              onPressed: _play,
-                              feel: widget.feel,
-                            ),
-                            const SizedBox(height: 10),
-                            DraftImageButton(
-                              key: const Key('menu-settings'),
-                              label: 'Settings',
-                              asset: UiAssets.secondary,
-                              leading: UiAssets.iconSettings,
-                              width: 210,
-                              height: 64,
-                              feel: widget.feel,
-                              onPressed: () =>
-                                  setState(() => _settingsOpen = true),
-                            ),
-                          ],
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Snowballs & water balloons',
+                                style: BarrageType.body,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Playing: ${meta.season.label}',
+                                key: const Key('season-label'),
+                                style: BarrageType.heading,
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SeasonChip(
+                                    key: const Key('season-winter'),
+                                    season: Season.winter,
+                                    selected: meta.season == Season.winter,
+                                    onTap: () => _setSeason(Season.winter),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  SeasonChip(
+                                    key: const Key('season-summer'),
+                                    season: Season.summer,
+                                    selected: meta.season == Season.summer,
+                                    onTap: () => _setSeason(Season.summer),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'Crew ${meta.crewSize}/${MetaState.maxCrew}'
+                                ' · Fort ${meta.fortStage}/${MetaState.maxFortStage}'
+                                ' · Throw ${meta.throwRank}/${MetaState.maxThrowRank}',
+                                style: BarrageType.muted.copyWith(
+                                  color: BarrageColors.ink,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Coins ${meta.coins} · Best wave ${meta.bestWave}',
+                                style: BarrageType.muted.copyWith(fontSize: 14),
+                              ),
+                              const SizedBox(height: 16),
+                              DraftImageButton(
+                                key: const Key('play-button'),
+                                label: 'Play',
+                                onPressed: _play,
+                                feel: widget.feel,
+                              ),
+                              const SizedBox(height: 10),
+                              DraftImageButton(
+                                key: const Key('menu-settings'),
+                                label: 'Settings',
+                                secondary: true,
+                                leadingKind: UiIconKind.settings,
+                                width: 210,
+                                height: 64,
+                                feel: widget.feel,
+                                onPressed: () =>
+                                    setState(() => _settingsOpen = true),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-          ),
-          if (_settingsOpen)
-            SettingsOverlay(
-              settings: widget.feel.settings,
-              feel: widget.feel,
-              onChanged: _commitSettings,
-              onClose: () => setState(() => _settingsOpen = false),
             ),
-        ],
+            if (_settingsOpen)
+              SettingsOverlay(
+                settings: widget.feel.settings,
+                feel: widget.feel,
+                onChanged: _commitSettings,
+                onClose: () => setState(() => _settingsOpen = false),
+              ),
+          ],
         ),
       ),
     );

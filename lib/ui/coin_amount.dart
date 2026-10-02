@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'barrage_colors.dart';
-import 'ui_assets.dart';
+import 'ui_kit.dart';
 
 class CoinAmount extends StatelessWidget {
   const CoinAmount({
@@ -19,10 +19,11 @@ class CoinAmount extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final kit = UiKitScope.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Image.asset(UiAssets.coin, width: fontSize + 10, height: fontSize + 10),
+        Image.asset(kit.coin, width: fontSize + 10, height: fontSize + 10),
         const SizedBox(width: 4),
         Text(
           '$prefix$amount',

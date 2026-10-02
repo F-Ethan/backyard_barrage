@@ -80,8 +80,12 @@ class CombatRules {
     required Vector2 anchorBottomCenter,
     required Vector2 spriteSize,
   }) {
-    final (double left, double top, double right, double bottom) =
-        switch (_clampInt(stage, 1, 3)) {
+    final (
+      double left,
+      double top,
+      double right,
+      double bottom,
+    ) = switch (_clampInt(stage, 1, 3)) {
       1 => (0.10, 0.56, 0.86, 0.95),
       2 => (0.08, 0.45, 0.86, 0.95),
       _ => (0.06, 0.20, 0.88, 0.95),

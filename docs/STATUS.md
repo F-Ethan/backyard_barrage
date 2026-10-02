@@ -65,6 +65,8 @@ All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet
 | `player_hit_summer_draft.png` | **new draft** | Same arc, tee |
 | `player_ko_winter_draft.png` | **new draft** | Slump + swirl + stars |
 | `player_ko_summer_draft.png` | **new draft** | Slump + swirl + stars, tee |
+| `player_pickup_winter_draft.png` | **playtest draft** | Selected / held-up pose (Studio) |
+| `player_pickup_summer_draft.png` | **playtest draft** | Selected / held-up pose, tee |
 
 ### Enemy (`assets/images/characters/enemy/`)
 
@@ -82,6 +84,8 @@ All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet
 | `enemy_hit_summer_draft.png` | **new draft** | Recoil + stars, tee |
 | `enemy_ko_winter_draft.png` | **new draft** | Slump + swirl |
 | `enemy_ko_summer_draft.png` | **new draft** | Slump + swirl, tee |
+| `enemy_pickup_winter_draft.png` | **playtest draft** | Held-up pose, loaded with the enemy sheet |
+| `enemy_pickup_summer_draft.png` | **playtest draft** | Held-up pose, tee |
 
 ---
 
@@ -92,6 +96,8 @@ All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet
 | `assets/images/world/backyard_bg_winter_draft.png` | draft |
 | `assets/images/world/backyard_bg_summer_draft.png` | draft |
 | `assets/images/forts/fort_stage_{1,2,3}_draft.png` | draft |
+| `assets/images/forts/fort_stage_{1,2,3}_damaged_draft.png` | playtest draft |
+| `assets/images/forts/fort_collapsed_draft.png` | playtest draft |
 | `assets/images/projectiles/snowball_draft.png` | draft |
 | `assets/images/projectiles/water_balloon_draft.png` | draft |
 | `assets/images/vfx/impact_snow_draft.png` | draft |

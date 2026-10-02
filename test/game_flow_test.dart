@@ -5,8 +5,11 @@ import 'package:backyard_barrage/app.dart';
 import 'package:backyard_barrage/audio/game_audio.dart';
 import 'package:backyard_barrage/feel/feel_bus.dart';
 import 'package:backyard_barrage/feel/game_haptics.dart';
+import 'package:backyard_barrage/game/arena_grid.dart';
 import 'package:backyard_barrage/game/backyard_barrage_game.dart';
 import 'package:backyard_barrage/game/combat_rules.dart';
+import 'package:backyard_barrage/game/components/kid_component.dart';
+import 'package:backyard_barrage/game/components/lob_projectile.dart';
 import 'package:backyard_barrage/game/throw_physics.dart';
 import 'package:backyard_barrage/meta/meta_state.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
@@ -39,7 +42,11 @@ void main() {
           for (final pose in SeasonAssets.poseNames)
             SeasonAssets.pose(player: player, season: season, pose: pose),
       ],
-      for (final stage in [1, 2, 3]) 'forts/fort_stage_${stage}_draft.png',
+      for (final stage in [1, 2, 3]) ...[
+        'forts/fort_stage_${stage}_draft.png',
+        'forts/fort_stage_${stage}_damaged_draft.png',
+      ],
+      'forts/fort_collapsed_draft.png',
       'vfx/charge_glow_draft.png',
       'ui/heart_draft.png',
       'ui/heart_empty_draft.png',
@@ -112,10 +119,15 @@ void main() {
     expect(game.players.first.hp, CombatRules.hitsToKo);
 
     final kid = game.players.first;
+    expect(kid.selected, isTrue);
+    expect(kid.sprite, kid.pickupSprite);
     kid.setWalking(true);
     expect(kid.sprite, kid.walkSprite);
     kid.showChargePose();
     expect(kid.sprite, kid.chargeSprite);
+    expect(game.fort.shelters(kid), isTrue);
+    expect(game.players[1].sprite, isNot(game.players[1].pickupSprite));
+    expect(game.fort.shelters(game.players[1]), isFalse);
   });
 
   testWidgets('clearing a wave opens the shop and the next wave grows', (
@@ -224,6 +236,101 @@ void main() {
     expect(booted.playback.loops, contains('music/battle_loop_winter.wav'));
   });
 
+  testWidgets('throw button charges with a slowing power bar', (tester) async {
+    final game = (await boot(tester, MetaState())).game;
+    await tester.pump();
+    expect(find.byKey(const Key('throw-button')), findsOneWidget);
+    expect(find.byKey(const Key('power-bar')), findsOneWidget);
+    expect(
+      find.text('Left thumb moves and aims  ·  hold Throw'),
+      findsOneWidget,
+    );
+
+    game.pressThrowButton();
+    game.update(0.08);
+    final early = game.charge;
+    expect(early, greaterThan(0));
+    game.update(0.35);
+    expect(game.charge, greaterThan(early));
+    game.releaseThrowButton();
+    expect(game.charge, 0);
+  });
+
+  testWidgets('kids walk the grid no faster than a snowball', (tester) async {
+    final game = (await boot(tester, MetaState(crewSize: 2))).game;
+    final kid = game.players.first;
+    final start = kid.position.clone();
+    game.debugPointerDown(start);
+    game.debugPointerMove(start + Vector2(0, -ArenaGrid.rowDrag * 3));
+    game.update(0.05);
+    final cap =
+        ThrowPhysics.kidMoveSpeed(
+              speedScale: CombatRules.projectileSpeedScale(game.meta.throwRank),
+            ) *
+            0.05 +
+        1.5;
+    expect(start.distanceTo(kid.position), lessThanOrEqualTo(cap));
+    for (var i = 0; i < 80; i++) {
+      game.update(0.05);
+    }
+    expect(kid.position.y, lessThan(start.y - 10));
+    expect(kid.position.x, lessThanOrEqualTo(ArenaGrid.playerRight + 0.1));
+    expect(ArenaGrid.inNeutral(kid.position.x), isFalse);
+
+    final held = kid.position.clone();
+    game.pressThrowButton();
+    game.debugPointerDown(Vector2(180, 500));
+    game.debugPointerMove(Vector2(420, 300));
+    game.update(0.2);
+    expect(kid.position.x, closeTo(held.x, 0.5));
+    expect(kid.position.y, closeTo(held.y, 0.5));
+    game.releaseThrowButton();
+  });
+
+  testWidgets('a KO kid is greyed out and a living fort shelters cover', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState(crewSize: 2))).game;
+    final down = game.players[1];
+    down.takeHit();
+    down.takeHit();
+    expect(down.isKo, isTrue);
+    expect(down.sprite, down.koSprite);
+    expect(down.paint.colorFilter, KidComponent.knockoutFilter);
+    game.debugPointerDown(down.hitCenter);
+    expect(game.selectedKid, isNot(down));
+
+    final cover = game.players.first;
+    expect(game.fort.shelters(cover), isTrue);
+    final before = game.fort.hp;
+    var hitKid = false;
+    var hitFort = false;
+    LobProjectile(
+      sprite: cover.sprite!,
+      position: cover.hitCenter.clone(),
+      velocity: Vector2.zero(),
+      targets: game.players,
+      blockedByFort: true,
+      fort: game.fort,
+      onHit: (_, _) => hitKid = true,
+      onFortHit: (_) {
+        hitFort = true;
+        game.fort.takeHit();
+      },
+    ).update(1 / 60);
+    expect(hitFort, isTrue);
+    expect(hitKid, isFalse);
+    expect(cover.hp, CombatRules.hitsToKo);
+    expect(game.fort.hp, lessThan(before));
+    expect(game.fort.showingDamage, isTrue);
+
+    while (game.fort.hp > 0) {
+      game.fort.takeHit();
+    }
+    expect(game.fort.isCollapsed, isTrue);
+    expect(game.fort.shelters(cover), isFalse);
+  });
+
   testWidgets('a wide phone fits the full backyard instead of cropping it', (
     tester,
   ) async {
@@ -275,10 +382,7 @@ void main() {
       tester.getSize(find.byKey(const Key('hud-heart-you-0-0'))).width,
       20,
     );
-    expect(
-      game.world.children.whereType<TextComponent>(),
-      isEmpty,
-    );
+    expect(game.world.children.whereType<TextComponent>(), isEmpty);
 
     final before = game.hudRevision.value;
     game.players.first.takeHit();

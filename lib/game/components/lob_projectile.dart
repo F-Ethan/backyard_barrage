@@ -224,6 +224,7 @@ class LobProjectile extends SpriteComponent {
   /// True when the shot was stopped. Peak-aligned shots are marked clear
   /// and keep flying.
   bool _meetFort(FortComponent cover) {
+    if (cover.isCollapsed) return false;
     if (_clearedForts.contains(cover)) return false;
     if (!_centerInFootprint(cover)) return false;
 
@@ -247,6 +248,7 @@ class LobProjectile extends SpriteComponent {
       sameSide: sameSide,
       throwerBehind: behind,
       friendlyDamage: friendly,
+      collapsed: cover.isCollapsed,
     );
     if (result == FortShotResult.none) return false;
     _stopOnFort(cover, damage: result == FortShotResult.damaged);

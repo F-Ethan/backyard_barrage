@@ -106,14 +106,13 @@ class BackyardBarrageGame extends FlameGame {
   int lastReward = 0;
 
   bool _pointerDown = false;
-  bool _moveArmed = false;
+  bool _yardHolding = false;
+  bool _stickHolding = false;
   bool _charging = false;
   bool _aimAdjusted = false;
   double _charge = 0;
   double _chargeHeld = 0;
   Vector2 _aimDir = Vector2(1, 0);
-  Vector2? _pressPoint;
-  Vector2? _heldMoveDir;
   Vector2? _moveStick;
   Vector2? _moveTarget;
   _Banner _pendingBanner = _Banner.none;
@@ -302,6 +301,8 @@ class BackyardBarrageGame extends FlameGame {
       damagedSprite: _fortDamaged[1]!,
       collapsedSprite: _fortCollapsed!,
     );
+    fort.placeOnRow(ArenaGrid.rollFortRow(_rng));
+    enemyFort.placeOnRow(ArenaGrid.rollFortRow(_rng));
     _publishHud();
     unawaited(feel.enterBattle(meta.season));
   }
@@ -498,19 +499,28 @@ class BackyardBarrageGame extends FlameGame {
     _spawnShot(owner: enemy, lob: lob, targets: players);
   }
 
-  /// Right thumb. Hold to charge; release throws. Aim is the left thumb.
+  /// Right thumb, or a hold on the selected kid. Release throws.
   void pressThrowButton() {
-    if (phase != MatchPhase.fight || _charging) return;
-    final kid = (_selected == null || _selected!.isKo)
-        ? _firstLiving(players)
-        : _selected;
-    if (kid == null || kid.isKo) return;
+    if (phase != MatchPhase.fight || _stickHolding) return;
+    final kid = _readyThrower();
+    if (kid == null) return;
+    _stickHolding = true;
     _setSelected(kid);
+    _beginCharge();
+  }
+
+  void _beginCharge() {
+    final kid = _selected;
+    if (kid == null || kid.isKo || kid.isStunned) return;
+    if (_charging) {
+      _syncChargeHud();
+      _publishCharge();
+      return;
+    }
     _charging = true;
     _chargeHeld = 0;
     _charge = ThrowPhysics.minThrowCharge;
     _moveTarget = null;
-    _heldMoveDir = null;
     kid.setWalking(false);
     final stick = _moveStick;
     if (stick != null && stick.length >= 10) {
@@ -544,7 +554,9 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   void releaseThrowButton() {
-    if (!_charging) return;
+    if (!_stickHolding) return;
+    _stickHolding = false;
+    if (_yardHolding || !_charging) return;
     _releaseThrow();
   }
 
@@ -559,7 +571,7 @@ class BackyardBarrageGame extends FlameGame {
     _charge = 0;
     chargeHud.visibleCharge = false;
     _publishCharge();
-    if (kid == null || kid.isKo || phase != MatchPhase.fight) {
+    if (kid == null || kid.isKo || kid.isStunned || phase != MatchPhase.fight) {
       kid?.clearChargePose();
       return;
     }
@@ -616,13 +628,14 @@ class BackyardBarrageGame extends FlameGame {
   void _onKidHit(LobProjectile shot, KidComponent target) {
     _burst(shot.position);
     if (phase != MatchPhase.fight || target.isKo) return;
-    final knockedOut = target.hp <= 1;
-    feel.kidHit(knockedOut: knockedOut, season: meta.season);
     final selectedHit = identical(target, _selected);
     target.takeHit();
+    feel.kidHit(knockedOut: target.isKo, season: meta.season);
     if (selectedHit) {
       _endActiveThrow();
-      if (target.isKo) _setSelected(_firstLiving(players));
+      if (target.isKo || target.isStunned) {
+        _setSelected(_firstReady(players) ?? _firstLiving(players));
+      }
     }
     resolveKnockouts();
   }
@@ -648,49 +661,46 @@ class BackyardBarrageGame extends FlameGame {
   void _onPointerDown(Vector2 point) {
     if (phase != MatchPhase.fight) return;
     _pointerDown = true;
-    _pressPoint = point.clone();
-    _heldMoveDir = null;
-    _moveArmed = false;
-    if (_charging) {
-      _applyAimAt(point);
+    final selected = _selected;
+    final onSelected =
+        selected != null &&
+        !selected.isKo &&
+        point.distanceTo(selected.hitCenter) <= ArenaGrid.moveTouchRadius;
+    if (!onSelected) {
+      final tapped = _nearestLiving(
+        players,
+        point,
+        maxDistance: ArenaGrid.moveTouchRadius,
+      );
+      if (tapped != null) _setSelected(tapped);
+    }
+    final kid = _selected;
+    final grabbed =
+        kid != null &&
+        !kid.isKo &&
+        !kid.isStunned &&
+        point.distanceTo(kid.hitCenter) <= ArenaGrid.moveTouchRadius;
+    if (grabbed) {
+      _yardHolding = true;
+      _beginCharge();
       return;
     }
-    final tapped = _nearestLiving(
-      players,
-      point,
-      maxDistance: ArenaGrid.moveTouchRadius,
-    );
-    if (tapped != null) _setSelected(tapped);
-    final kid = _selected;
-    if (kid != null &&
-        !kid.isKo &&
-        point.distanceTo(kid.hitCenter) <= ArenaGrid.moveTouchRadius) {
-      _moveArmed = true;
-    }
+    if (_charging) _applyAimAt(point);
   }
 
   void _onPointerMove(Vector2 point) {
     if (!_pointerDown || phase != MatchPhase.fight) return;
-    if (_charging) {
-      _applyAimAt(point);
-      return;
-    }
-    if (!_moveArmed) return;
-    final start = _pressPoint;
-    if (start == null) return;
-    final delta = point - start;
-    if (delta.length < ArenaGrid.moveDrag) {
-      _heldMoveDir = null;
-      return;
-    }
-    _heldMoveDir = delta;
+    if (_charging) _applyAimAt(point);
   }
 
   void _onPointerUp() {
+    final yard = _yardHolding;
     _pointerDown = false;
-    _moveArmed = false;
-    _heldMoveDir = null;
-    _pressPoint = null;
+    _yardHolding = false;
+    if (yard && !_stickHolding && _charging) {
+      _releaseThrow();
+      return;
+    }
     final kid = _selected;
     if (!_charging && kid != null && !kid.isKo && _moveTarget == null) {
       kid.setWalking(false);
@@ -746,8 +756,14 @@ class BackyardBarrageGame extends FlameGame {
 
   void _tickMove(double dt) {
     final kid = _selected;
-    if (kid == null || kid.isKo || _charging) return;
-    if (phase != MatchPhase.fight) return;
+    if (kid == null || kid.isKo || phase != MatchPhase.fight) return;
+    if (kid.isStunned || _charging) {
+      if (_moveTarget != null) {
+        _moveTarget = null;
+        kid.setWalking(false);
+      }
+      return;
+    }
     if (_moveTarget == null) _tryStartStep(kid);
     _advanceStep(kid, dt);
   }
@@ -794,8 +810,6 @@ class BackyardBarrageGame extends FlameGame {
   Vector2? _activeMoveDir() {
     final stick = _moveStick;
     if (stick != null && stick.length >= 16) return stick;
-    final held = _heldMoveDir;
-    if (held != null && held.length >= ArenaGrid.moveDrag) return held;
     return null;
   }
 
@@ -821,12 +835,11 @@ class BackyardBarrageGame extends FlameGame {
 
   void _endActiveThrow() {
     _pointerDown = false;
-    _moveArmed = false;
+    _yardHolding = false;
+    _stickHolding = false;
     _charging = false;
     _charge = 0;
     _chargeHeld = 0;
-    _pressPoint = null;
-    _heldMoveDir = null;
     _moveTarget = null;
     chargeHud.visibleCharge = false;
     _publishCharge();
@@ -850,6 +863,22 @@ class BackyardBarrageGame extends FlameGame {
       if (!kid.isKo) return kid;
     }
     return null;
+  }
+
+  /// A kid who can still step and throw. Skips KO and stun.
+  KidComponent? _firstReady(List<KidComponent> kids) {
+    for (final kid in kids) {
+      if (!kid.isKo && !kid.isStunned) return kid;
+    }
+    return null;
+  }
+
+  KidComponent? _readyThrower() {
+    final selected = _selected;
+    if (selected != null && !selected.isKo && !selected.isStunned) {
+      return selected;
+    }
+    return _firstReady(players);
   }
 
   KidComponent? _nearestLiving(
@@ -879,7 +908,10 @@ class BackyardBarrageGame extends FlameGame {
     _tickMove(dt);
     if (_charging) {
       final kid = _selected;
-      if (kid == null || kid.isKo || phase != MatchPhase.fight) {
+      if (kid == null ||
+          kid.isKo ||
+          kid.isStunned ||
+          phase != MatchPhase.fight) {
         _endActiveThrow();
       } else {
         _chargeHeld += dt;

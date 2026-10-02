@@ -55,7 +55,7 @@ class EnemyController extends Component {
       host.clearChargePose();
       return;
     }
-    if (host.isFlinching) return;
+    if (host.isStunned) return;
 
     _elapsed += dt;
     if (_phase == _AiPhase.step) {

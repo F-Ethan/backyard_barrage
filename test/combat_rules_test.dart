@@ -89,6 +89,83 @@ void main() {
       expect(ThrowPhysics.circleHitsRect(Vector2(140, 40), 10, rect), isFalse);
     });
 
+    test('three hits KO, with the SnowCraft stun windows', () {
+      expect(CombatRules.hitsToKo, 3);
+      expect(CombatRules.enemyBrushOffSeconds, inInclusiveRange(0.8, 1.2));
+      expect(
+        CombatRules.enemyKnockdownSeconds,
+        greaterThan(CombatRules.enemyBrushOffSeconds),
+      );
+      expect(CombatRules.allyStunSeconds, inInclusiveRange(7, 8));
+
+      final brush = CombatRules.resolveHit(
+        ally: false,
+        hp: 3,
+        maxHp: 3,
+        stunned: false,
+        fragile: false,
+      );
+      expect(brush.knockedOut, isFalse);
+      expect(brush.knockdown, isFalse);
+      expect(brush.hp, 2);
+      expect(brush.lockSeconds, CombatRules.enemyBrushOffSeconds);
+
+      final down = CombatRules.resolveHit(
+        ally: false,
+        hp: brush.hp,
+        maxHp: 3,
+        stunned: true,
+        fragile: false,
+      );
+      expect(down.knockedOut, isFalse);
+      expect(down.knockdown, isTrue);
+      expect(down.hp, 1);
+      expect(down.lockSeconds, CombatRules.enemyKnockdownSeconds);
+
+      final ko = CombatRules.resolveHit(
+        ally: false,
+        hp: down.hp,
+        maxHp: 3,
+        stunned: true,
+        fragile: false,
+      );
+      expect(ko.knockedOut, isTrue);
+      expect(ko.hp, 0);
+
+      final stun = CombatRules.resolveHit(
+        ally: true,
+        hp: 3,
+        maxHp: 3,
+        stunned: false,
+        fragile: false,
+      );
+      expect(stun.knockedOut, isFalse);
+      expect(stun.fragile, isTrue);
+      expect(stun.hp, 2);
+      expect(stun.lockSeconds, CombatRules.allyStunSeconds);
+
+      final fragileKo = CombatRules.resolveHit(
+        ally: true,
+        hp: stun.hp,
+        maxHp: 3,
+        stunned: true,
+        fragile: true,
+      );
+      expect(fragileKo.knockedOut, isTrue);
+      expect(fragileKo.hp, 0);
+
+      final after = CombatRules.resolveHit(
+        ally: true,
+        hp: 2,
+        maxHp: 3,
+        stunned: false,
+        fragile: false,
+      );
+      expect(after.knockedOut, isFalse);
+      expect(after.fragile, isTrue);
+      expect(after.hp, 1);
+    });
+
     test('taller forts reach higher', () {
       final anchor = Vector2(280, 670);
       final size = Vector2.all(360);

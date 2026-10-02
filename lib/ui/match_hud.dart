@@ -113,7 +113,7 @@ class MatchHud extends StatelessWidget {
                         fit: BoxFit.scaleDown,
                         child: _HudChip(
                           child: Text(
-                            'Left thumb aims and steps  ·  right thumb charges',
+                            'Hold a kid or right stick to charge  ·  drag or left thumb aims',
                             key: Key('hud-hint'),
                             style: BarrageType.muted,
                           ),
@@ -267,6 +267,7 @@ class _ChargeGlow extends StatelessWidget {
 }
 
 /// Right thumb. Hold anywhere on the ring to charge; release throws.
+/// A hold on the selected kid does the same thing.
 class _ThrowStick extends StatefulWidget {
   const _ThrowStick({required this.game, required this.charge});
 
@@ -341,7 +342,8 @@ class _ThrowStickState extends State<_ThrowStick> {
   }
 }
 
-/// Left thumb. Deflect to step, or to aim while the right thumb is charging.
+/// Left thumb. Deflect to step, or to aim while a charge is held.
+/// Steps are slow: about 1.2 seconds per column.
 class _MoveStick extends StatefulWidget {
   const _MoveStick({required this.game});
 

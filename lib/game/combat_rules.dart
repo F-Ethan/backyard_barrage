@@ -24,12 +24,12 @@ class CombatRules {
     };
   }
 
-  /// Seconds to reach a full player charge. Throw-speed ranks shorten it.
+  /// Seconds to reach a full player charge. Rank 0 is about 3 seconds.
+  /// Throw-speed ranks shorten it; a full hold stays deliberate.
   static double playerChargeSeconds(int throwRank) {
     final rank = _clampInt(throwRank, 0, 5);
-    final seconds = 0.85 - rank * 0.07;
-    if (seconds < 0.45) return 0.45;
-    if (seconds > 0.85) return 0.85;
+    final seconds = 3 - rank * 0.22;
+    if (seconds < 1.7) return 1.7;
     return seconds;
   }
 
@@ -38,14 +38,8 @@ class CombatRules {
     return 1 + rank * 0.07;
   }
 
-  static double enemyChargeSeconds(int wave) {
-    final steps = wave < 1 ? 0 : wave - 1;
-    final seconds = 1.2 - steps * 0.07;
-    if (seconds < 0.55) return 0.55;
-    return seconds.toDouble();
-  }
-
-  /// Aim error in radians. Higher waves tighten it.
+  /// Aim error in radians. Higher waves tighten it. The error scales how far
+  /// an enemy lob lands short or long inside the throw lane.
   static double enemyAimJitterRadians(int wave) {
     final steps = wave < 1 ? 0 : wave - 1;
     final jitter = 0.38 - steps * 0.045;

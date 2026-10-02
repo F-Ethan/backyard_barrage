@@ -42,4 +42,29 @@ void main() {
     );
     expect(ArenaGrid.isCoverCell(0, ArenaGrid.coverRow), isFalse);
   });
+
+  test('fort footprint is the two cover cells on each side', () {
+    for (final side in [KidSide.player, KidSide.enemy]) {
+      final box = ArenaGrid.fortFootprint(side);
+      final lane = ArenaGrid.laneY(ArenaGrid.coverRow);
+      final a = ArenaGrid.cellCenter(
+        side,
+        ArenaGrid.coverColumnA,
+        ArenaGrid.coverRow,
+      );
+      final b = ArenaGrid.cellCenter(
+        side,
+        ArenaGrid.coverColumnB,
+        ArenaGrid.coverRow,
+      );
+      expect(box.contains(Offset(a.x, lane)), isTrue);
+      expect(box.contains(Offset(b.x, lane)), isTrue);
+      final behind = ArenaGrid.cellCenter(side, 0, ArenaGrid.coverRow);
+      final front = ArenaGrid.cellCenter(side, 3, ArenaGrid.coverRow);
+      expect(box.contains(Offset(behind.x, lane)), isFalse);
+      expect(box.contains(Offset(front.x, lane)), isFalse);
+      final otherRow = ArenaGrid.laneY(ArenaGrid.coverRow + 2);
+      expect(box.contains(Offset(a.x, otherRow)), isFalse);
+    }
+  });
 }

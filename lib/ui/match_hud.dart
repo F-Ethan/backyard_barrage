@@ -102,7 +102,7 @@ class MatchHud extends StatelessWidget {
                     fit: BoxFit.scaleDown,
                     child: _HudChip(
                       child: Text(
-                        'Left thumb moves and aims  ·  hold Throw',
+                        'Left thumb moves and aims one row  ·  hold Throw',
                         key: Key('hud-hint'),
                         style: BarrageType.muted,
                       ),

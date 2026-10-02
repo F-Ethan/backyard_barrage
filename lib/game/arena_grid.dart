@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flame/extensions.dart';
 
 import 'components/kid_component.dart';
@@ -36,6 +38,12 @@ class ArenaGrid {
   static const double rowDrag = 34;
   static const double columnDrag = 76;
 
+  /// Matches [KidComponent] sprite size so lane Y lines up with hit centers.
+  static const double kidSize = 152;
+
+  /// Feet-to-hit-center lift (`size.y * 0.45`).
+  static const double bodyLift = kidSize * 0.45;
+
   static const List<(int, int)> playerSlots = [(1, 4), (0, 2), (3, 6)];
   static const List<(int, int)> enemySlots = [(2, 3), (3, 1), (1, 6)];
 
@@ -61,6 +69,29 @@ class ArenaGrid {
     final clamped = row.clamp(0, rows - 1);
     final t = clamped / (rows - 1);
     return rowBack + (rowFront - rowBack) * t;
+  }
+
+  /// Body-height Y for [row]. Projectiles and aim use this, not the feet line.
+  static double laneY(int row) => rowY(row) - bodyLift;
+
+  static int rowForLaneY(double y) {
+    var best = 0;
+    var bestDistance = double.infinity;
+    for (var row = 0; row < rows; row++) {
+      final distance = (laneY(row) - y).abs();
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = row;
+      }
+    }
+    return best;
+  }
+
+  /// True when [column] is on the far side of that side's fort (away from
+  /// the neutral band). Shots from there have to clear the fort.
+  static bool columnIsBehindFort(KidSide side, int column) {
+    if (side == KidSide.player) return column < coverColumnA;
+    return column > coverColumnB;
   }
 
   static Vector2 cellCenter(KidSide side, int column, int row) {
@@ -140,10 +171,28 @@ class ArenaGrid {
   }
 
   /// Bottom-center of the fort art, sitting on the two cover cells.
-  static Vector2 fortAnchor() {
-    final left = cellCenter(KidSide.player, coverColumnA, coverRow);
-    final right = cellCenter(KidSide.player, coverColumnB, coverRow);
+  static Vector2 fortAnchor([KidSide side = KidSide.player]) {
+    final left = cellCenter(side, coverColumnA, coverRow);
+    final right = cellCenter(side, coverColumnB, coverRow);
     return Vector2((left.x + right.x) / 2, left.y);
+  }
+
+  /// Lane box for the fort: cover columns 1 and 2 on the cover row.
+  ///
+  /// A snowball center inside this rect is in the fort's footprint. The box
+  /// is the two shelter cells, not the whole sprite and not every row.
+  static Rect fortFootprint(KidSide side) {
+    final a = cellCenter(side, coverColumnA, coverRow);
+    final b = cellCenter(side, coverColumnB, coverRow);
+    final left = math.min(a.x, b.x) - columnStep * 0.42;
+    final right = math.max(a.x, b.x) + columnStep * 0.42;
+    final mid = laneY(coverRow);
+    return Rect.fromLTRB(
+      left,
+      mid - rowStep * 0.85,
+      right,
+      rowY(coverRow) - rowStep * 0.15,
+    );
   }
 
   static Vector2 throwOrigin(KidSide side, Vector2 feet, Vector2 size) {

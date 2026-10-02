@@ -17,10 +17,7 @@ import '../seasons/season.dart';
 import '../seasons/season_kit.dart';
 import 'combat_rules.dart';
 import 'components/charge_indicator.dart';
-import 'components/coin_readout.dart';
-import 'components/crew_hearts.dart';
 import 'components/enemy_controller.dart';
-import 'components/fort_bar.dart';
 import 'components/fort_component.dart';
 import 'components/impact_burst.dart';
 import 'components/kid_component.dart';
@@ -83,12 +80,16 @@ class BackyardBarrageGame extends FlameGame {
   late ChargeIndicator chargeHud;
   late SeasonKit _kit;
   late SpriteComponent _bg;
-  late TextComponent _waveLabel;
 
   MatchPhase _phase = MatchPhase.fight;
   final ValueNotifier<MatchPhase> phaseListenable = ValueNotifier(
     MatchPhase.fight,
   );
+
+  /// Bumps when hearts, coins, fort HP, or the wave number change so the
+  /// screen-space HUD can rebuild without living in the scaled world.
+  final ValueNotifier<int> hudRevision = ValueNotifier(0);
+  int _hudSignature = 0;
   MatchPhase _resumePhase = MatchPhase.fight;
 
   MatchPhase get phase => _phase;
@@ -145,11 +146,6 @@ class BackyardBarrageGame extends FlameGame {
     }
 
     final glow = await loadSprite('vfx/charge_glow_draft.png');
-    final heart = await loadSprite('ui/heart_draft.png');
-    final heartEmpty = await loadSprite('ui/heart_empty_draft.png');
-    final coin = await loadSprite('ui/coin_draft.png');
-    final fortEmpty = await loadSprite('ui/fort_bar_empty_draft.png');
-    final fortFill = await loadSprite('ui/fort_bar_fill_draft.png');
 
     _bg = SpriteComponent(
       sprite: _kit.background,
@@ -168,61 +164,9 @@ class BackyardBarrageGame extends FlameGame {
 
     chargeHud = ChargeIndicator(glowSprite: glow);
     world.add(chargeHud);
-    world.add(
-      CrewHearts(
-        kids: players,
-        label: 'Crew',
-        position: Vector2(16, 16),
-        heartSprite: heart,
-        emptyHeartSprite: heartEmpty,
-      ),
-    );
-    world.add(
-      CrewHearts(
-        kids: enemies,
-        label: 'Rivals',
-        position: Vector2(worldWidth - 136, 16),
-        heartSprite: heart,
-        emptyHeartSprite: heartEmpty,
-      ),
-    );
-    world.add(FortBar(fort: fort, empty: fortEmpty, fill: fortFill));
-    world.add(CoinReadout(meta: meta, coin: coin));
-
-    _waveLabel = TextComponent(
-      text: 'Wave $wave',
-      position: Vector2(worldWidth / 2, 66),
-      anchor: Anchor.topCenter,
-      priority: 90,
-      textRenderer: TextPaint(
-        style: const TextStyle(
-          color: Color(0xFFFFF8F0),
-          fontSize: 16,
-          fontWeight: FontWeight.w800,
-          shadows: [Shadow(color: Color(0xAA2C3E50), blurRadius: 3)],
-        ),
-      ),
-    );
-    world.add(_waveLabel);
-    world.add(
-      TextComponent(
-        text: 'Drag sideways to move · hold to aim · release to throw',
-        position: Vector2(worldWidth / 2, worldHeight - 16),
-        anchor: Anchor.bottomCenter,
-        priority: 80,
-        textRenderer: TextPaint(
-          style: const TextStyle(
-            color: Color(0xEEFFF8F0),
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            shadows: [Shadow(color: Color(0xAA2C3E50), blurRadius: 3)],
-          ),
-        ),
-      ),
-    );
     world.add(_ArenaInput(this));
-    overlays.add('hud');
     startWave();
+    overlays.add('hud');
   }
 
   Future<void> persist() => _save.save(meta);
@@ -321,8 +265,28 @@ class BackyardBarrageGame extends FlameGame {
     }
 
     fort.applyStage(meta.fortStage, _fortSprites[meta.fortStage]!);
-    _waveLabel.text = 'Wave $wave';
+    _publishHud();
     unawaited(feel.enterBattle(meta.season));
+  }
+
+  void _publishHud() {
+    var signature = Object.hash(
+      wave,
+      meta.coins,
+      fort.hp,
+      fort.maxHp,
+      players.length,
+      enemies.length,
+    );
+    for (final kid in players) {
+      signature = Object.hash(signature, kid.hp);
+    }
+    for (final kid in enemies) {
+      signature = Object.hash(signature, kid.hp);
+    }
+    if (signature == _hudSignature) return;
+    _hudSignature = signature;
+    hudRevision.value++;
   }
 
   KidComponent _makeKid(KidSide side, int slot) {
@@ -429,7 +393,7 @@ class BackyardBarrageGame extends FlameGame {
       'Crew down',
       subtitle: 'Every kid is down.',
       fontSize: 48,
-      color: const Color(0xFF2C3E50),
+      color: const Color(0xFF1A2332),
     );
     _pendingBanner = _Banner.defeatKo;
     _bannerTime = 0.6;
@@ -442,7 +406,7 @@ class BackyardBarrageGame extends FlameGame {
           'Wave $wave clear!',
           subtitle: '+$lastReward coins',
           fontSize: 42,
-          color: const Color(0xFF2C3E50),
+          color: const Color(0xFF1A2332),
         );
         _pendingBanner = _Banner.waveDone;
         _bannerTime = 0.55;
@@ -764,6 +728,7 @@ class BackyardBarrageGame extends FlameGame {
       _bannerTime -= dt;
       if (_bannerTime <= 0) _advanceBanner();
     }
+    _publishHud();
   }
 }
 

@@ -8,8 +8,10 @@ import 'game/backyard_barrage_game.dart';
 import 'meta/meta_state.dart';
 import 'meta/save_store.dart';
 import 'meta/settings_store.dart';
+import 'ui/barrage_colors.dart';
 import 'ui/defeat_overlay.dart';
 import 'ui/main_menu.dart';
+import 'ui/match_hud.dart';
 import 'ui/pause_overlay.dart';
 import 'ui/settings_panel.dart';
 import 'ui/shop_overlay.dart';
@@ -45,10 +47,19 @@ class _BackyardBarrageAppState extends State<BackyardBarrageApp> {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF3D7CFF),
+          seedColor: BarrageColors.player,
           brightness: Brightness.light,
+        ).copyWith(
+          primary: BarrageColors.player,
+          onPrimary: BarrageColors.onPrimary,
+          surface: BarrageColors.cream,
+          onSurface: BarrageColors.ink,
         ),
-        scaffoldBackgroundColor: const Color(0xFFFFF8F0),
+        scaffoldBackgroundColor: BarrageColors.cream,
+        textTheme: Typography.material2021().black.apply(
+          bodyColor: BarrageColors.ink,
+          displayColor: BarrageColors.ink,
+        ),
         useMaterial3: true,
       ),
       home: running == null
@@ -117,7 +128,7 @@ class _GameScreenState extends State<GameScreen> {
       body: GameWidget<BackyardBarrageGame>(
         game: game,
         overlayBuilderMap: {
-          'hud': (context, game) => HudOverlay(game: game),
+          'hud': (context, game) => MatchHud(game: game),
           'pause': (context, game) => PauseOverlay(game: game),
           'settings': (context, game) => SettingsOverlay(
             settings: game.feel.settings,

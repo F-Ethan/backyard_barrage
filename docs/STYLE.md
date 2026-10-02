@@ -71,10 +71,7 @@ Playful, cozy backyard, kid-safe. Big readable silhouettes for phone **landscape
 - KO: swirl + stars
 
 ## UI
-- Wordmark: bold rounded sans, stacked or single line "Backyard Barrage"
-- Buttons: cream fill, navy outline, slight 3D bottom lip
-- Season chips: snowflake / sun icons
-- Shop cards: cream panels with wood border
+Screens follow [`docs/UI_MODERN.md`](UI_MODERN.md) (kit v2 in `assets/images/ui_modern/`). Pill primary buttons, soft cream sheets, glass HUD chips. Ink `#1A2332`, primary `#3D7CFF`. The older wood/comic frames in `assets/images/ui/` stay on disk and are not the live UI.
 
 ## Audio
 Studio does **not** generate final SFX in this pack — handoff list in `docs/AUDIO_HANDOFF.md`.

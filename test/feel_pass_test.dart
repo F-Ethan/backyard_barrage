@@ -6,6 +6,7 @@ import 'package:backyard_barrage/meta/game_settings.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
 import 'package:backyard_barrage/meta/settings_store.dart';
 import 'package:backyard_barrage/seasons/season.dart';
+import 'package:backyard_barrage/ui/settings_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -193,7 +194,7 @@ void main() {
     await tester.tap(find.byKey(const Key('menu-settings')));
     await tester.pump();
 
-    final toggle = tester.widget<Switch>(
+    final toggle = tester.widget<BarrageToggle>(
       find.byKey(const Key('haptics-toggle')),
     );
     expect(toggle.value, isFalse);

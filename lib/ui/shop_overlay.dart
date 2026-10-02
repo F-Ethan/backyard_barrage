@@ -39,43 +39,32 @@ class _ShopOverlayState extends State<ShopOverlay> {
     final game = widget.game;
     final meta = game.meta;
     return Material(
-      color: const Color(0xCC2C3E50),
+      color: BarrageColors.scrim,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: KitPanel(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 12),
+            padding: const EdgeInsets.fromLTRB(22, 18, 22, 14),
             child: Column(
               children: [
-                SizedBox(
-                  height: 76,
-                  child: ShopCardFrame(
-                    wide: true,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Wave ${game.wave} clear',
-                            style: const TextStyle(
-                              color: BarrageColors.ink,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          '+${game.lastReward}',
-                          style: const TextStyle(
-                            color: BarrageColors.ink,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        CoinAmount(amount: meta.coins),
-                      ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Wave ${game.wave} clear',
+                        style: BarrageType.heading.copyWith(fontSize: 22),
+                      ),
                     ),
-                  ),
+                    Text(
+                      '+${game.lastReward}',
+                      style: BarrageType.body.copyWith(
+                        color: BarrageColors.player,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    CoinAmount(amount: meta.coins),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -97,6 +86,7 @@ class _ShopOverlayState extends State<ShopOverlay> {
                 const SizedBox(height: 8),
                 Expanded(
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Expanded(
                         child: _UpgradeCard(
@@ -153,8 +143,8 @@ class _ShopOverlayState extends State<ShopOverlay> {
                   key: const Key('next-wave'),
                   label: 'Next wave',
                   onPressed: game.continueFromShop,
-                  width: 240,
-                  height: 48,
+                  width: 230,
+                  height: 64,
                   feel: game.feel,
                 ),
               ],
@@ -190,44 +180,32 @@ class _UpgradeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ShopCardFrame(
+      footer: DraftImageButton(
+        key: buttonKey,
+        label: label,
+        enabled: enabled,
+        onPressed: onPressed,
+        expand: true,
+        fontSize: 14,
+        feel: feel,
+      ),
       child: Column(
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: BarrageColors.ink,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
+            textAlign: TextAlign.center,
+            style: BarrageType.heading.copyWith(fontSize: 16),
           ),
-          Text(
-            rank,
-            style: const TextStyle(
-              color: BarrageColors.ink,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          Text(rank, textAlign: TextAlign.center, style: BarrageType.muted),
           const SizedBox(height: 4),
           Expanded(
             child: Text(
               detail,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: BarrageColors.ink,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: BarrageType.muted.copyWith(fontSize: 12),
             ),
-          ),
-          DraftImageButton(
-            key: buttonKey,
-            label: label,
-            enabled: enabled,
-            onPressed: onPressed,
-            width: 130,
-            height: 40,
-            feel: feel,
           ),
         ],
       ),

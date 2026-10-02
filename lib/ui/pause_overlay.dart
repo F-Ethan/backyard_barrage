@@ -6,40 +6,6 @@ import 'draft_button.dart';
 import 'kit_panel.dart';
 import 'ui_assets.dart';
 
-class HudOverlay extends StatelessWidget {
-  const HudOverlay({super.key, required this.game});
-
-  final BackyardBarrageGame game;
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<MatchPhase>(
-      valueListenable: game.phaseListenable,
-      builder: (context, phase, _) {
-        final show = phase == MatchPhase.fight || phase == MatchPhase.clearing;
-        if (!show) return const SizedBox.shrink();
-        return SafeArea(
-          child: Align(
-            alignment: Alignment.bottomLeft,
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: DraftImageButton(
-                key: const Key('pause-button'),
-                label: 'Pause',
-                asset: UiAssets.secondary,
-                width: 148,
-                height: 46,
-                feel: game.feel,
-                onPressed: game.pauseMatch,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
 class PauseOverlay extends StatelessWidget {
   const PauseOverlay({super.key, required this.game});
 
@@ -47,44 +13,38 @@ class PauseOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final width = size.width.clamp(0.0, 520.0).toDouble();
+    final height = (size.height - 24).clamp(0.0, 340.0).toDouble();
     return Material(
-      color: const Color(0xCC2C3E50),
+      color: BarrageColors.scrim,
       child: SafeArea(
         child: Center(
           child: SizedBox(
-            width: 520,
-            height: 280,
+            width: width > 48 ? width - 24 : width,
+            height: height > 48 ? height : 280,
             child: KitPanel(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    'Paused',
-                    style: TextStyle(
-                      color: BarrageColors.ink,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                  Image.asset(UiAssets.iconPause, width: 48, height: 48),
+                  const SizedBox(height: 8),
+                  const Text('Paused', style: BarrageType.title),
                   const SizedBox(height: 4),
                   const Text(
                     'The yard is frozen.',
-                    style: TextStyle(
-                      color: BarrageColors.ink,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: BarrageType.muted,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   DraftImageButton(
                     key: const Key('resume-button'),
                     label: 'Resume',
-                    width: 200,
-                    height: 48,
+                    width: 210,
+                    height: 64,
                     feel: game.feel,
                     onPressed: game.resumeMatch,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -92,8 +52,10 @@ class PauseOverlay extends StatelessWidget {
                         key: const Key('pause-settings'),
                         label: 'Settings',
                         asset: UiAssets.secondary,
-                        width: 150,
-                        height: 44,
+                        leading: UiAssets.iconSettings,
+                        width: 168,
+                        height: 52,
+                        fontSize: 15,
                         feel: game.feel,
                         onPressed: game.openSettings,
                       ),
@@ -102,8 +64,8 @@ class PauseOverlay extends StatelessWidget {
                         key: const Key('pause-menu'),
                         label: 'Menu',
                         asset: UiAssets.secondary,
-                        width: 150,
-                        height: 44,
+                        width: 140,
+                        height: 52,
                         feel: game.feel,
                         onPressed: game.exitToMenu,
                       ),

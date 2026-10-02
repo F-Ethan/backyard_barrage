@@ -252,6 +252,42 @@ void main() {
     _expectFullBackyard(game);
   });
 
+  testWidgets('fight HUD stays screen-sized on a short phone', (tester) async {
+    await _useSurface(tester, const Size(844, 390));
+    final game = (await boot(tester, MetaState(coins: 40, crewSize: 3))).game;
+    await tester.pump();
+    expect(game.phase, MatchPhase.fight);
+    expect(game.overlays.isActive('hud'), isTrue);
+    expect(find.byKey(const Key('pause-button')), findsOneWidget);
+    expect(find.byKey(const Key('hud-crew')), findsOneWidget);
+    expect(find.byKey(const Key('hud-fort')), findsOneWidget);
+    expect(find.byKey(const Key('hud-coins')), findsOneWidget);
+    expect(find.text('Wave 1'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('hud-coins')),
+        matching: find.text('40'),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.getSize(find.byKey(const Key('pause-button'))).height, 56);
+    expect(
+      tester.getSize(find.byKey(const Key('hud-heart-you-0-0'))).width,
+      20,
+    );
+    expect(
+      game.world.children.whereType<TextComponent>(),
+      isEmpty,
+    );
+
+    final before = game.hudRevision.value;
+    game.players.first.takeHit();
+    game.update(0.016);
+    await tester.pump();
+    expect(game.hudRevision.value, isNot(before));
+    expect(find.byKey(const Key('hud-heart-you-0-1')), findsOneWidget);
+  });
+
   testWidgets('the design resolution fills a 1280x720 window', (tester) async {
     await _useSurface(tester, const Size(1280, 720));
     final game = (await boot(tester, MetaState())).game;

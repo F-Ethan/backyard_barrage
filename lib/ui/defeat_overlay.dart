@@ -30,42 +30,30 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
     final game = widget.game;
     final meta = game.meta;
     final cleared = game.wave - 1;
+    final size = MediaQuery.sizeOf(context);
+    final width = (size.width - 32).clamp(320.0, 680.0).toDouble();
+    final height = (size.height - 24).clamp(240.0, 360.0).toDouble();
     return Material(
-      color: const Color(0xCC2C3E50),
+      color: BarrageColors.scrim,
       child: SafeArea(
         child: Center(
           child: SizedBox(
-            width: 640,
-            height: 320,
+            width: width,
+            height: height,
             child: KitPanel(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    'Crew down',
-                    style: TextStyle(
-                      color: BarrageColors.ink,
-                      fontSize: 30,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                  const Text('Crew down', style: BarrageType.title),
                   const SizedBox(height: 4),
                   const Text(
                     'Every kid is down.',
-                    style: TextStyle(
-                      color: BarrageColors.ink,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: BarrageType.body,
                   ),
                   const SizedBox(height: 6),
                   Text(
                     'Waves cleared $cleared · Best ${meta.bestWave}',
-                    style: const TextStyle(
-                      color: BarrageColors.ink,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: BarrageType.body,
                   ),
                   const SizedBox(height: 4),
                   CoinAmount(amount: meta.coins),
@@ -86,7 +74,7 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -94,8 +82,8 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                         key: const Key('retry'),
                         label: 'Retry',
                         onPressed: game.retryFromDefeat,
-                        width: 160,
-                        height: 48,
+                        width: 180,
+                        height: 58,
                         feel: game.feel,
                       ),
                       const SizedBox(width: 12),
@@ -105,7 +93,7 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                         asset: UiAssets.secondary,
                         onPressed: game.exitToMenu,
                         width: 160,
-                        height: 48,
+                        height: 52,
                         feel: game.feel,
                       ),
                     ],

@@ -9,23 +9,25 @@ class CoinAmount extends StatelessWidget {
     required this.amount,
     this.prefix = '',
     this.fontSize = 16,
+    this.color = BarrageColors.ink,
   });
 
   final int amount;
   final String prefix;
   final double fontSize;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Image.asset(UiAssets.coin, width: fontSize + 8, height: fontSize + 8),
+        Image.asset(UiAssets.coin, width: fontSize + 10, height: fontSize + 10),
         const SizedBox(width: 4),
         Text(
           '$prefix$amount',
           style: TextStyle(
-            color: BarrageColors.ink,
+            color: color,
             fontSize: fontSize,
             fontWeight: FontWeight.w800,
           ),

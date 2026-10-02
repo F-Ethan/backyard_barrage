@@ -74,11 +74,19 @@ class _MainMenuState extends State<MainMenu> {
   Widget build(BuildContext context) {
     final meta = _meta;
     final season = meta?.season ?? Season.winter;
+    final summer = season == Season.summer;
     return Scaffold(
-      backgroundColor: season == Season.summer
-          ? BarrageColors.summerSky
-          : BarrageColors.winterSky,
-      body: Stack(
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: summer
+                ? const [BarrageColors.summerMint, BarrageColors.cream]
+                : const [BarrageColors.winterCool, BarrageColors.cream],
+          ),
+        ),
+        child: Stack(
         children: [
           SafeArea(
             child: meta == null
@@ -91,25 +99,21 @@ class _MainMenuState extends State<MainMenu> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Image.asset(UiAssets.wordmark, height: 72),
-                            const SizedBox(height: 6),
+                            Image.asset(
+                              UiAssets.wordmark,
+                              height: 112,
+                              fit: BoxFit.contain,
+                            ),
+                            const SizedBox(height: 4),
                             const Text(
                               'Snowballs & water balloons',
-                              style: TextStyle(
-                                color: BarrageColors.ink,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: BarrageType.body,
                             ),
                             const SizedBox(height: 16),
                             Text(
                               'Playing: ${meta.season.label}',
                               key: const Key('season-label'),
-                              style: const TextStyle(
-                                color: BarrageColors.ink,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
+                              style: BarrageType.heading,
                             ),
                             const SizedBox(height: 8),
                             Row(
@@ -135,35 +139,31 @@ class _MainMenuState extends State<MainMenu> {
                               'Crew ${meta.crewSize}/${MetaState.maxCrew}'
                               ' · Fort ${meta.fortStage}/${MetaState.maxFortStage}'
                               ' · Throw ${meta.throwRank}/${MetaState.maxThrowRank}',
-                              style: const TextStyle(
+                              style: BarrageType.muted.copyWith(
                                 color: BarrageColors.ink,
                                 fontSize: 14,
-                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Coins ${meta.coins} · Best wave ${meta.bestWave}',
-                              style: const TextStyle(
-                                color: BarrageColors.ink,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style: BarrageType.muted.copyWith(fontSize: 14),
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 16),
                             DraftImageButton(
                               key: const Key('play-button'),
                               label: 'Play',
                               onPressed: _play,
                               feel: widget.feel,
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 10),
                             DraftImageButton(
                               key: const Key('menu-settings'),
                               label: 'Settings',
                               asset: UiAssets.secondary,
-                              width: 220,
-                              height: 48,
+                              leading: UiAssets.iconSettings,
+                              width: 210,
+                              height: 64,
                               feel: widget.feel,
                               onPressed: () =>
                                   setState(() => _settingsOpen = true),
@@ -182,6 +182,7 @@ class _MainMenuState extends State<MainMenu> {
               onClose: () => setState(() => _settingsOpen = false),
             ),
         ],
+        ),
       ),
     );
   }

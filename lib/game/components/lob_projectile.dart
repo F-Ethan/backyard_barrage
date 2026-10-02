@@ -8,7 +8,10 @@ import 'kid_component.dart';
 typedef ProjectileHit = void Function(LobProjectile shot, KidComponent target);
 typedef FortBlocked = void Function(LobProjectile shot);
 
-/// Gravity-arc snowball or water balloon. Hits stay in the thrower's row lane.
+/// Snowball or water balloon.
+///
+/// Enemy shots integrate gravity and stay in the thrower's row lane.
+/// Player shots follow a scripted lane: constant pace, aim picks the row.
 class LobProjectile extends SpriteComponent {
   LobProjectile({
     required Sprite sprite,
@@ -29,10 +32,18 @@ class LobProjectile extends SpriteComponent {
     this.apexRise = 0,
     this.landingDrop = 0,
     this.friendlyFortDamage = false,
+    this.scripted = false,
+    this.travelSpeed = 0,
+    this.flightRange = 0,
+    this.apexFraction = 0.22,
+    this.settleFraction = 0.42,
+    this.landingY = 0,
+    this.apexY = 0,
     double? launchVy,
   }) : launchVy = launchVy ?? velocity.y,
        originX = position.x,
        originY = position.y,
+       _scriptRow = landingRow,
        super(
          sprite: sprite,
          position: position,
@@ -60,6 +71,16 @@ class LobProjectile extends SpriteComponent {
   final double originX;
   final double originY;
   final bool friendlyFortDamage;
+  final bool scripted;
+  final double travelSpeed;
+  final double flightRange;
+  final double apexFraction;
+  final double settleFraction;
+  final double landingY;
+  final double apexY;
+
+  int _scriptRow;
+  double _traveled = 0;
 
   /// Set when this shot strikes a fort, before [onFortHit].
   FortComponent? struckFort;
@@ -78,27 +99,41 @@ class LobProjectile extends SpriteComponent {
     return const [];
   }
 
-  int get shotRow => ThrowPhysics.lobRow(
-    throwerRow: throwerRow,
-    peakRow: peakRow,
-    landingRow: landingRow,
-    originY: originY,
-    apexRise: apexRise,
-    landingDrop: landingDrop,
-    y: position.y,
-    vy: velocity.y,
-  );
+  int get shotRow {
+    if (scripted) return _scriptRow;
+    return ThrowPhysics.lobRow(
+      throwerRow: throwerRow,
+      peakRow: peakRow,
+      landingRow: landingRow,
+      originY: originY,
+      apexRise: apexRise,
+      landingDrop: landingDrop,
+      y: position.y,
+      vy: velocity.y,
+    );
+  }
 
-  bool get atArcPeak =>
-      ThrowPhysics.nearArcPeak(velocityY: velocity.y, launchVy: launchVy);
+  bool get atArcPeak {
+    if (scripted) {
+      if (flightRange <= 1) return false;
+      final u = _traveled / flightRange;
+      return (u - apexFraction).abs() <= 0.045;
+    }
+    return ThrowPhysics.nearArcPeak(velocityY: velocity.y, launchVy: launchVy);
+  }
 
   @override
   void update(double dt) {
     super.update(dt);
     if (_spent) return;
 
-    velocity.y += ThrowPhysics.gravity * dt;
-    position += velocity * dt;
+    if (scripted) {
+      _stepScript(dt);
+      if (_spent) return;
+    } else {
+      velocity.y += ThrowPhysics.gravity * dt;
+      position += velocity * dt;
+    }
 
     if (blockedByFort) {
       for (final cover in _fortList) {
@@ -109,8 +144,18 @@ class LobProjectile extends SpriteComponent {
     for (final target in List<KidComponent>.of(targets)) {
       if (identical(target, owner) || target.isKo) continue;
       final targetRow = ArenaGrid.nearestCell(target.side, target.position).row;
-      if (!ThrowPhysics.inThrowLane(throwerRow, targetRow)) continue;
-      if (shotRow != targetRow) continue;
+      if (scripted) {
+        if (!ThrowPhysics.playerCanHit(
+          landingRow: landingRow,
+          shotRow: shotRow,
+          targetRow: targetRow,
+        )) {
+          continue;
+        }
+      } else {
+        if (!ThrowPhysics.inThrowLane(throwerRow, targetRow)) continue;
+        if (shotRow != targetRow) continue;
+      }
       if (!ThrowPhysics.circlesOverlap(
         position,
         radius,
@@ -136,6 +181,44 @@ class LobProjectile extends SpriteComponent {
         position.y > 820) {
       removeFromParent();
     }
+  }
+
+  void _stepScript(double dt) {
+    final speed = travelSpeed > 0 ? travelSpeed : velocity.x.abs();
+    final facing = velocity.x < 0 ? -1.0 : 1.0;
+    _traveled += speed * dt;
+    if (_traveled >= flightRange) {
+      _spent = true;
+      removeFromParent();
+      return;
+    }
+    final u = flightRange <= 1 ? 1.0 : _traveled / flightRange;
+    position.x = originX + facing * _traveled;
+    position.y = ThrowPhysics.playerArcY(
+      originY: originY,
+      apexY: apexY,
+      landingY: landingY,
+      u: u,
+      apexFraction: apexFraction,
+      settleFraction: settleFraction,
+    );
+    _scriptRow = ThrowPhysics.playerArcRow(
+      throwerRow: throwerRow,
+      landingRow: landingRow,
+      u: u,
+      settleFraction: settleFraction,
+    );
+    velocity = ThrowPhysics.playerArcVelocity(
+      facing: facing,
+      speed: speed,
+      originY: originY,
+      apexY: apexY,
+      landingY: landingY,
+      u: u,
+      apexFraction: apexFraction,
+      settleFraction: settleFraction,
+      range: flightRange,
+    );
   }
 
   /// True when the shot was stopped. Peak-aligned shots are marked clear
@@ -187,11 +270,17 @@ class LobProjectile extends SpriteComponent {
   }
 
   bool _apexWillClear(FortComponent cover) {
-    final apexX = ThrowPhysics.apexX(
-      originX: originX,
-      velocity: velocity,
-      launchVy: launchVy,
-    );
+    final double apexX;
+    if (scripted) {
+      final facing = velocity.x < 0 ? -1.0 : 1.0;
+      apexX = originX + facing * flightRange * apexFraction;
+    } else {
+      apexX = ThrowPhysics.apexX(
+        originX: originX,
+        velocity: velocity,
+        launchVy: launchVy,
+      );
+    }
     final box = cover.footprint;
     return apexX >= box.left && apexX <= box.right;
   }

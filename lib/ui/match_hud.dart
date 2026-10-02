@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../game/backyard_barrage_game.dart';
@@ -29,96 +31,119 @@ class MatchHud extends StatelessWidget {
         final fort = game.fort;
         final fraction = fort.maxHp <= 0 ? 0.0 : fort.hp / fort.maxHp;
         final fighting = phase == MatchPhase.fight;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-            child: Column(
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        KitIconButton(
-                          key: const Key('pause-button'),
-                          kind: UiIconKind.pause,
-                          semanticLabel: 'Pause',
-                          feel: game.feel,
-                          onPressed: game.pauseMatch,
-                        ),
-                        const SizedBox(width: 8),
-                        _HudChip(
-                          key: const Key('hud-crew'),
-                          child: _HeartCluster(
-                            label: 'You',
-                            kids: game.players,
-                            idPrefix: 'you',
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _HudChip(
-                          key: const Key('hud-fort'),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Wave ${game.wave}',
-                                key: const Key('hud-wave'),
-                                style: BarrageType.heading.copyWith(
-                                  fontSize: 14,
-                                ),
+        final modern = UiKitScope.of(context).modern;
+        final charge = game.chargeListenable.value;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (fighting && modern && charge > 0)
+              Positioned.fill(
+                child: IgnorePointer(child: _ChargeGlow(charge: charge)),
+              ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                child: Column(
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            KitIconButton(
+                              key: const Key('pause-button'),
+                              kind: UiIconKind.pause,
+                              semanticLabel: 'Pause',
+                              feel: game.feel,
+                              onPressed: game.pauseMatch,
+                            ),
+                            const SizedBox(width: 8),
+                            _HudChip(
+                              key: const Key('hud-crew'),
+                              child: _HeartCluster(
+                                label: 'You',
+                                kids: game.players,
+                                idPrefix: 'you',
                               ),
-                              const SizedBox(height: 4),
-                              _FortMeter(fraction: fraction),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 8),
+                            _HudChip(
+                              key: const Key('hud-fort'),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Wave ${game.wave}',
+                                    key: const Key('hud-wave'),
+                                    style: BarrageType.heading.copyWith(
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  _FortMeter(fraction: fraction),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _HudChip(
+                              key: const Key('hud-rivals'),
+                              child: _HeartCluster(
+                                label: 'Rivals',
+                                kids: game.enemies,
+                                idPrefix: 'rival',
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _HudChip(
+                              key: const Key('hud-coins'),
+                              child: CoinAmount(
+                                amount: game.meta.coins,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        _HudChip(
-                          key: const Key('hud-rivals'),
-                          child: _HeartCluster(
-                            label: 'Rivals',
-                            kids: game.enemies,
-                            idPrefix: 'rival',
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _HudChip(
-                          key: const Key('hud-coins'),
-                          child: CoinAmount(
-                            amount: game.meta.coins,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (fighting) ...[
-                  const SizedBox(height: 6),
-                  const FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: _HudChip(
-                      child: Text(
-                        'Left thumb moves and aims one row  ·  hold Throw',
-                        key: Key('hud-hint'),
-                        style: BarrageType.muted,
                       ),
                     ),
-                  ),
-                  const Spacer(),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _ThrowButton(game: game),
-                  ),
-                  const SizedBox(height: 8),
-                  _PowerBar(charge: game.chargeListenable.value),
-                ],
-              ],
+                    if (fighting) ...[
+                      const SizedBox(height: 6),
+                      const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: _HudChip(
+                          child: Text(
+                            'Left thumb aims and steps  ·  right thumb charges',
+                            key: Key('hud-hint'),
+                            style: BarrageType.muted,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      if (!modern) _PowerBar(charge: charge),
+                    ],
+                  ],
+                ),
+              ),
             ),
-          ),
+            if (fighting)
+              SafeArea(
+                child: Stack(
+                  children: [
+                    Positioned(
+                      left: 10,
+                      bottom: modern ? 10 : 46,
+                      child: _MoveStick(game: game),
+                    ),
+                    Positioned(
+                      right: 10,
+                      bottom: modern ? 10 : 46,
+                      child: _ThrowStick(game: game, charge: charge),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         );
       },
     );
@@ -216,34 +241,186 @@ class _FortMeter extends StatelessWidget {
   }
 }
 
-class _ThrowButton extends StatelessWidget {
-  const _ThrowButton({required this.game});
+class _ChargeGlow extends StatelessWidget {
+  const _ChargeGlow({required this.charge});
+
+  final double charge;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = charge.clamp(0.0, 1.0);
+    return DecoratedBox(
+      key: const Key('charge-glow'),
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          radius: 0.18 + t * 1.25,
+          colors: [
+            const Color(0xFFFFE66D).withValues(alpha: 0.10 + t * 0.38),
+            const Color(0xFFFFE66D).withValues(alpha: 0.05 + t * 0.18),
+            const Color(0xFFFFE66D).withValues(alpha: 0),
+          ],
+          stops: const [0.0, 0.45, 1.0],
+        ),
+      ),
+    );
+  }
+}
+
+/// Right thumb. Hold anywhere on the ring to charge; release throws.
+class _ThrowStick extends StatefulWidget {
+  const _ThrowStick({required this.game, required this.charge});
+
+  final BackyardBarrageGame game;
+  final double charge;
+
+  @override
+  State<_ThrowStick> createState() => _ThrowStickState();
+}
+
+class _ThrowStickState extends State<_ThrowStick> {
+  static const double _size = 148;
+  int _pointers = 0;
+
+  void _down(PointerDownEvent event) {
+    _pointers += 1;
+    if (_pointers == 1) widget.game.pressThrowButton();
+    setState(() {});
+  }
+
+  void _up(PointerEvent event) {
+    _pointers = math.max(0, _pointers - 1);
+    if (_pointers == 0) widget.game.releaseThrowButton();
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final charge = widget.charge.clamp(0.0, 1.0);
+    final held = _pointers > 0 || charge > 0;
+    return Semantics(
+      button: true,
+      label: 'Charge throw',
+      child: Listener(
+        key: const Key('throw-stick'),
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: _down,
+        onPointerUp: _up,
+        onPointerCancel: _up,
+        child: SizedBox(
+          width: _size,
+          height: _size,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(
+                0xFFFFE66D,
+              ).withValues(alpha: held ? 0.16 + charge * 0.28 : 0.10),
+              border: Border.all(
+                color: const Color(
+                  0xFFFFE66D,
+                ).withValues(alpha: held ? 0.85 : 0.45),
+                width: held ? 4 : 3,
+              ),
+            ),
+            child: Center(
+              child: Container(
+                width: 28 + charge * 36,
+                height: 28 + charge * 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(
+                    0xFFFFE66D,
+                  ).withValues(alpha: 0.35 + charge * 0.55),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Left thumb. Deflect to step, or to aim while the right thumb is charging.
+class _MoveStick extends StatefulWidget {
+  const _MoveStick({required this.game});
 
   final BackyardBarrageGame game;
 
   @override
+  State<_MoveStick> createState() => _MoveStickState();
+}
+
+class _MoveStickState extends State<_MoveStick> {
+  static const double _size = 128;
+  static const double _reach = 36;
+  int? _pointer;
+  Offset _knob = Offset.zero;
+
+  void _down(PointerDownEvent event) {
+    _pointer = event.pointer;
+    _apply(event.localPosition);
+  }
+
+  void _move(PointerMoveEvent event) {
+    if (event.pointer != _pointer) return;
+    _apply(event.localPosition);
+  }
+
+  void _apply(Offset local) {
+    const center = Offset(_size / 2, _size / 2);
+    var delta = local - center;
+    if (delta.distance > _reach) {
+      delta = Offset.fromDirection(delta.direction, _reach);
+    }
+    setState(() => _knob = delta);
+    widget.game.setMoveStick(delta);
+  }
+
+  void _end(PointerEvent event) {
+    if (event.pointer != _pointer) return;
+    _pointer = null;
+    setState(() => _knob = Offset.zero);
+    widget.game.clearMoveStick();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final kit = UiKitScope.of(context);
-    return GestureDetector(
-      key: const Key('throw-button'),
-      onTapDown: (_) => game.pressThrowButton(),
-      onTapUp: (_) => game.releaseThrowButton(),
-      onTapCancel: game.releaseThrowButton,
-      child: SizedBox(
-        width: 168,
-        height: 72,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned.fill(child: Image.asset(kit.primary, fit: BoxFit.fill)),
-            Text(
-              'Throw',
-              style: BarrageType.button.copyWith(
-                color: kit.labelOn(true),
-                fontSize: 20,
+    return Semantics(
+      label: 'Aim and move',
+      child: Listener(
+        key: const Key('move-stick'),
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: _down,
+        onPointerMove: _move,
+        onPointerUp: _end,
+        onPointerCancel: _end,
+        child: SizedBox(
+          width: _size,
+          height: _size,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF3D7CFF).withValues(alpha: 0.16),
+              border: Border.all(
+                color: const Color(0xFF3D7CFF).withValues(alpha: 0.55),
+                width: 3,
               ),
             ),
-          ],
+            child: Center(
+              child: Transform.translate(
+                offset: _knob,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF3D7CFF).withValues(alpha: 0.82),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -257,7 +434,6 @@ class _PowerBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kit = UiKitScope.of(context);
     final amount = charge.clamp(0.0, 1.0);
     return SizedBox(
       key: const Key('power-bar'),
@@ -265,28 +441,36 @@ class _PowerBar extends StatelessWidget {
       width: double.infinity,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xCC1A2332),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: kit.cream, width: 2),
+          color: const Color(0xFF8B5E3C),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF2C3E50), width: 3),
         ),
         child: Padding(
           padding: const EdgeInsets.all(3),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: constraints.maxWidth * amount,
-                  height: constraints.maxHeight,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: amount >= 0.995 ? Colors.white : kit.charge,
-                      borderRadius: BorderRadius.circular(6),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8F0),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return Align(
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(
+                    width: constraints.maxWidth * amount,
+                    height: constraints.maxHeight,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: amount >= 0.995
+                            ? const Color(0xFFFFFFFF)
+                            : const Color(0xFFFFE66D),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ),

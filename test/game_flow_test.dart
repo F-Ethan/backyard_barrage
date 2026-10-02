@@ -15,6 +15,7 @@ import 'package:backyard_barrage/meta/meta_state.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
 import 'package:backyard_barrage/meta/settings_store.dart';
 import 'package:backyard_barrage/seasons/season.dart';
+import 'package:backyard_barrage/ui/ui_kit.dart';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -89,13 +90,16 @@ void main() {
     await primeSprites(game);
     await tester.pumpWidget(
       MaterialApp(
-        home: GameScreen(
-          meta: meta,
-          saveStore: store,
-          settingsStore: settings,
-          feel: feel,
-          onExit: () {},
-          game: game,
+        home: UiKitScope(
+          settings: feel.settingsListenable,
+          child: GameScreen(
+            meta: meta,
+            saveStore: store,
+            settingsStore: settings,
+            feel: feel,
+            onExit: () {},
+            game: game,
+          ),
         ),
       ),
     );
@@ -236,19 +240,30 @@ void main() {
     expect(booted.playback.loops, contains('music/battle_loop_winter.wav'));
   });
 
-  testWidgets('throw button charges with a slowing power bar', (tester) async {
+  testWidgets('throw stick charges; modern UI glows and classic keeps a bar', (
+    tester,
+  ) async {
     final game = (await boot(tester, MetaState())).game;
     await tester.pump();
-    expect(find.byKey(const Key('throw-button')), findsOneWidget);
-    expect(find.byKey(const Key('power-bar')), findsOneWidget);
+    expect(find.byKey(const Key('throw-stick')), findsOneWidget);
+    expect(find.byKey(const Key('move-stick')), findsOneWidget);
+    expect(find.byKey(const Key('power-bar')), findsNothing);
     expect(
-      find.text('Left thumb moves and aims one row  ·  hold Throw'),
+      find.text('Left thumb aims and steps  ·  right thumb charges'),
       findsOneWidget,
     );
 
     game.pressThrowButton();
     game.update(0.12);
+    await tester.pump();
     expect(game.charge, closeTo(1 / 3, 0.04));
+    expect(find.byKey(const Key('charge-glow')), findsOneWidget);
+
+    game.feel.apply(game.feel.settings.copyWith(modernUi: false));
+    await tester.pump();
+    expect(find.byKey(const Key('power-bar')), findsOneWidget);
+    expect(find.byKey(const Key('charge-glow')), findsNothing);
+
     game.update(0.9);
     expect(game.charge, closeTo(0.5, 0.06));
     game.update(2);
@@ -257,21 +272,36 @@ void main() {
     expect(game.charge, 0);
   });
 
-  testWidgets('kids walk the grid no faster than a snowball', (tester) async {
+  testWidgets('kids step one cell at a time and ignore distant taps', (
+    tester,
+  ) async {
     final game = (await boot(tester, MetaState(crewSize: 2))).game;
     final kid = game.players.first;
     final start = kid.position.clone();
-    game.debugPointerDown(start);
-    game.debugPointerMove(start + Vector2(0, -ArenaGrid.rowDrag * 3));
+    final far = Vector2(700, 400);
+    game.debugPointerDown(far);
+    game.debugPointerMove(far + Vector2(0, -180));
+    for (var i = 0; i < 20; i++) {
+      game.update(0.05);
+    }
+    expect(kid.position.x, closeTo(start.x, 0.5));
+    expect(kid.position.y, closeTo(start.y, 0.5));
+    game.debugPointerUp();
+
+    game.debugPointerDown(kid.hitCenter);
+    game.debugPointerMove(kid.hitCenter + Vector2(0, -180));
     game.update(0.05);
-    final cap =
-        ThrowPhysics.kidMoveSpeed(
-              speedScale: CombatRules.projectileSpeedScale(game.meta.throwRank),
-            ) *
-            0.05 +
-        1.5;
+    final cap = ThrowPhysics.kidMoveSpeed() * 0.05 + 1.5;
+    expect(start.distanceTo(kid.position), greaterThan(0));
     expect(start.distanceTo(kid.position), lessThanOrEqualTo(cap));
-    for (var i = 0; i < 80; i++) {
+    final hopped = kid.position.clone();
+    game.update(1);
+    expect(
+      hopped.distanceTo(kid.position),
+      lessThanOrEqualTo(ArenaGrid.columnStep + 1.5),
+    );
+
+    for (var i = 0; i < 40; i++) {
       game.update(0.05);
     }
     expect(kid.position.y, lessThan(start.y - 10));
@@ -451,7 +481,7 @@ void _expectFullBackyard(BackyardBarrageGame game) {
   final lob = ThrowPhysics.planPlayerLob(
     throwerRow: cell.row,
     throwerColumn: cell.column,
-    aimRow: cell.row,
+    aimDirection: Vector2(1, 0),
     charge: 1,
     facingRight: true,
     speedScale: CombatRules.projectileSpeedScale(game.meta.throwRank),

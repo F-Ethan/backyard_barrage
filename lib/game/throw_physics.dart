@@ -7,7 +7,8 @@ import 'arena_grid.dart';
 /// What a fort does to a snowball or water balloon that meets it.
 enum FortShotResult { none, blocked, damaged }
 
-/// A gravity lob whose peak and landing stay inside the thrower's row lane.
+/// A lob. Enemy shots are ballistic. Player shots are [scripted]: constant
+/// pace, with aim choosing the row instead of a realistic arc.
 class RowLob {
   const RowLob({
     required this.velocity,
@@ -18,6 +19,13 @@ class RowLob {
     required this.apexRise,
     required this.landingDrop,
     required this.range,
+    this.scripted = false,
+    this.travelSpeed = 0,
+    this.originY = 0,
+    this.landingY = 0,
+    this.apexY = 0,
+    this.apexFraction = 0.5,
+    this.settleFraction = 0.72,
   });
 
   final Vector2 velocity;
@@ -32,6 +40,53 @@ class RowLob {
   /// Pixels the landing sits below the throw origin. Negative lands higher.
   final double landingDrop;
   final double range;
+
+  /// Player lobs follow [ThrowPhysics.playerArcY] instead of gravity.
+  final bool scripted;
+  final double travelSpeed;
+  final double originY;
+  final double landingY;
+  final double apexY;
+
+  /// Fraction of [range] where the loft peaks, and where the ball locks
+  /// onto the committed lane.
+  final double apexFraction;
+  final double settleFraction;
+
+  double yAt(double u) {
+    if (!scripted) return originY;
+    return ThrowPhysics.playerArcY(
+      originY: originY,
+      apexY: apexY,
+      landingY: landingY,
+      u: u,
+      apexFraction: apexFraction,
+      settleFraction: settleFraction,
+    );
+  }
+
+  int rowAt(double u) {
+    if (!scripted) return landingRow;
+    return ThrowPhysics.playerArcRow(
+      throwerRow: throwerRow,
+      landingRow: landingRow,
+      u: u,
+      settleFraction: settleFraction,
+    );
+  }
+
+  /// World X of the loft peak. Player shots place it on the scripted path.
+  double apexWorldX(double originX) {
+    final facing = velocity.x < 0 ? -1.0 : 1.0;
+    if (!scripted) {
+      return ThrowPhysics.apexX(
+        originX: originX,
+        velocity: velocity,
+        launchVy: velocity.y,
+      );
+    }
+    return originX + facing * range * apexFraction;
+  }
 }
 
 /// Shared throw / hit helpers (pure, unit-testable).
@@ -49,12 +104,53 @@ class ThrowPhysics {
   /// Quick taps throw at this fraction of a full lob. Never near zero.
   static const double minThrowCharge = 1 / 3;
 
-  /// Rows a lob may rise above or drop below the thrower's row.
+  /// Width of the hit band around the row a shot has committed to.
   static const int laneRows = 1;
 
-  /// Half-range of a tap and a full hold, before throw-rank speed.
-  static const double tapRange = 230;
-  static const double fullRange = 960;
+  /// Far edge of the letterboxed yard. Full power from the back line
+  /// reaches this, plus a small margin so the ball center clears it.
+  static const double yardFarEdge = 1280;
+
+  /// A tap dies in the neutral band. Full power is computed so a back-line
+  /// throw reaches [yardFarEdge].
+  static const double tapRange = 250;
+
+  /// Horizontal pace of every player lob. Throw rank may scale it.
+  ///
+  /// This is the pre-lane launch pace (about 900 px/s), not the lane arc
+  /// that crossed the yard near 2000 px/s. More charge adds range, and
+  /// the flight simply lasts longer.
+  static const double playerTravelSpeed = 920;
+
+  /// Loft above the higher of the throw point and the landing lane.
+  /// Kept short so a flat lob can still peak inside the fort footprint.
+  static const double playerLoft = 12;
+
+  /// Where along the range the loft peaks, and where the ball locks onto
+  /// the aimed row. The lock happens in the neutral band on a full throw.
+  static const double playerApexFraction = 0.22;
+  static const double playerSettleFraction = 0.42;
+
+  /// Field of throw measured from horizontal. Straight up becomes 45°.
+  static const double maxAimRadians = math.pi / 4;
+
+  /// Rows a ±45° aim commits, at a tap and at full power.
+  /// A steep tap climbs about one row; a steep full throw climbs several.
+  static const double aimRowsAtTap = 1.2;
+  static const double aimRowsAtFull = 3.5;
+
+  /// One grid step takes this long at the hard walk cap. Columns are the
+  /// longer step, so a column takes [stepSeconds] and a row is a bit less.
+  static const double stepSeconds = 0.12;
+
+  static double get backLineThrowX =>
+      ArenaGrid.playerLeft + ArenaGrid.kidSize * 0.22;
+
+  static double get fullRange {
+    final reach = yardFarEdge - backLineThrowX + 40;
+    if (reach < 980) return 980;
+    return reach;
+  }
 
   /// `z` in `erf(z * u) / erf(z)`. Chosen so one third of the hold (1s of a
   /// 3s charge) lands on half power.
@@ -87,67 +183,208 @@ class ThrowPhysics {
     return bell;
   }
 
-  static double rangeForCharge(double charge, {double speedScale = 1}) {
+  /// Distance a player lob travels. Charge changes this, not the pace.
+  /// Throw-rank speed is applied separately in [planPlayerLob].
+  static double rangeForCharge(double charge) {
     final c = charge.clamp(minThrowCharge, 1.0);
     final t = (c - minThrowCharge) / (1 - minThrowCharge);
-    return (tapRange + (fullRange - tapRange) * t) * speedScale;
+    return tapRange + (fullRange - tapRange) * t;
+  }
+
+  static double _chargePower(double charge) {
+    final c = charge.clamp(minThrowCharge, 1.0);
+    return ((c - minThrowCharge) / (1 - minThrowCharge)).clamp(0.0, 1.0);
   }
 
   static bool inThrowLane(int throwerRow, int targetRow) {
     return (targetRow - throwerRow).abs() <= laneRows;
   }
 
-  /// Peak and landing rows for a player lob. Full power peaks one row up
-  /// (it can sail over a same-row target) and lands on the aimed row.
-  /// A tap lands up to one row below and does not climb a row.
-  static ({int peak, int landing}) rowsForCharge({
+  /// Player hit check. The ball has to be in the aimed band, and its
+  /// current row has to be in that same ±[laneRows] neighborhood.
+  static bool playerCanHit({
+    required int landingRow,
+    required int shotRow,
+    required int targetRow,
+  }) {
+    if ((targetRow - landingRow).abs() > laneRows) return false;
+    if ((targetRow - shotRow).abs() > laneRows) return false;
+    return true;
+  }
+
+  /// Folds [aimDirection] into a forward cone of ±[maxAimRadians].
+  /// Straight up and straight down become the cone edges, still with a
+  /// forward component, so a lob cannot be thrown vertically.
+  static Vector2 clampAimDirection(
+    Vector2 aimDirection, {
+    required bool facingRight,
+  }) {
+    final forward = facingRight ? 1.0 : -1.0;
+    var x = aimDirection.x;
+    var y = aimDirection.y;
+    if (x.abs() < 1e-8 && y.abs() < 1e-8) {
+      return Vector2(forward, 0);
+    }
+    if (x * forward <= 0) {
+      x = forward * (y.abs() < 1e-8 ? 1.0 : y.abs());
+    }
+    var elevation = math.atan2(-y, x.abs());
+    if (elevation > maxAimRadians) elevation = maxAimRadians;
+    if (elevation < -maxAimRadians) elevation = -maxAimRadians;
+    return Vector2(forward * math.cos(elevation), -math.sin(elevation));
+  }
+
+  /// Radians above horizontal after [clampAimDirection]. Positive is up.
+  static double aimElevation(
+    Vector2 aimDirection, {
+    required bool facingRight,
+  }) {
+    final aim = clampAimDirection(aimDirection, facingRight: facingRight);
+    return math.atan2(-aim.y, aim.x.abs());
+  }
+
+  /// Row the player commits to. Steeper aim climbs more rows than a flat
+  /// throw at the same charge. More charge reaches more rows at the same angle.
+  static int committedRow({
     required int throwerRow,
-    required int aimRow,
+    required double elevation,
     required double charge,
   }) {
     final row = throwerRow.clamp(0, ArenaGrid.rows - 1);
-    final c = charge.clamp(0.0, 1.0);
-    final power = ((c - minThrowCharge) / (1 - minThrowCharge)).clamp(0.0, 1.0);
-    var peak = row;
-    if (power >= 0.82 && row > 0) peak = row - 1;
-    final aimDelta = (aimRow - row).clamp(-laneRows, laneRows);
-    var landDelta = aimDelta;
-    if (power < 0.4) {
-      landDelta = (aimDelta + 1).clamp(-laneRows, laneRows);
-    }
-    var landing = row + landDelta;
+    final power = _chargePower(charge);
+    final reach = aimRowsAtTap + (aimRowsAtFull - aimRowsAtTap) * power;
+    final aim01 = (elevation / maxAimRadians).clamp(-1.0, 1.0);
+    final delta = -aim01 * reach;
+    var landing = (row + delta).round();
     if (landing < 0) landing = 0;
     if (landing >= ArenaGrid.rows) landing = ArenaGrid.rows - 1;
-    if (landing < row - laneRows) landing = row - laneRows;
-    if (landing > row + laneRows) landing = row + laneRows;
-    if (peak < row - laneRows) peak = row - laneRows;
-    if (peak > row) peak = row;
-    return (peak: peak, landing: landing);
+    return landing;
   }
 
   static RowLob planPlayerLob({
     required int throwerRow,
     required int throwerColumn,
-    required int aimRow,
+    required Vector2 aimDirection,
     required double charge,
     required bool facingRight,
     double speedScale = 1,
     required double originY,
   }) {
-    final rows = rowsForCharge(
-      throwerRow: throwerRow,
-      aimRow: aimRow,
+    final row = throwerRow.clamp(0, ArenaGrid.rows - 1);
+    final elevation = aimElevation(aimDirection, facingRight: facingRight);
+    final landing = committedRow(
+      throwerRow: row,
+      elevation: elevation,
       charge: charge,
     );
-    return _buildLob(
-      throwerRow: throwerRow,
-      throwerColumn: throwerColumn,
-      peakRow: rows.peak,
-      landingRow: rows.landing,
-      range: rangeForCharge(charge, speedScale: speedScale),
-      facingRight: facingRight,
+    final landingY = ArenaGrid.laneY(landing);
+    final chordHigh = math.min(originY, landingY);
+    final apexY = chordHigh - playerLoft;
+    final rise = originY - apexY;
+    final range = rangeForCharge(charge);
+    final scale = speedScale.clamp(0.2, 3.0);
+    final speed = playerTravelSpeed * scale;
+    final facing = facingRight ? 1.0 : -1.0;
+    final initialVy = playerArcVelocity(
+      facing: facing,
+      speed: speed,
       originY: originY,
+      apexY: apexY,
+      landingY: landingY,
+      u: 0,
+      apexFraction: playerApexFraction,
+      settleFraction: playerSettleFraction,
+      range: range,
+    ).y;
+    var peak = math.min(row, landing);
+    if (_chargePower(charge) >= 0.82 && peak > 0) peak -= 1;
+    return RowLob(
+      velocity: Vector2(facing * speed, initialVy),
+      throwerRow: row,
+      throwerColumn: throwerColumn.clamp(0, ArenaGrid.columnsPerSide - 1),
+      peakRow: peak,
+      landingRow: landing,
+      apexRise: rise < 1 ? 1 : rise,
+      landingDrop: landingY - originY,
+      range: range,
+      scripted: true,
+      travelSpeed: speed,
+      originY: originY,
+      landingY: landingY,
+      apexY: apexY,
+      apexFraction: playerApexFraction,
+      settleFraction: playerSettleFraction,
     );
+  }
+
+  /// Height of a scripted player lob. [u] is distance traveled / range.
+  static double playerArcY({
+    required double originY,
+    required double apexY,
+    required double landingY,
+    required double u,
+    required double apexFraction,
+    required double settleFraction,
+  }) {
+    final uu = u.clamp(0.0, 1.0);
+    if (uu <= apexFraction) {
+      final af = apexFraction <= 1e-6 ? 1.0 : apexFraction;
+      final t = uu / af;
+      final s = 1 - (1 - t) * (1 - t);
+      return originY + (apexY - originY) * s;
+    }
+    if (uu >= settleFraction) return landingY;
+    final span = settleFraction - apexFraction;
+    final t = span <= 1e-6 ? 1.0 : (uu - apexFraction) / span;
+    final s = t * t;
+    return apexY + (landingY - apexY) * s;
+  }
+
+  /// Logical row along a scripted lob. Locked to the landing row once the
+  /// ball has settled, which is before it reaches the enemy half.
+  static int playerArcRow({
+    required int throwerRow,
+    required int landingRow,
+    required double u,
+    required double settleFraction,
+  }) {
+    final uu = u.clamp(0.0, 1.0);
+    if (uu >= settleFraction) return landingRow;
+    final span = settleFraction <= 1e-6 ? 1.0 : settleFraction;
+    final t = uu / span;
+    var row = (throwerRow + (landingRow - throwerRow) * t).round();
+    if (row < 0) return 0;
+    if (row >= ArenaGrid.rows) return ArenaGrid.rows - 1;
+    return row;
+  }
+
+  static Vector2 playerArcVelocity({
+    required double facing,
+    required double speed,
+    required double originY,
+    required double apexY,
+    required double landingY,
+    required double u,
+    required double apexFraction,
+    required double settleFraction,
+    required double range,
+  }) {
+    final duDt = range <= 1 ? 0.0 : speed / range;
+    final uu = u.clamp(0.0, 1.0);
+    double dyDu;
+    if (uu <= apexFraction) {
+      final af = apexFraction <= 1e-6 ? 1.0 : apexFraction;
+      final t = uu / af;
+      dyDu = (apexY - originY) * (2 - 2 * t) / af;
+    } else if (uu >= settleFraction) {
+      dyDu = 0;
+    } else {
+      final span = settleFraction - apexFraction;
+      final safe = span <= 1e-6 ? 1.0 : span;
+      final t = (uu - apexFraction) / safe;
+      dyDu = (landingY - apexY) * (2 * t) / safe;
+    }
+    return Vector2(facing * speed, dyDu * duDt);
   }
 
   /// Enemy lobs land on the target's row when it is in the lane, with a
@@ -356,20 +593,12 @@ class ThrowPhysics {
     return Vector2(speed * math.cos(theta), -speed * math.sin(theta));
   }
 
-  /// Horizontal pace of a full-power lane lob. Kids are capped at this so
-  /// they cannot outrun a snowball. [speedScale] is the throw-rank multiplier.
-  static double kidMoveSpeed({double speedScale = 1}) {
-    final originY = ArenaGrid.laneY(4) - ArenaGrid.kidSize * 0.1;
-    final shot = planPlayerLob(
-      throwerRow: 4,
-      throwerColumn: 0,
-      aimRow: 4,
-      charge: 1,
-      facingRight: true,
-      speedScale: speedScale,
-      originY: originY,
-    );
-    return shot.velocity.x.abs();
+  /// Hard cap on kid walking, in pixels per second.
+  ///
+  /// One column takes [stepSeconds]. Throw rank does not speed this up;
+  /// difficulty applies its own scale on top in the match.
+  static double kidMoveSpeed() {
+    return ArenaGrid.columnStep / stepSeconds;
   }
 
   static double apexRise(Vector2 velocity) {

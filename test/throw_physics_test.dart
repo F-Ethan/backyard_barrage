@@ -104,88 +104,162 @@ void main() {
       );
     });
 
-    test('a lob stays inside the thrower row lane', () {
-      const size = 152.0;
-      final sprite = Vector2.all(size);
-      for (var row = 0; row < ArenaGrid.rows; row++) {
-        final from = ArenaGrid.throwOrigin(
-          KidSide.player,
-          ArenaGrid.cellCenter(KidSide.player, 0, row),
-          sprite,
-        );
-        for (final charge in [1 / 3, 0.5, 1.0]) {
-          for (final aim in [row - 1, row, row + 1]) {
-            final lob = ThrowPhysics.planPlayerLob(
-              throwerRow: row,
-              throwerColumn: 0,
-              aimRow: aim,
-              charge: charge,
-              facingRight: true,
-              originY: from.y,
-            );
-            expect(lob.peakRow, greaterThanOrEqualTo(row - 1));
-            expect(lob.peakRow, lessThanOrEqualTo(row));
-            expect(lob.peakRow, inInclusiveRange(0, ArenaGrid.rows - 1));
-            expect((lob.landingRow - row).abs(), lessThanOrEqualTo(1));
-            expect(lob.landingRow, inInclusiveRange(0, ArenaGrid.rows - 1));
-            _fly(lob, from, (x, y, vy, shotRow) {
-              expect(
-                (shotRow - row).abs(),
-                lessThanOrEqualTo(1),
-                reason: 'row $row charge $charge drifted to $shotRow',
-              );
-            });
-          }
-        }
-      }
+    test('full power reaches the far side without speeding the ball up', () {
+      final from = ArenaGrid.throwOrigin(
+        KidSide.player,
+        ArenaGrid.cellCenter(KidSide.player, 0, 4),
+        Vector2.all(152),
+      );
+      final full = ThrowPhysics.planPlayerLob(
+        throwerRow: 4,
+        throwerColumn: 0,
+        aimDirection: Vector2(1, 0),
+        charge: 1,
+        facingRight: true,
+        originY: from.y,
+      );
+      final tap = ThrowPhysics.planPlayerLob(
+        throwerRow: 4,
+        throwerColumn: 0,
+        aimDirection: Vector2(1, 0),
+        charge: ThrowPhysics.minThrowCharge,
+        facingRight: true,
+        originY: from.y,
+      );
+      expect(full.scripted, isTrue);
+      expect(
+        from.x + full.range,
+        greaterThanOrEqualTo(ThrowPhysics.yardFarEdge),
+      );
+      expect(full.velocity.x, closeTo(ThrowPhysics.playerTravelSpeed, 0.01));
+      expect(tap.velocity.x, closeTo(full.velocity.x, 0.01));
+      expect(tap.range, lessThan(full.range * 0.35));
+      final tapEnd = from.x + tap.range;
+      expect(tapEnd, greaterThan(ArenaGrid.playerRight));
+      expect(tapEnd, lessThan(ArenaGrid.enemyLeft));
     });
 
     test(
-      'full power sails over a same-row target and a tap lands short below',
+      'a steep tap climbs more rows than a flat throw at the same power',
       () {
         final from = ArenaGrid.throwOrigin(
           KidSide.player,
           ArenaGrid.cellCenter(KidSide.player, 1, 4),
           Vector2.all(152),
         );
-        final full = ThrowPhysics.planPlayerLob(
-          throwerRow: 4,
-          throwerColumn: 1,
-          aimRow: 4,
-          charge: 1,
-          facingRight: true,
-          originY: from.y,
-        );
-        expect(full.peakRow, 3);
-        expect(full.landingRow, 4);
-        expect(full.range, greaterThan(800));
-        var sailedOver = false;
-        var cameDown = false;
-        _fly(full, from, (x, y, vy, shotRow) {
-          final along = x - from.x;
-          if (shotRow == 3 &&
-              along > full.range * 0.25 &&
-              along < full.range * 0.8) {
-            sailedOver = true;
-          }
-          if (shotRow == 4 && along > full.range * 0.85) cameDown = true;
-        });
-        expect(sailedOver, isTrue);
-        expect(cameDown, isTrue);
+        RowLob throwAt(Vector2 aim, double charge) {
+          return ThrowPhysics.planPlayerLob(
+            throwerRow: 4,
+            throwerColumn: 1,
+            aimDirection: aim,
+            charge: charge,
+            facingRight: true,
+            originY: from.y,
+          );
+        }
 
-        final tap = ThrowPhysics.planPlayerLob(
-          throwerRow: 4,
-          throwerColumn: 1,
-          aimRow: 4,
-          charge: ThrowPhysics.minThrowCharge,
-          facingRight: true,
-          originY: from.y,
+        final flat = throwAt(Vector2(1, 0), ThrowPhysics.minThrowCharge);
+        final steep = throwAt(Vector2(0, -1), ThrowPhysics.minThrowCharge);
+        final fullFlat = throwAt(Vector2(1, 0), 1);
+        final fullSteep = throwAt(Vector2(0, -1), 1);
+        expect(flat.landingRow, 4);
+        expect(fullFlat.landingRow, 4);
+        expect(steep.landingRow, lessThan(flat.landingRow));
+        expect(fullSteep.landingRow, lessThan(steep.landingRow));
+        expect(steep.velocity.x, closeTo(flat.velocity.x, 0.01));
+        expect(steep.range, closeTo(flat.range, 0.01));
+        expect(steep.rowAt(1), steep.landingRow);
+        expect(
+          ThrowPhysics.playerCanHit(
+            landingRow: steep.landingRow,
+            shotRow: steep.rowAt(1),
+            targetRow: steep.landingRow + 1,
+          ),
+          isTrue,
         );
-        expect(tap.peakRow, 4);
-        expect(tap.landingRow, 5);
-        expect(tap.range, lessThan(full.range * 0.4));
+        expect(
+          ThrowPhysics.playerCanHit(
+            landingRow: steep.landingRow,
+            shotRow: steep.rowAt(1),
+            targetRow: steep.landingRow + 2,
+          ),
+          isFalse,
+        );
+
+        expect(
+          ThrowPhysics.aimElevation(Vector2(0, -1), facingRight: true),
+          closeTo(math.pi / 4, 0.001),
+        );
+        expect(
+          ThrowPhysics.aimElevation(Vector2(0, 1), facingRight: true),
+          closeTo(-math.pi / 4, 0.001),
+        );
+        expect(
+          ThrowPhysics.aimElevation(Vector2(1, 0), facingRight: true).abs(),
+          lessThan(0.001),
+        );
+        expect(
+          ThrowPhysics.aimElevation(Vector2(0.2, -1), facingRight: true),
+          lessThanOrEqualTo(math.pi / 4 + 0.001),
+        );
       },
     );
+
+    test('a player lob keeps its pace and locks onto the aimed row', () {
+      final from = ArenaGrid.throwOrigin(
+        KidSide.player,
+        ArenaGrid.cellCenter(KidSide.player, 0, 4),
+        Vector2.all(152),
+      );
+      final lob = ThrowPhysics.planPlayerLob(
+        throwerRow: 4,
+        throwerColumn: 0,
+        aimDirection: Vector2(1, -0.35),
+        charge: 1,
+        facingRight: true,
+        originY: from.y,
+      );
+      expect(
+        lob.velocity.x.abs(),
+        closeTo(ThrowPhysics.playerTravelSpeed, 0.01),
+      );
+      var previousX = from.x;
+      for (var i = 1; i <= 20; i++) {
+        final u = i / 20.0;
+        final x = from.x + lob.range * u;
+        final y = lob.yAt(u);
+        final row = lob.rowAt(u);
+        expect(x, greaterThan(previousX));
+        expect(y, inInclusiveRange(1, 719));
+        final low = math.min(4, lob.landingRow);
+        final high = math.max(4, lob.landingRow);
+        expect(row, inInclusiveRange(low, high));
+        if (u >= lob.settleFraction) {
+          expect(row, lob.landingRow);
+          expect(y, closeTo(lob.landingY, 0.01));
+        }
+        previousX = x;
+      }
+    });
+
+    test('enemy lobs stay on the fast ballistic lane', () {
+      final enemy = ThrowPhysics.planEnemyLob(
+        throwerRow: 4,
+        throwerColumn: 2,
+        targetRow: 4,
+        distance: 720,
+        rangeScale: 1,
+        facingRight: false,
+        originY: ArenaGrid.laneY(4),
+      );
+      expect(enemy.scripted, isFalse);
+      expect(enemy.landingRow, 4);
+      expect((enemy.peakRow - 4).abs(), lessThanOrEqualTo(1));
+      expect(
+        enemy.velocity.x.abs(),
+        greaterThan(ThrowPhysics.playerTravelSpeed * 1.2),
+      );
+    });
 
     test('fort shots clear only at the peak and friendly damage is opt-in', () {
       expect(
@@ -264,16 +338,12 @@ void main() {
           final lob = ThrowPhysics.planPlayerLob(
             throwerRow: 4,
             throwerColumn: 0,
-            aimRow: 4,
+            aimDirection: Vector2(1, 0),
             charge: charge,
             facingRight: true,
             originY: from.y,
           );
-          return ThrowPhysics.apexX(
-            originX: from.x,
-            velocity: lob.velocity,
-            launchVy: lob.velocity.y,
-          );
+          return lob.apexWorldX(from.x);
         }
 
         final tapApex = apexFor(ThrowPhysics.minThrowCharge);
@@ -295,20 +365,28 @@ void main() {
       expect(shot.x, greaterThan(shot.y.abs()));
     });
 
-    test('kid move speed stays at or under projectile speed', () {
-      final shot = ThrowPhysics.planPlayerLob(
+    test('walk cap is one column per step and stays under throw pace', () {
+      final pace = ThrowPhysics.kidMoveSpeed();
+      expect(
+        pace,
+        closeTo(ArenaGrid.columnStep / ThrowPhysics.stepSeconds, 0.01),
+      );
+      expect(pace, lessThan(ThrowPhysics.playerTravelSpeed));
+      expect(pace, greaterThan(200));
+      final ranked = ThrowPhysics.planPlayerLob(
         throwerRow: 4,
         throwerColumn: 0,
-        aimRow: 4,
+        aimDirection: Vector2(1, 0),
         charge: 1,
         facingRight: true,
         speedScale: 1.35,
-        originY: ArenaGrid.laneY(4) - ArenaGrid.kidSize * 0.1,
+        originY: ArenaGrid.laneY(4),
       );
-      final pace = ThrowPhysics.kidMoveSpeed(speedScale: 1.35);
-      expect(pace, lessThanOrEqualTo(shot.velocity.length + 0.001));
-      expect(pace, closeTo(shot.velocity.x.abs(), 0.001));
-      expect(pace, greaterThan(200));
+      expect(
+        ranked.velocity.x.abs(),
+        closeTo(ThrowPhysics.playerTravelSpeed * 1.35, 0.01),
+      );
+      expect(ranked.range, closeTo(ThrowPhysics.fullRange, 0.01));
     });
 
     test('speedScale multiplies launch speed', () {
@@ -324,33 +402,4 @@ void main() {
       expect(fast.length, closeTo(slow.length * 2, 0.001));
     });
   });
-}
-
-void _fly(
-  RowLob lob,
-  Vector2 from,
-  void Function(double x, double y, double vy, int row) sample,
-) {
-  var x = from.x;
-  var y = from.y;
-  var vy = lob.velocity.y;
-  final vx = lob.velocity.x;
-  const dt = 1 / 120;
-  for (var i = 0; i < 120 * 4; i++) {
-    vy += ThrowPhysics.gravity * dt;
-    x += vx * dt;
-    y += vy * dt;
-    final row = ThrowPhysics.lobRow(
-      throwerRow: lob.throwerRow,
-      peakRow: lob.peakRow,
-      landingRow: lob.landingRow,
-      originY: from.y,
-      apexRise: lob.apexRise,
-      landingDrop: lob.landingDrop,
-      y: y,
-      vy: vy,
-    );
-    sample(x, y, vy, row);
-    if ((x - from.x).abs() > lob.range + 20) return;
-  }
 }

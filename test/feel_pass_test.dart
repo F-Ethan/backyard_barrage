@@ -2,6 +2,7 @@ import 'package:backyard_barrage/app.dart';
 import 'package:backyard_barrage/audio/game_audio.dart';
 import 'package:backyard_barrage/feel/feel_bus.dart';
 import 'package:backyard_barrage/feel/game_haptics.dart';
+import 'package:backyard_barrage/meta/difficulty.dart';
 import 'package:backyard_barrage/meta/game_settings.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
 import 'package:backyard_barrage/meta/settings_store.dart';
@@ -49,6 +50,7 @@ void main() {
     expect(loaded.musicEnabled, isTrue);
     expect(loaded.hapticsEnabled, isTrue);
     expect(loaded.modernUi, isTrue);
+    expect(loaded.difficulty, Difficulty.normal);
   });
 
   test('haptics no-op when disabled and fire when enabled', () async {
@@ -250,5 +252,51 @@ void main() {
       find.byKey(const Key('ui-style-toggle')),
     );
     expect(toggle.value, isFalse);
+  });
+
+  testWidgets('difficulty persists beside the other settings', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final store = SaveStore(preferences: prefs);
+    final settings = SettingsStore(preferences: prefs);
+    FeelBus feel() => FeelBus(
+      audio: GameAudio(playback: RecordingPlayback()),
+      haptics: GameHaptics(pulse: RecordingPulse()),
+    );
+
+    await tester.pumpWidget(
+      BackyardBarrageApp(
+        saveStore: store,
+        settingsStore: settings,
+        feel: feel(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('menu-settings')));
+    await tester.pump();
+    expect(find.byKey(const Key('difficulty-normal')), findsOneWidget);
+    expect(find.byKey(const Key('difficulty-easy')), findsOneWidget);
+    expect(find.byKey(const Key('difficulty-hard')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('difficulty-hard')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
+    expect((await settings.load()).difficulty, Difficulty.hard);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(
+      BackyardBarrageApp(
+        saveStore: store,
+        settingsStore: settings,
+        feel: feel(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('menu-settings')));
+    await tester.pump();
+    expect((await settings.load()).difficulty, Difficulty.hard);
+    expect(find.byKey(const Key('ui-style-toggle')), findsOneWidget);
   });
 }

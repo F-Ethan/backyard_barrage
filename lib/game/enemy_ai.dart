@@ -2,7 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flame/extensions.dart';
 
-/// Target pick, sidestep, and aim jitter for the backyard rivals.
+import '../meta/difficulty.dart';
+
+/// Target pick, grid step, and aim scatter for the backyard rivals.
 class EnemyAi {
   const EnemyAi._();
 
@@ -15,31 +17,47 @@ class EnemyAi {
     return options[rng.nextInt(options.length)];
   }
 
-  /// Row-biased grid step. Most nudges change row; columns are rarer.
-  static ({int column, int row}) gridNudge(math.Random rng) {
-    final roll = rng.nextDouble();
-    if (roll < 0.12) return (column: 0, row: 0);
-    if (roll < 0.72) {
-      final sign = rng.nextBool() ? 1 : -1;
-      final row = rng.nextDouble() < 0.35 ? sign * 2 : sign;
-      return (column: 0, row: row);
+  /// Prefer a living kid inside the thrower's ±1 row lane.
+  static int? pickLaneTarget(
+    List<bool> living,
+    List<int> rows,
+    int throwerRow,
+    math.Random rng,
+  ) {
+    final inLane = <int>[];
+    for (var i = 0; i < living.length; i++) {
+      if (!living[i]) continue;
+      final row = i < rows.length ? rows[i] : throwerRow;
+      if ((row - throwerRow).abs() <= 1) inLane.add(i);
     }
-    final column = rng.nextBool() ? 1 : -1;
-    final row = rng.nextDouble() < 0.55 ? (rng.nextBool() ? 1 : -1) : 0;
-    return (column: column, row: row);
+    if (inLane.isNotEmpty) return inLane[rng.nextInt(inLane.length)];
+    return pickLivingIndex(living, rng);
   }
 
-  /// Horizontal sidestep in pixels, or 0 when the rival holds still.
-  static double sidestep(
-    math.Random rng, {
-    double chance = 0.45,
-    double minDistance = 36,
-    double maxDistance = 90,
-  }) {
-    if (rng.nextDouble() > chance) return 0;
-    final distance =
-        minDistance + rng.nextDouble() * (maxDistance - minDistance);
-    return rng.nextBool() ? distance : -distance;
+  /// Seconds until the next throw, inside the difficulty's band.
+  static double throwGap(math.Random rng, DifficultyTuning tuning) {
+    return tuning.throwGap(rng.nextDouble());
+  }
+
+  /// One step after every [throwsPerStep] throws. The first throw does not
+  /// step. [throwsCompleted] is how many lobs have already left the hand.
+  static bool shouldGridStep(int throwsCompleted, int throwsPerStep) {
+    if (throwsPerStep <= 1) return true;
+    return throwsCompleted > 0 && throwsCompleted % throwsPerStep == 0;
+  }
+
+  /// A single orthogonal cell: one row or one column, never both, never two.
+  static ({int column, int row}) gridStep(math.Random rng) {
+    if (rng.nextBool()) {
+      return (column: 0, row: rng.nextBool() ? 1 : -1);
+    }
+    return (column: rng.nextBool() ? 1 : -1, row: 0);
+  }
+
+  /// Multiplier on throw distance. Higher [radians] (early waves) miss more.
+  static double rangeScatter(math.Random rng, double radians) {
+    final span = radians.clamp(0.0, 0.45);
+    return 1 + (rng.nextDouble() * 2 - 1) * span;
   }
 
   /// Unit aim vector rotated by at most [radians] in either direction.

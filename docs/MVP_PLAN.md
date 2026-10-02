@@ -51,6 +51,8 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | Player starts with | 1 kid |
 | Hits to KO | 2 |
 | Throw | Right-thumb Throw button: hold to charge, release to lob |
+| Charge | Tap ≈ 1/3 power, ~1s ≈ 1/2, ~3s full. Half-bell ease toward max |
+| Throw lane | Peak at most one row above the thrower; landing at most one row below |
 | Active thrower | One kid charging at a time |
 | Enemy count | Starts ~2–3, scales by wave |
 | Win | All enemies KO’d |
@@ -58,15 +60,15 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 
 ### 3.3 Controls (touch, landscape)
 - Left thumb: select a kid and drag to move on your half of the grid. While Throw is held, the same thumb aims. Aim does not have to start on the kid.
-- Right thumb: Throw button. Hold to charge (the bar fills slower the longer you hold), release to lob.
+- Right thumb: Throw button. Hold to charge (half-bell: a tap is about 1/3, ~1s is half, ~3s is full), release to lob. Aim stays within one row of the thrower.
 - Each side stays on its own half. The middle band is neutral.
 - Lock orientation: landscape left/right only  
 
 ### 3.4 AI (simple)
-- Target random living player kid  
-- Charge with jittered aim  
-- Occasional sidestep  
-- Per-wave: slightly faster charge / better accuracy  
+- Target a living player kid in the thrower's row lane when one is there
+- Throw about every 1.5–3s on Normal (slower on Easy, about 1–1.5s on Hard)
+- One grid step every few throws (less often on Easy, more often on Hard)
+- Per-wave: slightly shorter gaps and tighter landing scatter  
 
 ### 3.5 Upgrades (between waves)
 Spend soft currency earned from wins:

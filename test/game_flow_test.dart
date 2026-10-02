@@ -242,16 +242,17 @@ void main() {
     expect(find.byKey(const Key('throw-button')), findsOneWidget);
     expect(find.byKey(const Key('power-bar')), findsOneWidget);
     expect(
-      find.text('Left thumb moves and aims  ·  hold Throw'),
+      find.text('Left thumb moves and aims one row  ·  hold Throw'),
       findsOneWidget,
     );
 
     game.pressThrowButton();
-    game.update(0.08);
-    final early = game.charge;
-    expect(early, greaterThan(0));
-    game.update(0.35);
-    expect(game.charge, greaterThan(early));
+    game.update(0.12);
+    expect(game.charge, closeTo(1 / 3, 0.04));
+    game.update(0.9);
+    expect(game.charge, closeTo(0.5, 0.06));
+    game.update(2);
+    expect(game.charge, greaterThan(0.98));
     game.releaseThrowButton();
     expect(game.charge, 0);
   });
@@ -446,14 +447,17 @@ void _expectFullBackyard(BackyardBarrageGame game) {
   expect(visible.inflate(1).contains(fort.bottomRight), isTrue);
 
   final kid = game.players.first;
-  final velocity = ThrowPhysics.launchVelocity(
+  final cell = ArenaGrid.nearestCell(kid.side, kid.position);
+  final lob = ThrowPhysics.planPlayerLob(
+    throwerRow: cell.row,
+    throwerColumn: cell.column,
+    aimRow: cell.row,
     charge: 1,
-    aimDirection: Vector2(1, -0.9),
+    facingRight: true,
     speedScale: CombatRules.projectileSpeedScale(game.meta.throwRank),
+    originY: kid.throwOrigin.y,
   );
-  final apexY =
-      kid.throwOrigin.y -
-      (velocity.y * velocity.y) / (2 * ThrowPhysics.gravity);
+  final apexY = kid.throwOrigin.y - lob.apexRise;
   expect(apexY, greaterThan(visible.top));
   expect(apexY, lessThan(kid.throwOrigin.y));
   expect(visible.contains(Offset(kid.throwOrigin.x, apexY)), isTrue);

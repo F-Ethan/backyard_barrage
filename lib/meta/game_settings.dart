@@ -1,10 +1,13 @@
-/// SFX, music, haptics, and which UI kit is on screen. Stored beside the meta save.
+import 'difficulty.dart';
+
+/// SFX, music, haptics, UI kit, and difficulty. Stored beside the meta save.
 class GameSettings {
   const GameSettings({
     this.sfxEnabled = true,
     this.musicEnabled = true,
     this.hapticsEnabled = true,
     this.modernUi = true,
+    this.difficulty = Difficulty.normal,
   });
 
   final bool sfxEnabled;
@@ -14,17 +17,22 @@ class GameSettings {
   /// Modern kit when true, classic wood kit when false. Missing saves stay modern.
   final bool modernUi;
 
+  /// Missing saves stay on Normal.
+  final Difficulty difficulty;
+
   GameSettings copyWith({
     bool? sfxEnabled,
     bool? musicEnabled,
     bool? hapticsEnabled,
     bool? modernUi,
+    Difficulty? difficulty,
   }) {
     return GameSettings(
       sfxEnabled: sfxEnabled ?? this.sfxEnabled,
       musicEnabled: musicEnabled ?? this.musicEnabled,
       hapticsEnabled: hapticsEnabled ?? this.hapticsEnabled,
       modernUi: modernUi ?? this.modernUi,
+      difficulty: difficulty ?? this.difficulty,
     );
   }
 
@@ -33,6 +41,7 @@ class GameSettings {
     'music': musicEnabled,
     'haptics': hapticsEnabled,
     'modernUi': modernUi,
+    'difficulty': difficulty.name,
   };
 
   factory GameSettings.fromJson(Map<String, dynamic> json) {
@@ -41,6 +50,7 @@ class GameSettings {
       musicEnabled: _asBool(json['music']),
       hapticsEnabled: _asBool(json['haptics']),
       modernUi: _asBool(json['modernUi']),
+      difficulty: DifficultyTuning.parse(json['difficulty']),
     );
   }
 

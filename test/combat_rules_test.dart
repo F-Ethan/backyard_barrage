@@ -18,11 +18,12 @@ void main() {
     });
 
     test('throw rank shortens charge and raises lob speed', () {
-      expect(CombatRules.playerChargeSeconds(0), 0.85);
+      expect(CombatRules.playerChargeSeconds(0), 3);
       expect(
         CombatRules.playerChargeSeconds(5),
         lessThan(CombatRules.playerChargeSeconds(0)),
       );
+      expect(CombatRules.playerChargeSeconds(5), greaterThanOrEqualTo(1.7));
       expect(CombatRules.projectileSpeedScale(0), 1);
       expect(
         CombatRules.projectileSpeedScale(5),
@@ -30,17 +31,12 @@ void main() {
       );
     });
 
-    test('later waves charge faster and aim tighter', () {
-      expect(
-        CombatRules.enemyChargeSeconds(4),
-        lessThan(CombatRules.enemyChargeSeconds(1)),
-      );
+    test('later waves aim tighter', () {
       expect(
         CombatRules.enemyAimJitterRadians(4),
         lessThan(CombatRules.enemyAimJitterRadians(1)),
       );
       expect(CombatRules.enemyAimJitterRadians(20), 0.08);
-      expect(CombatRules.enemyChargeSeconds(20), 0.55);
     });
 
     test('round ends when one side is gone', () {

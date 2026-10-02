@@ -10,6 +10,7 @@ import 'kid_component.dart';
 /// stays and the cover is gone until the next wave.
 class FortComponent extends SpriteComponent {
   FortComponent({
+    required this.side,
     required Sprite sprite,
     required Vector2 position,
     required Vector2 size,
@@ -21,6 +22,7 @@ class FortComponent extends SpriteComponent {
          priority: 12,
        );
 
+  final KidSide side;
   int stage = 1;
   int maxHp = 1;
   int hp = 1;
@@ -33,6 +35,9 @@ class FortComponent extends SpriteComponent {
   bool get showingDamage => hp > 0 && hp < maxHp;
 
   bool get isCollapsed => hp <= 0;
+
+  /// The two cover cells this fort occupies. Shots meet the fort here.
+  Rect get footprint => ArenaGrid.fortFootprint(side);
 
   Rect get hitRect => CombatRules.fortHitRect(
     stage: stage,
@@ -65,8 +70,8 @@ class FortComponent extends SpriteComponent {
   /// True when [kid] is standing on one of the two cover cells and the fort
   /// is still up.
   bool shelters(KidComponent kid) {
-    if (hp <= 0 || kid.isKo || kid.side != KidSide.player) return false;
-    final cell = ArenaGrid.nearestCell(KidSide.player, kid.position);
+    if (hp <= 0 || kid.isKo || kid.side != side) return false;
+    final cell = ArenaGrid.nearestCell(kid.side, kid.position);
     return ArenaGrid.isCoverCell(cell.column, cell.row);
   }
 

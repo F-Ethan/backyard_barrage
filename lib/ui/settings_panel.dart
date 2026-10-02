@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../feel/feel_bus.dart';
+import '../meta/difficulty.dart';
 import '../meta/game_settings.dart';
 import 'barrage_colors.dart';
 import 'draft_button.dart';
@@ -108,9 +109,15 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                             onChanged: (value) =>
                                 _set(_settings.copyWith(modernUi: value)),
                           ),
+                          const SizedBox(height: 8),
+                          _DifficultyPicker(
+                            value: _settings.difficulty,
+                            onChanged: (value) =>
+                                _set(_settings.copyWith(difficulty: value)),
+                          ),
                           const SizedBox(height: 6),
                           const Text(
-                            'Sound, music, and haptics for this device. Modern UI is the new kit; turn it off for the classic wood look.',
+                            'Sound, music, and haptics for this device. Modern UI is the new kit; turn it off for the classic wood look. Difficulty changes how often rivals throw and whether your own lobs can chip your fort.',
                             textAlign: TextAlign.center,
                             style: BarrageType.muted,
                           ),
@@ -203,6 +210,93 @@ class _ClassicSwitch extends StatelessWidget {
           decoration: BoxDecoration(
             color: on ? cream : ink,
             shape: BoxShape.circle,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DifficultyPicker extends StatelessWidget {
+  const _DifficultyPicker({required this.value, required this.onChanged});
+
+  final Difficulty value;
+  final ValueChanged<Difficulty> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final kit = UiKitScope.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Difficulty', style: BarrageType.body),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            for (final mode in Difficulty.values)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: _DifficultyChip(
+                    key: Key('difficulty-${mode.name}'),
+                    label: switch (mode) {
+                      Difficulty.easy => 'Easy',
+                      Difficulty.normal => 'Normal',
+                      Difficulty.hard => 'Hard',
+                    },
+                    selected: value == mode,
+                    ink: kit.ink,
+                    cream: kit.cream,
+                    onTap: () => onChanged(mode),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _DifficultyChip extends StatelessWidget {
+  const _DifficultyChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.ink,
+    required this.cream,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final Color ink;
+  final Color cream;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? ink : cream,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: ink, width: 3),
+          ),
+          child: Text(
+            label,
+            style: BarrageType.body.copyWith(
+              color: selected ? cream : ink,
+              fontSize: 15,
+            ),
           ),
         ),
       ),

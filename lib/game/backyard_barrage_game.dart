@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
 import '../feel/feel_bus.dart';
+import '../meta/difficulty.dart';
 import '../meta/game_settings.dart';
 import '../meta/meta_state.dart';
 import '../meta/save_store.dart';
@@ -57,7 +58,6 @@ class BackyardBarrageGame extends FlameGame {
   /// rectangle onto the device so phones do not crop it 1:1.
   static const double worldWidth = 1280;
   static const double worldHeight = 720;
-  static const double _kidSize = 152;
 
   final MetaState meta;
   final VoidCallback? onExitToMenu;
@@ -74,6 +74,7 @@ class BackyardBarrageGame extends FlameGame {
   final List<KidComponent> enemies = [];
 
   late FortComponent fort;
+  late FortComponent enemyFort;
   late ChargeIndicator chargeHud;
   late SeasonKit _kit;
   late SpriteComponent _bg;
@@ -167,11 +168,19 @@ class BackyardBarrageGame extends FlameGame {
     world.add(_bg);
 
     fort = FortComponent(
+      side: KidSide.player,
       sprite: _fortIntact[meta.fortStage]!,
       position: ArenaGrid.fortAnchor(),
       size: Vector2(270, 300),
     );
     world.add(fort);
+    enemyFort = FortComponent(
+      side: KidSide.enemy,
+      sprite: _fortIntact[1]!,
+      position: ArenaGrid.fortAnchor(KidSide.enemy),
+      size: Vector2(270, 300),
+    );
+    world.add(enemyFort);
 
     chargeHud = ChargeIndicator(glowSprite: glow);
     world.add(chargeHud);
@@ -260,14 +269,20 @@ class BackyardBarrageGame extends FlameGame {
       final kid = _makeKid(KidSide.enemy, i);
       enemies.add(kid);
       world.add(kid);
+      final profile = _tuning();
+      final gap = profile.throwGap(_rng.nextDouble());
+      final stagger = (gap * (0.75 + i * 0.1)).clamp(
+        profile.throwGapMin,
+        profile.throwGapMax,
+      );
       kid.add(
         EnemyController(
           host: kid,
           players: players,
           wave: wave,
           rng: _rng,
-          moveSpeed: ThrowPhysics.kidMoveSpeed(),
-          initialDelay: 0.35 + i * 0.5 + _rng.nextDouble() * 0.35,
+          tuning: _tuning,
+          initialDelay: stagger,
           onFire: _onEnemyFire,
           isFighting: () => phase == MatchPhase.fight,
         ),
@@ -278,6 +293,12 @@ class BackyardBarrageGame extends FlameGame {
       nextStage: meta.fortStage,
       intactSprite: _fortIntact[meta.fortStage]!,
       damagedSprite: _fortDamaged[meta.fortStage]!,
+      collapsedSprite: _fortCollapsed!,
+    );
+    enemyFort.applyStage(
+      nextStage: 1,
+      intactSprite: _fortIntact[1]!,
+      damagedSprite: _fortDamaged[1]!,
       collapsedSprite: _fortCollapsed!,
     );
     _publishHud();
@@ -310,7 +331,7 @@ class BackyardBarrageGame extends FlameGame {
       side: side,
       poses: player ? _kit.playerPoses : _kit.enemyPoses,
       position: ArenaGrid.slot(side, slot),
-      size: Vector2.all(_kidSize),
+      size: Vector2.all(ArenaGrid.kidSize),
       maxHp: CombatRules.hitsToKo,
     );
   }
@@ -447,19 +468,33 @@ class BackyardBarrageGame extends FlameGame {
     _banner = null;
   }
 
-  void _onEnemyFire(KidComponent enemy, Vector2 aim, double charge) {
+  DifficultyTuning _tuning() =>
+      DifficultyTuning.of(feel.settings.difficulty, wave: wave);
+
+  void _onEnemyFire(
+    KidComponent enemy,
+    KidComponent? target,
+    double rangeScale,
+  ) {
     if (phase != MatchPhase.fight || enemy.isKo) return;
     feel.enemyReleased();
-    final velocity = ThrowPhysics.launchVelocity(
-      charge: charge,
-      aimDirection: aim,
+    final cell = ArenaGrid.nearestCell(KidSide.enemy, enemy.position);
+    final targetRow = target == null
+        ? cell.row
+        : ArenaGrid.nearestCell(target.side, target.position).row;
+    final distance = target == null
+        ? 640.0
+        : (enemy.throwOrigin.x - target.hitCenter.x).abs();
+    final lob = ThrowPhysics.planEnemyLob(
+      throwerRow: cell.row,
+      throwerColumn: cell.column,
+      targetRow: targetRow,
+      distance: distance,
+      rangeScale: rangeScale,
+      facingRight: false,
+      originY: enemy.throwOrigin.y,
     );
-    _spawnShot(
-      owner: enemy,
-      velocity: velocity,
-      targets: players,
-      blockedByFort: true,
-    );
+    _spawnShot(owner: enemy, lob: lob, targets: players);
   }
 
   /// Right-thumb Throw button. Hold to charge; the left thumb aims.
@@ -472,7 +507,7 @@ class BackyardBarrageGame extends FlameGame {
     _setSelected(kid);
     _charging = true;
     _chargeHeld = 0;
-    _charge = 0;
+    _charge = ThrowPhysics.minThrowCharge;
     _moveTarget = null;
     _moving = false;
     kid.setWalking(false);
@@ -489,7 +524,10 @@ class BackyardBarrageGame extends FlameGame {
 
   void _releaseThrow() {
     final kid = _selected;
-    final charge = _charge < 0.15 ? 0.15 : (_charge > 1 ? 1.0 : _charge);
+    final charge = ThrowPhysics.chargeForHold(
+      _chargeHeld,
+      CombatRules.playerChargeSeconds(meta.throwRank),
+    );
     _charging = false;
     _chargeHeld = 0;
     _charge = 0;
@@ -499,41 +537,44 @@ class BackyardBarrageGame extends FlameGame {
       kid?.clearChargePose();
       return;
     }
-    final scale = CombatRules.projectileSpeedScale(meta.throwRank);
-    final speed = ThrowPhysics.speedForCharge(charge, speedScale: scale);
-    final from = kid.throwOrigin;
-    final velocity =
-        ThrowPhysics.launchToward(from: from, to: _aimTarget, speed: speed) ??
-        ThrowPhysics.launchVelocity(
-          charge: charge,
-          aimDirection: _aimTarget - from,
-          speedScale: scale,
-        );
+    final cell = ArenaGrid.nearestCell(KidSide.player, kid.position);
+    _clampAimLane();
+    final lob = ThrowPhysics.planPlayerLob(
+      throwerRow: cell.row,
+      throwerColumn: cell.column,
+      aimRow: _aimRow(cell.row),
+      charge: charge,
+      facingRight: true,
+      speedScale: CombatRules.projectileSpeedScale(meta.throwRank),
+      originY: kid.throwOrigin.y,
+    );
     kid.showThrowPose();
     feel.playerReleased();
-    _spawnShot(
-      owner: kid,
-      velocity: velocity,
-      targets: enemies,
-      blockedByFort: false,
-    );
+    _spawnShot(owner: kid, lob: lob, targets: enemies);
   }
 
   void _spawnShot({
     required KidComponent owner,
-    required Vector2 velocity,
+    required RowLob lob,
     required List<KidComponent> targets,
-    required bool blockedByFort,
   }) {
     world.add(
       LobProjectile(
         sprite: _kit.projectile,
         position: owner.throwOrigin.clone(),
-        velocity: velocity,
+        velocity: lob.velocity.clone(),
         targets: targets,
         owner: owner,
-        blockedByFort: blockedByFort,
-        fort: blockedByFort ? fort : null,
+        blockedByFort: true,
+        forts: [fort, enemyFort],
+        friendlyFortDamage: _tuning().friendlyFortDamage,
+        throwerRow: lob.throwerRow,
+        throwerColumn: lob.throwerColumn,
+        peakRow: lob.peakRow,
+        landingRow: lob.landingRow,
+        apexRise: lob.apexRise,
+        landingDrop: lob.landingDrop,
+        launchVy: lob.velocity.y,
         onHit: _onKidHit,
         onFortHit: _onFortHit,
       ),
@@ -558,7 +599,8 @@ class BackyardBarrageGame extends FlameGame {
     _burst(shot.position);
     feel.impact(meta.season);
     if (phase != MatchPhase.fight) return;
-    fort.takeHit();
+    final cover = shot.struckFort;
+    if (shot.fortDamage && cover != null) cover.takeHit();
   }
 
   void _burst(Vector2 at) {
@@ -600,10 +642,8 @@ class BackyardBarrageGame extends FlameGame {
       if (delta.length < 8) return;
       _aimAdjusted = true;
       final nudged = _aimStickOrigin + Vector2(delta.x * 1.2, delta.y * 1.35);
-      _aimTarget = ArenaGrid.clampToRect(
-        ArenaGrid.aimField(KidSide.enemy),
-        nudged,
-      );
+      _aimTarget = nudged;
+      _clampAimLane();
       _syncChargeHud();
       return;
     }
@@ -629,16 +669,61 @@ class BackyardBarrageGame extends FlameGame {
 
   void _aimAtNearest() {
     final kid = _selected;
-    final target = kid == null
-        ? null
-        : _nearestLiving(enemies, kid.throwOrigin);
-    final fallback =
-        ArenaGrid.cellCenter(KidSide.enemy, 1, 3) + Vector2(0, -68);
-    _aimTarget = ArenaGrid.clampToRect(
-      ArenaGrid.aimField(KidSide.enemy),
-      target?.hitCenter.clone() ?? fallback,
+    if (kid == null) return;
+    final row = ArenaGrid.nearestCell(kid.side, kid.position).row;
+    KidComponent? target;
+    var best = double.infinity;
+    for (final enemy in enemies) {
+      if (enemy.isKo) continue;
+      final enemyRow = ArenaGrid.nearestCell(enemy.side, enemy.position).row;
+      if (!ThrowPhysics.inThrowLane(row, enemyRow)) continue;
+      final distance = enemy.hitCenter.distanceToSquared(kid.throwOrigin);
+      if (distance < best) {
+        best = distance;
+        target = enemy;
+      }
+    }
+    target ??= _nearestLiving(enemies, kid.throwOrigin);
+    final fallback = ArenaGrid.cellCenter(
+      KidSide.enemy,
+      1,
+      row.clamp(0, ArenaGrid.rows - 1),
     );
+    _aimTarget = target?.hitCenter.clone() ?? fallback.clone();
+    _clampAimLane();
     _aimStickOrigin = _aimTarget.clone();
+  }
+
+  int _aimRow(int throwerRow) {
+    final aimed = ArenaGrid.rowForLaneY(_aimTarget.y);
+    var row = aimed;
+    if (row < throwerRow - ThrowPhysics.laneRows) {
+      row = throwerRow - ThrowPhysics.laneRows;
+    }
+    if (row > throwerRow + ThrowPhysics.laneRows) {
+      row = throwerRow + ThrowPhysics.laneRows;
+    }
+    if (row < 0) return 0;
+    if (row >= ArenaGrid.rows) return ArenaGrid.rows - 1;
+    return row;
+  }
+
+  void _clampAimLane() {
+    final kid = _selected;
+    if (kid == null) return;
+    final row = ArenaGrid.nearestCell(kid.side, kid.position).row;
+    final minRow = row <= 0 ? 0 : row - 1;
+    final maxRow = row >= ArenaGrid.rows - 1 ? ArenaGrid.rows - 1 : row + 1;
+    final top = ArenaGrid.laneY(minRow);
+    final bottom = ArenaGrid.laneY(maxRow);
+    final field = ArenaGrid.field(KidSide.enemy);
+    var x = _aimTarget.x;
+    var y = _aimTarget.y;
+    if (x < field.left) x = field.left;
+    if (x > field.right) x = field.right;
+    if (y < top) y = top;
+    if (y > bottom) y = bottom;
+    _aimTarget = Vector2(x, y);
   }
 
   void _syncChargeHud() {
@@ -666,9 +751,11 @@ class BackyardBarrageGame extends FlameGame {
     final target = _moveTarget;
     if (kid == null || target == null || kid.isKo || _charging) return;
     if (phase != MatchPhase.fight) return;
-    final speed = ThrowPhysics.kidMoveSpeed(
-      speedScale: CombatRules.projectileSpeedScale(meta.throwRank),
-    );
+    final speed =
+        ThrowPhysics.kidMoveSpeed(
+          speedScale: CombatRules.projectileSpeedScale(meta.throwRank),
+        ) *
+        _tuning().playerMoveScale;
     final delta = target - kid.position;
     final distance = delta.length;
     final step = speed * dt;

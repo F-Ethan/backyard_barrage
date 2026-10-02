@@ -188,11 +188,11 @@ void main() {
 
         expect(
           ThrowPhysics.aimElevation(Vector2(0, -1), facingRight: true),
-          closeTo(math.pi / 4, 0.001),
+          closeTo(ThrowPhysics.maxAimRadians, 0.001),
         );
         expect(
           ThrowPhysics.aimElevation(Vector2(0, 1), facingRight: true),
-          closeTo(-math.pi / 4, 0.001),
+          closeTo(-ThrowPhysics.maxAimRadians, 0.001),
         );
         expect(
           ThrowPhysics.aimElevation(Vector2(1, 0), facingRight: true).abs(),
@@ -200,8 +200,17 @@ void main() {
         );
         expect(
           ThrowPhysics.aimElevation(Vector2(0.2, -1), facingRight: true),
-          lessThanOrEqualTo(math.pi / 4 + 0.001),
+          lessThanOrEqualTo(ThrowPhysics.maxAimRadians + 0.001),
         );
+        expect(ThrowPhysics.maxAimRadians, closeTo(20 * math.pi / 180, 1e-9));
+        final aim01 =
+            ThrowPhysics.maxAimRadians / ThrowPhysics.aimRowScaleRadians;
+        expect(aim01, lessThan(0.5));
+        expect(
+          (4 - fullSteep.landingRow).abs(),
+          lessThanOrEqualTo((ThrowPhysics.aimRowsAtFull * aim01).ceil()),
+        );
+        expect((4 - fullSteep.landingRow).abs(), lessThan(3));
       },
     );
 
@@ -411,6 +420,88 @@ void main() {
         closeTo(ThrowPhysics.playerTravelSpeed * 1.35, 0.01),
       );
       expect(ranked.range, closeTo(ThrowPhysics.fullRange, 0.01));
+    });
+
+    test('a drawn lob arches in the open and meets the hit path at contact', () {
+      final from = ArenaGrid.throwOrigin(
+        KidSide.player,
+        ArenaGrid.cellCenter(KidSide.player, 0, 4),
+        Vector2.all(152),
+      );
+      final lob = ThrowPhysics.planPlayerLob(
+        throwerRow: 4,
+        throwerColumn: 0,
+        aimDirection: Vector2(1, 0),
+        charge: 1,
+        facingRight: true,
+        originY: from.y,
+      );
+      double collisionAt(double x) {
+        final u = ((x - from.x) / lob.range).clamp(0.0, 1.0);
+        return lob.yAt(u);
+      }
+
+      double visualAt(double x) {
+        return ThrowPhysics.flightVisualY(
+          collisionY: collisionAt(x),
+          worldX: x,
+          originX: from.x,
+          originY: from.y,
+          range: lob.range,
+          facingRight: true,
+          behindFort: true,
+          scripted: true,
+          apexY: lob.apexY,
+          landingY: lob.landingY,
+          apexFraction: lob.apexFraction,
+          settleFraction: lob.settleFraction,
+        );
+      }
+
+      final fort = ArenaGrid.fortFootprint(KidSide.player);
+      final fortX = (fort.left + fort.right) / 2;
+      expect(visualAt(fortX), closeTo(collisionAt(fortX), 0.01));
+      expect(visualAt(from.x), closeTo(collisionAt(from.x), 0.01));
+
+      final mid = (from.x + ArenaGrid.enemyLeft) / 2;
+      expect(visualAt(mid), lessThan(collisionAt(mid) - 36));
+
+      final contactX = ArenaGrid.enemyLeft + 8;
+      expect(visualAt(contactX), closeTo(collisionAt(contactX), 0.01));
+      expect(visualAt(from.x + lob.range), closeTo(lob.landingY, 0.01));
+    });
+
+    test('an enemy lob arches across the yard and is back on the hit path', () {
+      final originX = ArenaGrid.columnX(KidSide.enemy, 3) - 20;
+      final originY = ArenaGrid.laneY(4);
+      const range = 780.0;
+      double visualAt(double x) {
+        return ThrowPhysics.flightVisualY(
+          collisionY: originY,
+          worldX: x,
+          originX: originX,
+          originY: originY,
+          range: range,
+          facingRight: false,
+          behindFort: true,
+          scripted: false,
+        );
+      }
+
+      final open = (originX + ArenaGrid.playerRight) / 2;
+      expect(visualAt(open), lessThan(originY - 24));
+      expect(
+        visualAt(ArenaGrid.playerRight - 12),
+        closeTo(originY, 0.01),
+      );
+      expect(visualAt(originX), closeTo(originY, 0.01));
+    });
+
+    test('a miss lands on that row’s feet, not the bottom of the screen', () {
+      final ground = ThrowPhysics.impactGroundY(4);
+      expect(ground, greaterThan(ArenaGrid.laneY(4)));
+      expect(ground, lessThan(ArenaGrid.rowY(4)));
+      expect(ground, lessThan(700));
     });
 
     test('speedScale multiplies launch speed', () {

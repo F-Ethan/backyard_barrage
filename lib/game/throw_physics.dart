@@ -131,13 +131,21 @@ class ThrowPhysics {
   static const double playerApexFraction = 0.22;
   static const double playerSettleFraction = 0.42;
 
-  /// Field of throw measured from horizontal. Straight up becomes 45°.
-  static const double maxAimRadians = math.pi / 4;
+  /// Player stick cone, measured from horizontal. A full stick is ±20°.
+  ///
+  /// Rival shots do not use this cone. Their scatter stays on the
+  /// difficulty profile (`CombatRules.enemyAimJitterRadians`).
+  static const double maxAimRadians = 20 * math.pi / 180;
 
-  /// Rows a ±45° aim commits, at a tap and at full power.
-  /// A steep tap climbs about one row; a steep full throw climbs several.
+  /// Rows a stick used to commit when the cone was ±45°.
+  /// [committedRow] still scales by [aimRowScaleRadians], so the tighter
+  /// ±20° cone reaches about 20/45 of these and a steep throw swings fewer lanes.
   static const double aimRowsAtTap = 1.2;
   static const double aimRowsAtFull = 3.5;
+
+  /// Full-scale reference for lane swing. Elevation is divided by this,
+  /// not by [maxAimRadians], so shrinking the cone shrinks the row reach.
+  static const double aimRowScaleRadians = math.pi / 4;
 
   /// One grid step takes this long at the hard walk cap. Ten times the old
   /// 120ms cadence, so a column is about 1.2 seconds. A row is a shorter
@@ -253,7 +261,7 @@ class ThrowPhysics {
     final row = throwerRow.clamp(0, ArenaGrid.rows - 1);
     final power = _chargePower(charge);
     final reach = aimRowsAtTap + (aimRowsAtFull - aimRowsAtTap) * power;
-    final aim01 = (elevation / maxAimRadians).clamp(-1.0, 1.0);
+    final aim01 = (elevation / aimRowScaleRadians).clamp(-1.0, 1.0);
     final delta = -aim01 * reach;
     var landing = (row + delta).round();
     if (landing < 0) landing = 0;
@@ -356,6 +364,168 @@ class ThrowPhysics {
     if (row < 0) return 0;
     if (row >= ArenaGrid.rows) return ArenaGrid.rows - 1;
     return row;
+  }
+
+  /// Backyard floor on [landingRow]: just above that row's feet.
+  /// A miss splats here. It stays on that row's ground, not the screen bottom,
+  /// so a back-row lob does not fall to the front of the 3/4 yard.
+  static double impactGroundY(int landingRow) {
+    final row = landingRow.clamp(0, ArenaGrid.rows - 1);
+    return ArenaGrid.rowY(row) - 16;
+  }
+
+  /// Drawn flight height. [collisionY] is the hit path.
+  ///
+  /// In the open yard the sprite follows a smooth lob from the hand toward
+  /// the same landing the hit path commits to. Over a fort still ahead of
+  /// the thrower, and once the ball reaches the target half, the drawn Y
+  /// matches [collisionY] so splats line up with contact.
+  static double flightVisualY({
+    required double collisionY,
+    required double worldX,
+    required double originX,
+    required double originY,
+    required double range,
+    required bool facingRight,
+    required bool behindFort,
+    required bool scripted,
+    double apexY = 0,
+    double landingY = 0,
+    double apexFraction = 0.22,
+    double settleFraction = 0.42,
+  }) {
+    if (range < 1) return collisionY;
+    final dir = facingRight ? 1.0 : -1.0;
+    final endX = _flightVisualEndX(
+      originX: originX,
+      range: range,
+      facingRight: facingRight,
+    );
+    final span = (endX - originX) * dir;
+    if (span < 36) return collisionY;
+    final along = (worldX - originX) * dir;
+    if (along <= 0 || along >= span) return collisionY;
+
+    final t = along / span;
+    final shaped = scripted
+        ? _scriptedVisualY(
+            t: t,
+            span: span,
+            originY: originY,
+            endX: endX,
+            originX: originX,
+            range: range,
+            facingRight: facingRight,
+            apexY: apexY,
+            landingY: landingY,
+            apexFraction: apexFraction,
+            settleFraction: settleFraction,
+          )
+        : collisionY - _visualHump(t, span);
+
+    final lock = _fortVisualLock(
+      worldX: worldX,
+      facingRight: facingRight,
+      behindFort: behindFort,
+    );
+    if (lock >= 1) return collisionY;
+    if (lock <= 0) return shaped;
+    return collisionY + (shaped - collisionY) * (1 - lock);
+  }
+
+  /// Where the drawn lob has to be back on the hit path: the planned
+  /// landing, or just before the other side's half, whichever is closer.
+  static double _flightVisualEndX({
+    required double originX,
+    required double range,
+    required bool facingRight,
+  }) {
+    final dir = facingRight ? 1.0 : -1.0;
+    final landingX = originX + dir * range;
+    final approachX = facingRight
+        ? ArenaGrid.enemyLeft - 48
+        : ArenaGrid.playerRight + 48;
+    if ((approachX - originX) * dir > 36) {
+      return facingRight
+          ? math.min(landingX, approachX)
+          : math.max(landingX, approachX);
+    }
+    return landingX;
+  }
+
+  static double _scriptedVisualY({
+    required double t,
+    required double span,
+    required double originY,
+    required double endX,
+    required double originX,
+    required double range,
+    required bool facingRight,
+    required double apexY,
+    required double landingY,
+    required double apexFraction,
+    required double settleFraction,
+  }) {
+    final dir = facingRight ? 1.0 : -1.0;
+    final uEnd = ((endX - originX) * dir / range).clamp(0.0, 1.0);
+    final yEnd = playerArcY(
+      originY: originY,
+      apexY: apexY,
+      landingY: landingY,
+      u: uEnd,
+      apexFraction: apexFraction,
+      settleFraction: settleFraction,
+    );
+    final s = t * t * (3 - 2 * t);
+    final chord = originY + (yEnd - originY) * s;
+    final y = chord - _visualHump(t, span);
+    if (y < 28) return 28;
+    return y;
+  }
+
+  /// Smooth hump: zero height and zero slope at both ends of the lob
+  /// so it leaves the hand and joins the hit path without a corner.
+  static double _visualHump(double t, double span) {
+    final loft = (span.abs() * 0.22).clamp(40.0, 120.0);
+    final s = math.sin(math.pi * t);
+    return loft * s * s;
+  }
+
+  /// 1 while a shot from behind a fort is still over that fort, easing to 0
+  /// just after it clears so the sprite can rise into the lob.
+  static double _fortVisualLock({
+    required double worldX,
+    required bool facingRight,
+    required bool behindFort,
+  }) {
+    if (!behindFort) return 0;
+    final edges = _fortHorizontalEdges(playerSide: facingRight);
+    final clearX = facingRight ? edges.$2 + 12 : edges.$1 - 12;
+    final dir = facingRight ? 1.0 : -1.0;
+    final past = (worldX - clearX) * dir;
+    if (past <= 0) return 1;
+    const blend = 72.0;
+    if (past >= blend) return 0;
+    final u = past / blend;
+    final smooth = u * u * (3 - 2 * u);
+    return 1 - smooth;
+  }
+
+  /// Horizontal fort footprint. Matches [ArenaGrid.fortFootprint] on X.
+  /// Row does not move those edges. Kept here so throw math does not import
+  /// the kid component (that import would cycle through combat rules).
+  static (double, double) _fortHorizontalEdges({required bool playerSide}) {
+    final leftEdge = playerSide ? ArenaGrid.playerLeft : ArenaGrid.enemyLeft;
+    final rightEdge = playerSide ? ArenaGrid.playerRight : ArenaGrid.enemyRight;
+    final step = ArenaGrid.columnStep;
+    double x(int column) {
+      final t = column / (ArenaGrid.columnsPerSide - 1);
+      return leftEdge + (rightEdge - leftEdge) * t;
+    }
+
+    final a = x(ArenaGrid.coverColumnA);
+    final b = x(ArenaGrid.coverColumnB);
+    return (math.min(a, b) - step * 0.42, math.max(a, b) + step * 0.42);
   }
 
   static Vector2 playerArcVelocity({

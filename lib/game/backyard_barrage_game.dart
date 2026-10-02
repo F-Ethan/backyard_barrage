@@ -621,6 +621,7 @@ class BackyardBarrageGame extends FlameGame {
         apexY: lob.apexY,
         onHit: _onKidHit,
         onFortHit: _onFortHit,
+        onGround: _onGroundMiss,
       ),
     );
   }
@@ -646,6 +647,11 @@ class BackyardBarrageGame extends FlameGame {
     if (phase != MatchPhase.fight) return;
     final cover = shot.struckFort;
     if (shot.fortDamage && cover != null) cover.takeHit();
+  }
+
+  void _onGroundMiss(LobProjectile shot) {
+    _burst(shot.position);
+    feel.impact(meta.season);
   }
 
   void _burst(Vector2 at) {

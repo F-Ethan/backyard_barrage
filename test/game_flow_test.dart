@@ -255,6 +255,9 @@ void main() {
   testWidgets('fight HUD stays screen-sized on a short phone', (tester) async {
     await _useSurface(tester, const Size(844, 390));
     final game = (await boot(tester, MetaState(coins: 40, crewSize: 3))).game;
+    await tester.pump();
+    expect(game.phase, MatchPhase.fight);
+    expect(game.overlays.isActive('hud'), isTrue);
     expect(find.byKey(const Key('pause-button')), findsOneWidget);
     expect(find.byKey(const Key('hud-crew')), findsOneWidget);
     expect(find.byKey(const Key('hud-fort')), findsOneWidget);

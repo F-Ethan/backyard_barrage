@@ -139,9 +139,10 @@ class ThrowPhysics {
   static const double aimRowsAtTap = 1.2;
   static const double aimRowsAtFull = 3.5;
 
-  /// One grid step takes this long at the hard walk cap. Columns are the
-  /// longer step, so a column takes [stepSeconds] and a row is a bit less.
-  static const double stepSeconds = 0.12;
+  /// One grid step takes this long at the hard walk cap. Ten times the old
+  /// 120ms cadence, so a column is about 1.2 seconds. A row is a shorter
+  /// distance at the same speed, so it finishes a little sooner.
+  static const double stepSeconds = 1.2;
 
   static double get backLineThrowX =>
       ArenaGrid.playerLeft + ArenaGrid.kidSize * 0.22;
@@ -200,16 +201,15 @@ class ThrowPhysics {
     return (targetRow - throwerRow).abs() <= laneRows;
   }
 
-  /// Player hit check. The ball has to be in the aimed band, and its
-  /// current row has to be in that same ±[laneRows] neighborhood.
+  /// Player hit check. The throw still commits to a lane, but the kid has
+  /// to be standing on the ball's current row. One step off that path misses.
   static bool playerCanHit({
     required int landingRow,
     required int shotRow,
     required int targetRow,
   }) {
     if ((targetRow - landingRow).abs() > laneRows) return false;
-    if ((targetRow - shotRow).abs() > laneRows) return false;
-    return true;
+    return targetRow == shotRow;
   }
 
   /// Folds [aimDirection] into a forward cone of ±[maxAimRadians].
@@ -531,17 +531,19 @@ class ThrowPhysics {
     return originX + velocity.x * tApex;
   }
 
-  /// Fort vs snowball. Peak shots clear. Shots from behind your own fort
-  /// are blocked without damage unless [friendlyDamage] is on. Opponent
-  /// shots that are not at the peak damage the fort.
+  /// Fort vs snowball. Peak shots clear. A collapsed fort does not block
+  /// either direction. Shots from behind your own standing fort are blocked
+  /// without damage unless [friendlyDamage] is on. Opponent shots that are
+  /// not at the peak damage a standing fort.
   static FortShotResult resolveFortShot({
     required bool overlaps,
     required bool atPeak,
     required bool sameSide,
     required bool throwerBehind,
     required bool friendlyDamage,
+    bool collapsed = false,
   }) {
-    if (!overlaps || atPeak) return FortShotResult.none;
+    if (!overlaps || atPeak || collapsed) return FortShotResult.none;
     if (sameSide && !throwerBehind) return FortShotResult.none;
     if (sameSide) {
       return friendlyDamage ? FortShotResult.damaged : FortShotResult.blocked;

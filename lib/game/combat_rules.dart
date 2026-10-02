@@ -4,11 +4,41 @@ import 'throw_physics.dart';
 
 enum RoundOutcome { ongoing, waveClear, defeat }
 
+/// What one hit does to a kid who is still in the fight.
+class HitResolution {
+  const HitResolution({
+    required this.hp,
+    required this.lockSeconds,
+    required this.fragile,
+    required this.knockdown,
+    required this.knockedOut,
+  });
+
+  final int hp;
+  final double lockSeconds;
+  final bool fragile;
+
+  /// Enemy second hit: slumped, then back on their feet.
+  final bool knockdown;
+  final bool knockedOut;
+}
+
 /// Wave size, fort cover, and upgrade scaling. Pure so tests can lock it.
 class CombatRules {
   const CombatRules._();
 
-  static const int hitsToKo = 2;
+  /// Snowballs to put a rival down for good. An ally can go out sooner if
+  /// they are hit again while the first hit's stun is still up.
+  static const int hitsToKo = 3;
+
+  /// Enemy hit 1. A short flinch; they cannot throw through it.
+  static const double enemyBrushOffSeconds = 1;
+
+  /// Enemy hit 2. Down, then back up. Longer than the brush-off, not a KO.
+  static const double enemyKnockdownSeconds = 1.8;
+
+  /// Ally hit 1. Cannot move or throw. A hit during this window KOs.
+  static const double allyStunSeconds = 7.5;
 
   static int enemyCountForWave(int wave) {
     if (wave <= 1) return 2;
@@ -54,6 +84,75 @@ class CombatRules {
     if (livingPlayers <= 0) return RoundOutcome.defeat;
     if (livingEnemies <= 0) return RoundOutcome.waveClear;
     return RoundOutcome.ongoing;
+  }
+
+  /// One snowball.
+  ///
+  /// Rivals always take [hitsToKo] hits: a brief brush-off, a knockdown
+  /// they get up from, then out. Allies lock up for [allyStunSeconds] on a
+  /// hit that does not finish them; another hit while that stun (or the
+  /// fragile flag it sets) is up knocks them out.
+  static HitResolution resolveHit({
+    required bool ally,
+    required int hp,
+    required int maxHp,
+    required bool stunned,
+    required bool fragile,
+  }) {
+    if (hp <= 0) {
+      return const HitResolution(
+        hp: 0,
+        lockSeconds: 0,
+        fragile: false,
+        knockdown: false,
+        knockedOut: true,
+      );
+    }
+    if (ally && (stunned || fragile)) {
+      return const HitResolution(
+        hp: 0,
+        lockSeconds: 0,
+        fragile: false,
+        knockdown: false,
+        knockedOut: true,
+      );
+    }
+    final next = hp - 1;
+    if (next <= 0) {
+      return const HitResolution(
+        hp: 0,
+        lockSeconds: 0,
+        fragile: false,
+        knockdown: false,
+        knockedOut: true,
+      );
+    }
+    if (ally) {
+      return HitResolution(
+        hp: next,
+        lockSeconds: allyStunSeconds,
+        fragile: true,
+        knockdown: false,
+        knockedOut: false,
+      );
+    }
+    final firstHit = next >= maxHp - 1;
+    if (firstHit) {
+      return HitResolution(
+        hp: next,
+        lockSeconds: enemyBrushOffSeconds,
+        fragile: false,
+        knockdown: false,
+        knockedOut: false,
+      );
+    }
+    return HitResolution(
+      hp: next,
+      lockSeconds: enemyKnockdownSeconds,
+      fragile: false,
+      knockdown: true,
+      knockedOut: false,
+    );
   }
 
   /// Enemy lobs that overlap the fort are absorbed while it has HP.

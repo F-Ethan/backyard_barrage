@@ -8,6 +8,7 @@ import 'package:backyard_barrage/feel/game_haptics.dart';
 import 'package:backyard_barrage/game/arena_grid.dart';
 import 'package:backyard_barrage/game/backyard_barrage_game.dart';
 import 'package:backyard_barrage/game/combat_rules.dart';
+import 'package:backyard_barrage/game/components/fort_component.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
 import 'package:backyard_barrage/game/components/lob_projectile.dart';
 import 'package:backyard_barrage/game/throw_physics.dart';
@@ -129,6 +130,19 @@ void main() {
     expect(kid.sprite, kid.walkSprite);
     kid.showChargePose();
     expect(kid.sprite, kid.chargeSprite);
+    expect(
+      game.fort.coverRow,
+      inInclusiveRange(ArenaGrid.fortRowMin, ArenaGrid.fortRowMax),
+    );
+    expect(
+      game.enemyFort.coverRow,
+      inInclusiveRange(ArenaGrid.fortRowMin, ArenaGrid.fortRowMax),
+    );
+    kid.position = ArenaGrid.cellCenter(
+      KidSide.player,
+      ArenaGrid.coverColumnA,
+      game.fort.coverRow,
+    );
     expect(game.fort.shelters(kid), isTrue);
     expect(game.players[1].sprite, isNot(game.players[1].pickupSprite));
     expect(game.fort.shelters(game.players[1]), isFalse);
@@ -139,10 +153,7 @@ void main() {
   ) async {
     final game = (await boot(tester, MetaState())).game;
 
-    for (final enemy in game.enemies) {
-      enemy.takeHit();
-      enemy.takeHit();
-    }
+    knockOut(game.enemies);
     game.resolveKnockouts();
     expect(game.phase, MatchPhase.clearing);
     expect(game.meta.coins, MetaState.coinsForWave(1));
@@ -188,10 +199,7 @@ void main() {
 
   testWidgets('pause freezes the clear timer until resume', (tester) async {
     final game = (await boot(tester, MetaState())).game;
-    for (final enemy in game.enemies) {
-      enemy.takeHit();
-      enemy.takeHit();
-    }
+    knockOut(game.enemies);
     game.resolveKnockouts();
     expect(game.phase, MatchPhase.clearing);
 
@@ -221,10 +229,7 @@ void main() {
   ) async {
     final booted = await boot(tester, MetaState(coins: 40));
     final game = booted.game;
-    for (final enemy in game.enemies) {
-      enemy.takeHit();
-      enemy.takeHit();
-    }
+    knockOut(game.enemies);
     game.resolveKnockouts();
     game.update(0.7);
     game.update(0.6);
@@ -249,7 +254,9 @@ void main() {
     expect(find.byKey(const Key('move-stick')), findsOneWidget);
     expect(find.byKey(const Key('power-bar')), findsNothing);
     expect(
-      find.text('Left thumb aims and steps  ·  right thumb charges'),
+      find.text(
+        'Hold a kid or right stick to charge  ·  drag or left thumb aims',
+      ),
       findsOneWidget,
     );
 
@@ -272,7 +279,7 @@ void main() {
     expect(game.charge, 0);
   });
 
-  testWidgets('kids step one cell at a time and ignore distant taps', (
+  testWidgets('left stick steps one slow cell and distant taps do not', (
     tester,
   ) async {
     final game = (await boot(tester, MetaState(crewSize: 2))).game;
@@ -281,15 +288,13 @@ void main() {
     final far = Vector2(700, 400);
     game.debugPointerDown(far);
     game.debugPointerMove(far + Vector2(0, -180));
-    for (var i = 0; i < 20; i++) {
-      game.update(0.05);
-    }
+    game.update(0.5);
+    game.debugPointerUp();
+    expect(game.isCharging, isFalse);
     expect(kid.position.x, closeTo(start.x, 0.5));
     expect(kid.position.y, closeTo(start.y, 0.5));
-    game.debugPointerUp();
 
-    game.debugPointerDown(kid.hitCenter);
-    game.debugPointerMove(kid.hitCenter + Vector2(0, -180));
+    game.setMoveStick(const Offset(36, 0));
     game.update(0.05);
     final cap = ThrowPhysics.kidMoveSpeed() * 0.05 + 1.5;
     expect(start.distanceTo(kid.position), greaterThan(0));
@@ -301,21 +306,130 @@ void main() {
       lessThanOrEqualTo(ArenaGrid.columnStep + 1.5),
     );
 
-    for (var i = 0; i < 40; i++) {
-      game.update(0.05);
-    }
-    expect(kid.position.y, lessThan(start.y - 10));
+    final beforeLong = kid.position.clone();
+    game.update(2);
+    expect(
+      (kid.position.x - beforeLong.x).abs(),
+      lessThanOrEqualTo(ArenaGrid.columnStep + 1),
+    );
+    expect(kid.position.x, greaterThan(start.x + 10));
     expect(kid.position.x, lessThanOrEqualTo(ArenaGrid.playerRight + 0.1));
     expect(ArenaGrid.inNeutral(kid.position.x), isFalse);
+    game.clearMoveStick();
 
     final held = kid.position.clone();
     game.pressThrowButton();
-    game.debugPointerDown(Vector2(180, 500));
-    game.debugPointerMove(Vector2(420, 300));
-    game.update(0.2);
+    game.update(0.3);
+    expect(game.isCharging, isTrue);
     expect(kid.position.x, closeTo(held.x, 0.5));
     expect(kid.position.y, closeTo(held.y, 0.5));
     game.releaseThrowButton();
+    expect(game.charge, 0);
+  });
+
+  testWidgets('holding the selected kid charges, drag aims, release throws', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    final kid = game.players.first;
+    final start = kid.position.clone();
+    final row = ArenaGrid.nearestCell(KidSide.player, start).row;
+
+    game.debugPointerDown(kid.hitCenter);
+    expect(game.isCharging, isTrue);
+    game.debugPointerMove(kid.throwOrigin + Vector2(30, -220));
+    game.update(0.2);
+    expect(kid.position.x, closeTo(start.x, 0.5));
+    expect(kid.position.y, closeTo(start.y, 0.5));
+    expect(game.charge, greaterThan(0.3));
+    expect(game.charge, lessThan(0.5));
+    game.debugPointerUp();
+    expect(game.isCharging, isFalse);
+    expect(game.charge, 0);
+    game.update(0);
+
+    final lob = game.world.children.whereType<LobProjectile>().single;
+    expect(lob.landingRow, lessThan(row));
+
+    game.pressThrowButton();
+    game.setMoveStick(const Offset(4, -36));
+    game.releaseThrowButton();
+    game.clearMoveStick();
+    game.update(0);
+    final aimed = game.world.children.whereType<LobProjectile>().last;
+    expect(aimed.landingRow, lessThan(row));
+  });
+
+  testWidgets('rivals take three hits; an ally stun can end on the next hit', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState(crewSize: 2))).game;
+    final enemy = game.enemies.first;
+    enemy.takeHit();
+    expect(enemy.isKo, isFalse);
+    expect(enemy.isDown, isFalse);
+    expect(enemy.isStunned, isTrue);
+    expect(
+      enemy.stunRemaining,
+      closeTo(CombatRules.enemyBrushOffSeconds, 0.001),
+    );
+    expect(enemy.sprite, enemy.hitSprite);
+    game.update(CombatRules.enemyBrushOffSeconds + 0.05);
+    expect(enemy.isStunned, isFalse);
+    expect(enemy.hp, 2);
+
+    enemy.takeHit();
+    expect(enemy.isKo, isFalse);
+    expect(enemy.isDown, isTrue);
+    expect(enemy.sprite, enemy.koSprite);
+    expect(enemy.paint.colorFilter, isNull);
+    expect(
+      enemy.stunRemaining,
+      closeTo(CombatRules.enemyKnockdownSeconds, 0.001),
+    );
+    game.update(CombatRules.enemyKnockdownSeconds + 0.05);
+    expect(enemy.isDown, isFalse);
+    expect(enemy.isStunned, isFalse);
+    expect(enemy.isKo, isFalse);
+    expect(enemy.sprite, isNot(enemy.koSprite));
+
+    enemy.takeHit();
+    expect(enemy.isKo, isTrue);
+    expect(enemy.sprite, enemy.koSprite);
+    expect(enemy.paint.colorFilter, KidComponent.knockoutFilter);
+
+    final ally = game.players[1];
+    ally.takeHit();
+    expect(ally.isKo, isFalse);
+    expect(ally.isFragile, isTrue);
+    expect(ally.stunRemaining, inInclusiveRange(7, 8));
+    ally.takeHit();
+    expect(ally.isKo, isTrue);
+
+    final lead = game.players.first;
+    lead.takeHit();
+    expect(lead.isKo, isFalse);
+    expect(lead.isFragile, isTrue);
+    game.debugPointerDown(lead.hitCenter);
+    game.debugPointerUp();
+    expect(game.selectedKid, lead);
+    expect(game.isCharging, isFalse);
+    final pos = lead.position.clone();
+    game.setMoveStick(const Offset(36, 0));
+    game.pressThrowButton();
+    expect(game.isCharging, isFalse);
+    game.update(0.4);
+    expect(lead.position.x, closeTo(pos.x, 0.5));
+    game.clearMoveStick();
+
+    lead.update(CombatRules.allyStunSeconds);
+    expect(lead.isStunned, isFalse);
+    expect(lead.isFragile, isFalse);
+    expect(lead.hp, CombatRules.hitsToKo - 1);
+    lead.takeHit();
+    expect(lead.isKo, isFalse);
+    expect(lead.isFragile, isTrue);
+    expect(lead.hp, 1);
   });
 
   testWidgets('a KO kid is greyed out and a living fort shelters cover', (
@@ -332,6 +446,11 @@ void main() {
     expect(game.selectedKid, isNot(down));
 
     final cover = game.players.first;
+    cover.position = ArenaGrid.cellCenter(
+      KidSide.player,
+      ArenaGrid.coverColumnA,
+      game.fort.coverRow,
+    );
     expect(game.fort.shelters(cover), isTrue);
     final before = game.fort.hp;
     var hitKid = false;
@@ -360,6 +479,76 @@ void main() {
     }
     expect(game.fort.isCollapsed, isTrue);
     expect(game.fort.shelters(cover), isFalse);
+
+    expect(
+      _shotStopped(
+        cover: game.fort,
+        owner: cover,
+        velocity: Vector2(500, 0),
+        throwerColumn: 0,
+      ),
+      isFalse,
+    );
+    final rival = game.enemies.first;
+    expect(
+      _shotStopped(
+        cover: game.fort,
+        owner: rival,
+        velocity: Vector2(-500, 0),
+        throwerColumn: 3,
+      ),
+      isFalse,
+    );
+    while (game.enemyFort.hp > 0) {
+      game.enemyFort.takeHit();
+    }
+    expect(
+      _shotStopped(
+        cover: game.enemyFort,
+        owner: cover,
+        velocity: Vector2(500, 0),
+        throwerColumn: 0,
+      ),
+      isFalse,
+    );
+  });
+
+  testWidgets('a standing fort still blocks and a collapsed one does not', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    final kid = game.players.first;
+    expect(
+      _shotStopped(
+        cover: game.fort,
+        owner: kid,
+        velocity: Vector2(500, 0),
+        throwerColumn: 0,
+      ),
+      isTrue,
+    );
+    while (game.fort.hp > 0) {
+      game.fort.takeHit();
+    }
+    expect(game.fort.isCollapsed, isTrue);
+    expect(
+      _shotStopped(
+        cover: game.fort,
+        owner: kid,
+        velocity: Vector2(500, 0),
+        throwerColumn: 0,
+      ),
+      isFalse,
+    );
+    expect(
+      _shotStopped(
+        cover: game.fort,
+        owner: game.enemies.first,
+        velocity: Vector2(-500, 0),
+        throwerColumn: 3,
+      ),
+      isFalse,
+    );
   });
 
   testWidgets('a wide phone fits the full backyard instead of cropping it', (
@@ -430,6 +619,44 @@ void main() {
     expect(game.camera.viewport.size.x, closeTo(1280, 1));
     expect(game.camera.viewport.size.y, closeTo(720, 1));
   });
+}
+
+void knockOut(Iterable<KidComponent> kids) {
+  for (final kid in kids) {
+    var guard = 0;
+    while (!kid.isKo && guard < 8) {
+      kid.takeHit();
+      guard += 1;
+    }
+    expect(kid.isKo, isTrue);
+  }
+}
+
+bool _shotStopped({
+  required FortComponent cover,
+  required KidComponent owner,
+  required Vector2 velocity,
+  required int throwerColumn,
+}) {
+  final box = cover.footprint;
+  final y = (box.top + box.bottom) / 2;
+  final startX = velocity.x < 0 ? box.right + 8 : box.left - 8;
+  var stopped = false;
+  LobProjectile(
+    sprite: owner.sprite!,
+    position: Vector2(startX, y),
+    velocity: velocity.clone(),
+    targets: <KidComponent>[],
+    owner: owner,
+    blockedByFort: true,
+    forts: [cover],
+    throwerColumn: throwerColumn,
+    throwerRow: cover.coverRow,
+    landingRow: cover.coverRow,
+    onHit: (_, _) {},
+    onFortHit: (_) => stopped = true,
+  ).update(0.08);
+  return stopped;
 }
 
 Future<void> _useSurface(WidgetTester tester, Size size) async {

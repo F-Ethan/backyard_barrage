@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 
+import '../combat_rules.dart';
+
 enum KidSide { player, enemy }
 
 /// One season's pose sheet for a kid.
@@ -95,10 +97,27 @@ class KidComponent extends SpriteComponent {
   }
 
   bool get isKo => hp <= 0;
-  bool get isFlinching => _hitPoseTimer > 0;
+
+  /// Cannot move or throw. Brush-off, knockdown, and the ally stun all count.
+  bool get isStunned => _stunTimer > 0;
+
+  bool get isFlinching => isStunned;
+
+  /// Set on an ally's first hit. Cleared when the stun ends. A hit while
+  /// this is set knocks them out.
+  bool get isFragile => _fragile;
+
+  /// Enemy second hit: the KO pose, then they stand back up.
+  bool get isDown => _downTimer > 0;
+
+  double get stunRemaining => _stunTimer;
 
   double _throwPoseTimer = 0;
   double _hitPoseTimer = 0;
+  double _stunTimer = 0;
+  double _downTimer = 0;
+  double _downDuration = 1;
+  bool _fragile = false;
   bool _chargingPose = false;
   bool _walking = false;
 
@@ -145,7 +164,14 @@ class KidComponent extends SpriteComponent {
 
   void takeHit() {
     if (isKo) return;
-    hp = (hp - 1).clamp(0, maxHp);
+    final result = CombatRules.resolveHit(
+      ally: side == KidSide.player,
+      hp: hp,
+      maxHp: maxHp,
+      stunned: isStunned,
+      fragile: _fragile,
+    );
+    hp = result.hp;
     _chargingPose = false;
     _walking = false;
     _throwPoseTimer = 0;
@@ -155,11 +181,19 @@ class KidComponent extends SpriteComponent {
         OpacityEffect.to(1.0, EffectController(duration: 0.12)),
       ]),
     );
-    if (isKo) {
+    if (result.knockedOut) {
+      _stunTimer = 0;
+      _downTimer = 0;
+      _fragile = false;
+      _hitPoseTimer = 0;
       _applyKoLook();
       return;
     }
-    _hitPoseTimer = 0.35;
+    _fragile = result.fragile;
+    _stunTimer = result.lockSeconds;
+    _downDuration = result.lockSeconds <= 0 ? 1 : result.lockSeconds;
+    _downTimer = result.knockdown ? result.lockSeconds : 0;
+    _hitPoseTimer = result.knockdown ? 0 : result.lockSeconds;
     _refreshSprite();
   }
 
@@ -169,6 +203,9 @@ class KidComponent extends SpriteComponent {
     _walking = false;
     _throwPoseTimer = 0;
     _hitPoseTimer = 0;
+    _stunTimer = 0;
+    _downTimer = 0;
+    _fragile = false;
     _selected = false;
     paint.colorFilter = null;
     for (final effect in children.whereType<Effect>().toList()) {
@@ -189,7 +226,7 @@ class KidComponent extends SpriteComponent {
   }
 
   void _refreshSprite() {
-    if (isKo) {
+    if (isKo || _downTimer > 0) {
       sprite = koSprite;
       return;
     }
@@ -226,6 +263,21 @@ class KidComponent extends SpriteComponent {
   void update(double dt) {
     super.update(dt);
     var refresh = false;
+    if (_stunTimer > 0) {
+      _stunTimer -= dt;
+      if (_stunTimer <= 0) {
+        _stunTimer = 0;
+        _fragile = false;
+        refresh = true;
+      }
+    }
+    if (_downTimer > 0) {
+      _downTimer -= dt;
+      if (_downTimer <= 0) {
+        _downTimer = 0;
+        refresh = true;
+      }
+    }
     if (_hitPoseTimer > 0) {
       _hitPoseTimer -= dt;
       if (_hitPoseTimer <= 0) refresh = true;
@@ -241,30 +293,20 @@ class KidComponent extends SpriteComponent {
   void render(Canvas canvas) {
     canvas.save();
     if (isKo) {
-      canvas.translate(0, 22);
+      canvas.translate(0, 40);
+    } else if (_downTimer > 0 && _downDuration > 0) {
+      final t = (_downTimer / _downDuration).clamp(0.0, 1.0);
+      final down = t > 0.35 ? 30.0 : 30.0 * (t / 0.35);
+      canvas.translate(0, down);
     }
     super.render(canvas);
     if (isKo) {
-      final mark = Paint()
-        ..color = const Color(0xFF2C3E50)
-        ..strokeWidth = 7
-        ..strokeCap = StrokeCap.round;
-      final center = Offset(size.x / 2, size.y * 0.38);
-      const arm = 18.0;
-      canvas.drawLine(
-        center.translate(-arm, -arm),
-        center.translate(arm, arm),
-        mark,
-      );
-      canvas.drawLine(
-        center.translate(arm, -arm),
-        center.translate(-arm, arm),
-        mark,
-      );
+      _drawKnockoutMark(canvas);
       canvas.restore();
       return;
     }
     canvas.restore();
+    if (isStunned && _downTimer <= 0) _drawDizzy(canvas);
     if (!selected) return;
     final oval = Rect.fromCenter(
       center: Offset(size.x / 2, size.y - 8),
@@ -278,6 +320,65 @@ class KidComponent extends SpriteComponent {
         ..color = const Color(0xFFFFE66D)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3,
+    );
+  }
+
+  void _drawKnockoutMark(Canvas canvas) {
+    final center = Offset(size.x / 2, size.y * 0.32);
+    canvas.drawCircle(center, 30, Paint()..color = const Color(0xF2FFF8F0));
+    canvas.drawCircle(
+      center,
+      30,
+      Paint()
+        ..color = const Color(0xFF2C3E50)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4,
+    );
+    final mark = Paint()
+      ..color = const Color(0xFF2C3E50)
+      ..strokeWidth = 8
+      ..strokeCap = StrokeCap.round;
+    const arm = 16.0;
+    canvas.drawLine(
+      center.translate(-arm, -arm),
+      center.translate(arm, arm),
+      mark,
+    );
+    canvas.drawLine(
+      center.translate(arm, -arm),
+      center.translate(-arm, arm),
+      mark,
+    );
+    _drawSwirl(canvas, Offset(size.x / 2, size.y * 0.08));
+  }
+
+  void _drawDizzy(Canvas canvas) {
+    _drawSwirl(canvas, Offset(size.x / 2, size.y * 0.12));
+    final star = Paint()
+      ..color = const Color(0xFFFFE66D)
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    for (final spot in [
+      Offset(size.x / 2 - 18, size.y * 0.08),
+      Offset(size.x / 2 + 20, size.y * 0.1),
+    ]) {
+      canvas.drawLine(spot.translate(-6, 0), spot.translate(6, 0), star);
+      canvas.drawLine(spot.translate(0, -6), spot.translate(0, 6), star);
+    }
+  }
+
+  void _drawSwirl(Canvas canvas, Offset origin) {
+    final paint = Paint()
+      ..color = const Color(0xFF2C3E50)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(
+      Rect.fromCenter(center: origin, width: 40, height: 18),
+      0.3,
+      2.4,
+      false,
+      paint,
     );
   }
 }

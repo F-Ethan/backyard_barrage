@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:backyard_barrage/game/enemy_ai.dart';
+import 'package:backyard_barrage/game/throw_physics.dart';
 import 'package:backyard_barrage/meta/difficulty.dart';
 import 'package:flame/extensions.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,6 +70,9 @@ void main() {
       expect(hard.friendlyFortDamage, isTrue);
       expect(easy.playerMoveScale, greaterThan(normal.playerMoveScale));
       expect(hard.playerMoveScale, lessThan(normal.playerMoveScale));
+      final playerPace = ThrowPhysics.kidMoveSpeed();
+      expect(hard.enemyStepSpeed, greaterThan(playerPace));
+      expect(hard.enemyStepSpeed, lessThan(playerPace * 4));
 
       final rng = math.Random(2);
       for (var i = 0; i < 12; i++) {

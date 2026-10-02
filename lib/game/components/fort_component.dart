@@ -5,9 +5,10 @@ import '../arena_grid.dart';
 import '../combat_rules.dart';
 import 'kid_component.dart';
 
-/// Player-side fort. Intact cover hides one or two kids and absorbs enemy
-/// lobs. Damage swaps in the damaged stage art; at 0 HP the collapsed art
-/// stays and the cover is gone until the next wave.
+/// Fort on one side of the yard. Intact cover hides one or two kids and
+/// absorbs lobs that are not at the top of their arc. Damage swaps in the
+/// damaged stage art. At 0 HP the collapsed art stays, the cover is gone,
+/// and shots from both sides pass through until the next wave.
 class FortComponent extends SpriteComponent {
   FortComponent({
     required this.side,
@@ -26,6 +27,9 @@ class FortComponent extends SpriteComponent {
   int stage = 1;
   int maxHp = 1;
   int hp = 1;
+
+  /// Cover row for this wave. Always inside the mid-depth band.
+  int coverRow = ArenaGrid.coverRow;
   Sprite? intact;
   Sprite? damaged;
   Sprite? collapsed;
@@ -37,7 +41,17 @@ class FortComponent extends SpriteComponent {
   bool get isCollapsed => hp <= 0;
 
   /// The two cover cells this fort occupies. Shots meet the fort here.
-  Rect get footprint => ArenaGrid.fortFootprint(side);
+  Rect get footprint => ArenaGrid.fortFootprint(side, coverRow);
+
+  /// Puts the fort on a usable row. Columns stay on the cover pair, off
+  /// the back line, so a kid can still shelter and peak a short lob over it.
+  void placeOnRow(int row) {
+    var next = row;
+    if (next < ArenaGrid.fortRowMin) next = ArenaGrid.fortRowMin;
+    if (next > ArenaGrid.fortRowMax) next = ArenaGrid.fortRowMax;
+    coverRow = next;
+    position = ArenaGrid.fortAnchor(side, next);
+  }
 
   Rect get hitRect => CombatRules.fortHitRect(
     stage: stage,
@@ -72,7 +86,9 @@ class FortComponent extends SpriteComponent {
   bool shelters(KidComponent kid) {
     if (hp <= 0 || kid.isKo || kid.side != side) return false;
     final cell = ArenaGrid.nearestCell(kid.side, kid.position);
-    return ArenaGrid.isCoverCell(cell.column, cell.row);
+    return cell.row == coverRow &&
+        (cell.column == ArenaGrid.coverColumnA ||
+            cell.column == ArenaGrid.coverColumnB);
   }
 
   void _syncSprite() {

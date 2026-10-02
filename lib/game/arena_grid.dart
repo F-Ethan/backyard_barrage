@@ -30,16 +30,22 @@ class ArenaGrid {
   static const double rowFront = 690;
 
   /// Two neighboring player cells. One or two kids can stand here in cover.
+  /// Column 0 stays behind the fort (the back line). Column 3 stays in front.
   static const int coverColumnA = 1;
   static const int coverColumnB = 2;
+
+  /// Default cover row, inside [fortRowMin]..[fortRowMax]. Matches the
+  /// geometry tests. A live match rolls a row in that band instead.
   static const int coverRow = 4;
 
-  /// A move touch has to start this close to the selected kid's body.
-  /// Distant taps must not set a destination across the yard.
-  static const double moveTouchRadius = 104;
+  /// Mid-depth band. Not row 0 or the last row, and not the rows flush
+  /// against those edges, so there is always room to walk past the fort.
+  static const int fortRowMin = 2;
+  static const int fortRowMax = 5;
 
-  /// Drag this far from the press point before a step is committed.
-  static const double moveDrag = 28;
+  /// A throw touch has to start this close to the selected kid's body.
+  /// Distant taps must not start a charge.
+  static const double moveTouchRadius = 104;
 
   /// Matches [KidComponent] sprite size so lane Y lines up with hit centers.
   static const double kidSize = 152;
@@ -131,6 +137,17 @@ class ArenaGrid {
     return ArenaCell(bestColumn, bestRow);
   }
 
+  static bool fortRowIsUsable(int row) {
+    return row >= fortRowMin && row <= fortRowMax;
+  }
+
+  /// A cover row that is never the top edge, the bottom edge, or the back line.
+  /// Columns stay on [coverColumnA] and [coverColumnB].
+  static int rollFortRow(math.Random rng) {
+    final span = fortRowMax - fortRowMin + 1;
+    return fortRowMin + rng.nextInt(span);
+  }
+
   static bool isCoverCell(int column, int row) {
     return row == coverRow &&
         (column == coverColumnA || column == coverColumnB);
@@ -174,17 +191,21 @@ class ArenaGrid {
   }
 
   /// Bottom-center of the fort art, sitting on the two cover cells.
-  static Vector2 fortAnchor([KidSide side = KidSide.player]) {
+  static Vector2 fortAnchor([KidSide side = KidSide.player, int? row]) {
+    final coverRow = row ?? ArenaGrid.coverRow;
     final left = cellCenter(side, coverColumnA, coverRow);
     final right = cellCenter(side, coverColumnB, coverRow);
     return Vector2((left.x + right.x) / 2, left.y);
   }
 
-  /// Lane box for the fort: cover columns 1 and 2 on the cover row.
+  /// Lane box for the fort: cover columns 1 and 2 on [row] (or [coverRow]).
   ///
   /// A snowball center inside this rect is in the fort's footprint. The box
   /// is the two shelter cells, not the whole sprite and not every row.
-  static Rect fortFootprint(KidSide side) {
+  /// Horizontal edges do not move when the row changes, so a lob from the
+  /// back line still peaks over the same columns.
+  static Rect fortFootprint(KidSide side, [int? row]) {
+    final coverRow = row ?? ArenaGrid.coverRow;
     final a = cellCenter(side, coverColumnA, coverRow);
     final b = cellCenter(side, coverColumnB, coverRow);
     final left = math.min(a.x, b.x) - columnStep * 0.42;

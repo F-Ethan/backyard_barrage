@@ -173,7 +173,7 @@ void main() {
           ThrowPhysics.playerCanHit(
             landingRow: steep.landingRow,
             shotRow: steep.rowAt(1),
-            targetRow: steep.landingRow + 1,
+            targetRow: steep.landingRow,
           ),
           isTrue,
         );
@@ -181,7 +181,7 @@ void main() {
           ThrowPhysics.playerCanHit(
             landingRow: steep.landingRow,
             shotRow: steep.rowAt(1),
-            targetRow: steep.landingRow + 2,
+            targetRow: steep.landingRow + 1,
           ),
           isFalse,
         );
@@ -322,6 +322,28 @@ void main() {
         ),
         FortShotResult.none,
       );
+      expect(
+        ThrowPhysics.resolveFortShot(
+          overlaps: true,
+          atPeak: false,
+          sameSide: true,
+          throwerBehind: true,
+          friendlyDamage: false,
+          collapsed: true,
+        ),
+        FortShotResult.none,
+      );
+      expect(
+        ThrowPhysics.resolveFortShot(
+          overlaps: true,
+          atPeak: false,
+          sameSide: false,
+          throwerBehind: false,
+          friendlyDamage: false,
+          collapsed: true,
+        ),
+        FortShotResult.none,
+      );
     });
 
     test(
@@ -371,8 +393,10 @@ void main() {
         pace,
         closeTo(ArenaGrid.columnStep / ThrowPhysics.stepSeconds, 0.01),
       );
+      expect(ThrowPhysics.stepSeconds, closeTo(1.2, 0.001));
       expect(pace, lessThan(ThrowPhysics.playerTravelSpeed));
-      expect(pace, greaterThan(200));
+      expect(pace, lessThan(80));
+      expect(pace, greaterThan(40));
       final ranked = ThrowPhysics.planPlayerLob(
         throwerRow: 4,
         throwerColumn: 0,

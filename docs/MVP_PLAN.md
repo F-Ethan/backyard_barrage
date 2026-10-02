@@ -49,18 +49,20 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | Rule | MVP value |
 | --- | --- |
 | Player starts with | 1 kid |
-| Hits to KO | 2 |
-| Throw | Right-thumb stick: hold to charge, release to lob |
+| Hits to KO | 3. Enemy: brush-off (~1s), knockdown then up, then out. Ally: a hit stuns ~7.5s; a second hit during that stun KOs |
+| Throw | Hold the selected kid or the right stick to charge; drag or the left thumb aims; release lobs |
 | Charge | Tap ≈ 1/3 power, ~1s ≈ 1/2, ~3s full. Half-bell ease toward max |
-| Throw lane | Aim commits the row (about a ±45° cone). Hits use that row ±1 |
+| Throw lane | Aim commits the row (about a ±45° cone). A hit requires the kid on the ball's current row |
+| Walk | About 1.2s per column (left stick). Enemy step timing stays on the difficulty profile |
 | Active thrower | One kid charging at a time |
 | Enemy count | Starts ~2–3, scales by wave |
 | Win | All enemies KO’d |
 | Lose | All player kids KO’d |
 
 ### 3.3 Controls (touch, landscape)
-- Left thumb: a stick under the selected kid. Deflect to step one cell at a time, or to aim while charging. A tap or drag only moves the kid when it starts on or near that kid. Aim is clamped to about ±45° from horizontal.
-- Right thumb: a stick, not a labeled button. Hold to charge (half-bell: a tap is about 1/3, ~1s is half, ~3s is full), release to lob. Player lobs keep a slow pace and gain range with charge. Enemy lobs stay on the faster lane arc.
+- Hold on the selected kid: power charges while the finger is down, drag sets the aim, release throws. A short tap is still about 1/3 power. Grabbing another living kid selects them and starts that same charge.
+- Left thumb: a stick. Deflect to step one cell at a time (about 1.2 seconds per column), or to aim while a charge is held. Aim is clamped to about ±45° from horizontal.
+- Right thumb: a stick, not a labeled button. Hold to charge (half-bell: a tap is about 1/3, ~1s is half, ~3s is full), release to lob. Same charge as holding the kid. Player lobs keep a slow pace and gain range with charge. Enemy lobs stay on the faster lane arc.
 - Each side stays on its own half. The middle band is neutral.
 - Lock orientation: landscape left/right only  
 
@@ -80,7 +82,7 @@ Spend soft currency earned from wins:
 | Fort | Cover + fort HP / stages | 3 stages |
 | (Optional) Balloon/snow size | Larger hit radius | 3 ranks |
 
-Fort cover shelters 1–2 player kids and absorbs enemy lobs. Enough hits collapse it and remove the cover for the rest of the wave. HP refills at the start of the next wave.
+Fort cover shelters 1–2 kids on the cover columns and absorbs lobs that are not at the top of their arc. The fort's row is random inside the mid band (not flush with the top or bottom of the yard, and not on the back line) so a kid can still shelter and a short lob can still peak over it. Enough hits collapse it. A collapsed fort does not block shots from either side. HP refills, and the row is rolled again, at the start of the next wave.
 
 ### 3.6 Seasons
 Same rules; swap:

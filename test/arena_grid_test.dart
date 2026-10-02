@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:backyard_barrage/game/arena_grid.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -66,5 +68,30 @@ void main() {
       final otherRow = ArenaGrid.laneY(ArenaGrid.coverRow + 2);
       expect(box.contains(Offset(a.x, otherRow)), isFalse);
     }
+  });
+
+  test('fort rows stay in the mid band and off the back line', () {
+    expect(ArenaGrid.fortRowMin, greaterThan(0));
+    expect(ArenaGrid.fortRowMax, lessThan(ArenaGrid.rows - 1));
+    expect(ArenaGrid.fortRowIsUsable(0), isFalse);
+    expect(ArenaGrid.fortRowIsUsable(ArenaGrid.rows - 1), isFalse);
+    expect(ArenaGrid.fortRowIsUsable(ArenaGrid.coverRow), isTrue);
+    expect(ArenaGrid.coverColumnA, greaterThan(0));
+    expect(ArenaGrid.coverColumnB, lessThan(ArenaGrid.columnsPerSide - 1));
+    expect(ArenaGrid.columnIsBehindFort(KidSide.player, 0), isTrue);
+    expect(ArenaGrid.columnIsBehindFort(KidSide.enemy, 3), isTrue);
+
+    final seen = <int>{};
+    final rng = math.Random(1);
+    final baseline = ArenaGrid.fortFootprint(KidSide.player);
+    for (var i = 0; i < 24; i++) {
+      final row = ArenaGrid.rollFortRow(rng);
+      seen.add(row);
+      expect(ArenaGrid.fortRowIsUsable(row), isTrue);
+      final box = ArenaGrid.fortFootprint(KidSide.player, row);
+      expect(box.left, closeTo(baseline.left, 0.01));
+      expect(box.right, closeTo(baseline.right, 0.01));
+    }
+    expect(seen.length, greaterThan(1));
   });
 }

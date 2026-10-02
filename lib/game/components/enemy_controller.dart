@@ -6,6 +6,7 @@ import '../../meta/difficulty.dart';
 import '../arena_grid.dart';
 import '../combat_rules.dart';
 import '../enemy_ai.dart';
+import '../throw_physics.dart';
 import 'kid_component.dart';
 
 typedef EnemyFire =
@@ -13,21 +14,25 @@ typedef EnemyFire =
 
 enum _AiPhase { wait, step, telegraph }
 
-/// Telegraph a lob, then throw. Movement is one grid step every few throws.
+/// Telegraph a lob, then throw. After each throw, step toward a lane,
+/// closer when the lob falls short, and back when hit.
 class EnemyController extends Component {
   EnemyController({
     required this.host,
     required this.players,
+    required this.rivals,
     required this.wave,
     required this.rng,
     required this.onFire,
     required this.isFighting,
     required this.tuning,
     required double initialDelay,
-  }) : _cycle = initialDelay;
+  }) : _cycle = initialDelay,
+       _seenHp = host.hp;
 
   final KidComponent host;
   final List<KidComponent> players;
+  final List<KidComponent> rivals;
   final int wave;
   final math.Random rng;
   final EnemyFire onFire;
@@ -38,6 +43,8 @@ class EnemyController extends Component {
   double _cycle;
   double _elapsed = 0;
   int _throws = 0;
+  int _seenHp;
+  int _retreats = 0;
   Vector2? _moveTarget;
 
   double get _telegraph {
@@ -50,18 +57,25 @@ class EnemyController extends Component {
   @override
   void update(double dt) {
     super.update(dt);
+    _watchHp();
     if (!isFighting() || host.isKo) {
       host.setWalking(false);
       host.clearChargePose();
+      _retreats = 0;
       return;
     }
-    if (host.isStunned) return;
+    if (host.isStunned) {
+      host.setWalking(false);
+      return;
+    }
 
     _elapsed += dt;
     if (_phase == _AiPhase.step) {
       _tickStep(dt);
       if (_phase == _AiPhase.step) return;
     }
+    _maybeRetreat();
+    if (_phase == _AiPhase.step) return;
 
     final telegraphAt = _cycle - _telegraph;
     if (_phase == _AiPhase.wait && _elapsed >= telegraphAt) {
@@ -95,42 +109,107 @@ class EnemyController extends Component {
     host.setWalking(true);
   }
 
+  void _watchHp() {
+    if (host.hp < _seenHp && host.hp > 0) {
+      _retreats += _seenHp - host.hp;
+    }
+    _seenHp = host.hp;
+  }
+
+  void _maybeRetreat() {
+    if (_retreats <= 0 || _phase == _AiPhase.telegraph) return;
+    if (_phase == _AiPhase.step) return;
+    final next = _plan(retreat: true, shotFellShort: false);
+    if (next == null) {
+      _retreats = 0;
+      return;
+    }
+    _retreats -= 1;
+    _applyStep(next);
+  }
+
   void _fire() {
     final cell = ArenaGrid.nearestCell(KidSide.enemy, host.position);
-    final index = EnemyAi.pickLaneTarget(
-      [for (final kid in players) !kid.isKo],
-      [
-        for (final kid in players)
-          ArenaGrid.nearestCell(kid.side, kid.position).row,
-      ],
-      cell.row,
-      rng,
-    );
+    final rows = [
+      for (final kid in players)
+        ArenaGrid.nearestCell(kid.side, kid.position).row,
+    ];
+    final living = [for (final kid in players) !kid.isKo];
+    final index = EnemyAi.pickLaneTarget(living, rows, cell.row, rng);
     final target = index == null ? null : players[index];
     final scatter = EnemyAi.rangeScatter(
       rng,
       CombatRules.enemyAimJitterRadians(wave),
     );
+    var fellShort = false;
+    if (target != null) {
+      final distance = (host.throwOrigin.x - target.hitCenter.x).abs();
+      fellShort = !ThrowPhysics.enemyLobReaches(
+        distance: distance,
+        rangeScale: scatter,
+      );
+    }
     host.showThrowPose();
     onFire(host, target, scatter);
     _throws += 1;
-    _beginCycle();
+    _beginCycle(shotFellShort: fellShort);
   }
 
-  void _beginCycle() {
+  void _beginCycle({required bool shotFellShort}) {
     final profile = tuning();
     _cycle = EnemyAi.throwGap(rng, profile);
     _elapsed = 0;
     _phase = _AiPhase.wait;
     _moveTarget = null;
     host.clearChargePose();
-    if (!EnemyAi.shouldGridStep(_throws, profile.throwsPerStep)) return;
-    final nudge = EnemyAi.gridStep(rng);
+    if (_retreats > 0) {
+      final back = _plan(retreat: true, shotFellShort: false);
+      if (back == null) {
+        _retreats = 0;
+      } else {
+        _retreats -= 1;
+        _applyStep(back);
+        return;
+      }
+    }
+    _applyStep(_plan(retreat: false, shotFellShort: shotFellShort));
+  }
+
+  ({int column, int row})? _plan({
+    required bool retreat,
+    required bool shotFellShort,
+  }) {
+    final profile = tuning();
     final cell = ArenaGrid.nearestCell(KidSide.enemy, host.position);
-    final next = ArenaGrid.clampCell(
-      cell.column + nudge.column,
-      cell.row + nudge.row,
+    return EnemyAi.planBotStep(
+      column: cell.column,
+      row: cell.row,
+      playerRows: [
+        for (final kid in players)
+          ArenaGrid.nearestCell(kid.side, kid.position).row,
+      ],
+      living: [for (final kid in players) !kid.isKo],
+      laneEvery: profile.throwsPerStep,
+      matchPlayerRow: profile.matchPlayerRow,
+      throwsCompleted: _throws,
+      shotFellShort: shotFellShort,
+      retreat: retreat,
+      occupied: _occupied(),
     );
+  }
+
+  List<({int column, int row})> _occupied() {
+    final spots = <({int column, int row})>[];
+    for (final kid in rivals) {
+      if (identical(kid, host) || kid.isKo) continue;
+      final cell = ArenaGrid.nearestCell(KidSide.enemy, kid.position);
+      spots.add((column: cell.column, row: cell.row));
+    }
+    return spots;
+  }
+
+  void _applyStep(({int column, int row})? next) {
+    if (next == null) return;
     final dest = ArenaGrid.cellCenter(KidSide.enemy, next.column, next.row);
     if (dest.distanceTo(host.position) < 1) return;
     _moveTarget = dest;

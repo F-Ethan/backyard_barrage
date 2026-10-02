@@ -559,6 +559,25 @@ class ThrowPhysics {
 
   /// Enemy lobs land on the target's row when it is in the lane, with a
   /// one-row arc so a nearer kid in the same row can be sailed over.
+  /// How far an enemy lob travels after scatter. Same clamp as [planEnemyLob].
+  static double enemyLobRange({
+    required double distance,
+    required double rangeScale,
+  }) {
+    final scale = rangeScale.clamp(0.55, 1.45);
+    return distance.abs().clamp(180.0, 1100.0) * scale;
+  }
+
+  /// True when that lob reaches [distance]. A short shot is the cue to step closer.
+  static bool enemyLobReaches({
+    required double distance,
+    required double rangeScale,
+  }) {
+    final span = distance.abs();
+    if (span < 8) return true;
+    return enemyLobRange(distance: span, rangeScale: rangeScale) >= span - 8;
+  }
+
   static RowLob planEnemyLob({
     required int throwerRow,
     required int throwerColumn,
@@ -575,8 +594,7 @@ class ThrowPhysics {
     if (landing < 0) landing = 0;
     if (landing >= ArenaGrid.rows) landing = ArenaGrid.rows - 1;
     final peak = row > 0 ? row - 1 : row;
-    final scale = rangeScale.clamp(0.55, 1.45);
-    final range = distance.abs().clamp(180.0, 1100.0) * scale;
+    final range = enemyLobRange(distance: distance, rangeScale: rangeScale);
     return _buildLob(
       throwerRow: row,
       throwerColumn: throwerColumn,

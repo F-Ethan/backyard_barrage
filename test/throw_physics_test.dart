@@ -251,6 +251,21 @@ void main() {
       }
     });
 
+    test('a short enemy lob is the cue to step closer', () {
+      expect(
+        ThrowPhysics.enemyLobReaches(distance: 700, rangeScale: 1),
+        isTrue,
+      );
+      expect(
+        ThrowPhysics.enemyLobReaches(distance: 700, rangeScale: 0.62),
+        isFalse,
+      );
+      expect(
+        ThrowPhysics.enemyLobReaches(distance: 1200, rangeScale: 1),
+        isFalse,
+      );
+    });
+
     test('enemy lobs stay on the fast ballistic lane', () {
       final enemy = ThrowPhysics.planEnemyLob(
         throwerRow: 4,
@@ -422,54 +437,57 @@ void main() {
       expect(ranked.range, closeTo(ThrowPhysics.fullRange, 0.01));
     });
 
-    test('a drawn lob arches in the open and meets the hit path at contact', () {
-      final from = ArenaGrid.throwOrigin(
-        KidSide.player,
-        ArenaGrid.cellCenter(KidSide.player, 0, 4),
-        Vector2.all(152),
-      );
-      final lob = ThrowPhysics.planPlayerLob(
-        throwerRow: 4,
-        throwerColumn: 0,
-        aimDirection: Vector2(1, 0),
-        charge: 1,
-        facingRight: true,
-        originY: from.y,
-      );
-      double collisionAt(double x) {
-        final u = ((x - from.x) / lob.range).clamp(0.0, 1.0);
-        return lob.yAt(u);
-      }
-
-      double visualAt(double x) {
-        return ThrowPhysics.flightVisualY(
-          collisionY: collisionAt(x),
-          worldX: x,
-          originX: from.x,
-          originY: from.y,
-          range: lob.range,
-          facingRight: true,
-          behindFort: true,
-          scripted: true,
-          apexY: lob.apexY,
-          landingY: lob.landingY,
-          apexFraction: lob.apexFraction,
-          settleFraction: lob.settleFraction,
+    test(
+      'a drawn lob arches in the open and meets the hit path at contact',
+      () {
+        final from = ArenaGrid.throwOrigin(
+          KidSide.player,
+          ArenaGrid.cellCenter(KidSide.player, 0, 4),
+          Vector2.all(152),
         );
-      }
+        final lob = ThrowPhysics.planPlayerLob(
+          throwerRow: 4,
+          throwerColumn: 0,
+          aimDirection: Vector2(1, 0),
+          charge: 1,
+          facingRight: true,
+          originY: from.y,
+        );
+        double collisionAt(double x) {
+          final u = ((x - from.x) / lob.range).clamp(0.0, 1.0);
+          return lob.yAt(u);
+        }
 
-      final fort = ArenaGrid.fortFootprint(KidSide.player);
-      final fortX = (fort.left + fort.right) / 2;
-      expect(visualAt(fortX), closeTo(collisionAt(fortX), 0.01));
-      expect(visualAt(from.x), closeTo(collisionAt(from.x), 0.01));
+        double visualAt(double x) {
+          return ThrowPhysics.flightVisualY(
+            collisionY: collisionAt(x),
+            worldX: x,
+            originX: from.x,
+            originY: from.y,
+            range: lob.range,
+            facingRight: true,
+            behindFort: true,
+            scripted: true,
+            apexY: lob.apexY,
+            landingY: lob.landingY,
+            apexFraction: lob.apexFraction,
+            settleFraction: lob.settleFraction,
+          );
+        }
 
-      final mid = (from.x + ArenaGrid.enemyLeft) / 2;
-      expect(visualAt(mid), lessThan(collisionAt(mid) - 36));
+        final fort = ArenaGrid.fortFootprint(KidSide.player);
+        final fortX = (fort.left + fort.right) / 2;
+        expect(visualAt(fortX), closeTo(collisionAt(fortX), 0.01));
+        expect(visualAt(from.x), closeTo(collisionAt(from.x), 0.01));
 
-      final contactX = ArenaGrid.enemyLeft + 8;
-      expect(visualAt(contactX), closeTo(collisionAt(contactX), 0.01));
-      expect(visualAt(from.x + lob.range), closeTo(lob.landingY, 0.01));
-    });
+        final mid = (from.x + ArenaGrid.enemyLeft) / 2;
+        expect(visualAt(mid), lessThan(collisionAt(mid) - 36));
+
+        final contactX = ArenaGrid.enemyLeft + 8;
+        expect(visualAt(contactX), closeTo(collisionAt(contactX), 0.01));
+        expect(visualAt(from.x + lob.range), closeTo(lob.landingY, 0.01));
+      },
+    );
 
     test('an enemy lob arches across the yard and is back on the hit path', () {
       final originX = ArenaGrid.columnX(KidSide.enemy, 3) - 20;
@@ -490,10 +508,7 @@ void main() {
 
       final open = (originX + ArenaGrid.playerRight) / 2;
       expect(visualAt(open), lessThan(originY - 24));
-      expect(
-        visualAt(ArenaGrid.playerRight - 12),
-        closeTo(originY, 0.01),
-      );
+      expect(visualAt(ArenaGrid.playerRight - 12), closeTo(originY, 0.01));
       expect(visualAt(originX), closeTo(originY, 0.01));
     });
 

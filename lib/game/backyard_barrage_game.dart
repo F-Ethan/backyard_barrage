@@ -279,6 +279,7 @@ class BackyardBarrageGame extends FlameGame {
         EnemyController(
           host: kid,
           players: players,
+          rivals: enemies,
           wave: wave,
           rng: _rng,
           tuning: _tuning,

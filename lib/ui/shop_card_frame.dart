@@ -2,16 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'ui_assets.dart';
+import 'ui_kit.dart';
 
 /// Soft v2 shop card. [child] sits in the transparent well; [footer] sits on
 /// the price pill at the bottom.
 class ShopCardFrame extends StatelessWidget {
-  const ShopCardFrame({
-    super.key,
-    required this.child,
-    required this.footer,
-  });
+  const ShopCardFrame({super.key, required this.child, required this.footer});
 
   final Widget child;
   final Widget footer;
@@ -25,6 +21,7 @@ class ShopCardFrame extends StatelessWidget {
         if (!maxW.isFinite || !maxH.isFinite || maxW <= 0 || maxH <= 0) {
           return const SizedBox.shrink();
         }
+        final kit = UiKitScope.of(context);
         var width = maxW;
         var height = width * 640 / 512;
         if (height > maxH) {
@@ -40,7 +37,7 @@ class ShopCardFrame extends StatelessWidget {
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: Image.asset(UiAssets.shopCard, fit: BoxFit.fill),
+                  child: Image.asset(kit.shopCard, fit: BoxFit.fill),
                 ),
                 Positioned(
                   left: width * 0.12,

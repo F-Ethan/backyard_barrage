@@ -42,6 +42,7 @@ Future<SeasonKit> loadSeasonKit(FlameGame game, Season season) async {
       throwPose: byName['throw']!,
       hit: byName['hit']!,
       ko: byName['ko']!,
+      pickup: byName['pickup']!,
     );
   }
 

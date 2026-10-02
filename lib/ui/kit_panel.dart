@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'ui_assets.dart';
+import 'ui_kit.dart';
 
 /// Frosted cream sheet from `panel_modal_v2.png`.
 class KitPanel extends StatelessWidget {
@@ -15,11 +15,12 @@ class KitPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final kit = UiKitScope.of(context);
     return SizedBox.expand(
       child: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage(UiAssets.panel),
+            image: AssetImage(kit.panel),
             fit: BoxFit.fill,
           ),
         ),

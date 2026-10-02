@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import '../audio/game_audio.dart';
 import '../meta/game_settings.dart';
 import '../seasons/season.dart';
@@ -12,12 +14,14 @@ class FeelBus {
     GameAudio? audio,
     GameHaptics? haptics,
   }) : settings = settings,
+       settingsListenable = ValueNotifier(settings),
        audio = audio ?? GameAudio(),
        haptics = haptics ?? GameHaptics() {
     apply(settings);
   }
 
   GameSettings settings;
+  final ValueNotifier<GameSettings> settingsListenable;
   final GameAudio audio;
   final GameHaptics haptics;
 
@@ -29,6 +33,9 @@ class FeelBus {
     haptics.enabled = next.hapticsEnabled;
     audio.sfxEnabled = next.sfxEnabled;
     audio.musicEnabled = next.musicEnabled;
+    if (settingsListenable.value != next) {
+      settingsListenable.value = next;
+    }
   }
 
   void uiTap() {

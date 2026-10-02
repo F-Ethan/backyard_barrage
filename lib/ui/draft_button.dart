@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../feel/feel_bus.dart';
 import 'barrage_colors.dart';
-import 'ui_assets.dart';
+import 'ui_kit.dart';
 
-/// Pill CTA from the v2 kit. Primary art is blue, so its label is cream.
+/// Pill CTA. Art and label color follow the active [UiKit].
 class DraftImageButton extends StatefulWidget {
   const DraftImageButton({
     super.key,
@@ -13,10 +13,10 @@ class DraftImageButton extends StatefulWidget {
     this.enabled = true,
     this.width = 224,
     this.height = 70,
-    this.asset = UiAssets.primary,
+    this.secondary = false,
     this.feel,
     this.expand = false,
-    this.leading,
+    this.leadingKind,
     this.fontSize = 16,
   });
 
@@ -25,10 +25,10 @@ class DraftImageButton extends StatefulWidget {
   final bool enabled;
   final double width;
   final double height;
-  final String asset;
+  final bool secondary;
   final FeelBus? feel;
   final bool expand;
-  final String? leading;
+  final UiIconKind? leadingKind;
   final double fontSize;
 
   @override
@@ -40,8 +40,6 @@ class _DraftImageButtonState extends State<DraftImageButton> {
 
   bool get _canTap => widget.enabled && widget.onPressed != null;
 
-  bool get _primary => widget.asset == UiAssets.primary;
-
   void _setDown(bool value) {
     if (_down == value) return;
     setState(() => _down = value);
@@ -49,9 +47,15 @@ class _DraftImageButtonState extends State<DraftImageButton> {
 
   @override
   Widget build(BuildContext context) {
-    final pressedArt = _primary && _down && _canTap;
+    final kit = UiKitScope.of(context);
+    final primary = !widget.secondary;
+    final pressedArt = primary && _down && _canTap && kit.modern;
     final scale = _down && _canTap && !pressedArt ? 0.98 : 1.0;
-    final labelColor = _primary ? BarrageColors.onPrimary : BarrageColors.ink;
+    final labelColor = kit.labelOn(primary);
+    final asset = pressedArt
+        ? kit.primaryPressed
+        : (primary ? kit.primary : kit.secondary);
+    final leading = widget.leadingKind;
     final button = Opacity(
       opacity: _canTap ? 1 : 0.45,
       child: GestureDetector(
@@ -72,19 +76,14 @@ class _DraftImageButtonState extends State<DraftImageButton> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Positioned.fill(
-                  child: Image.asset(
-                    pressedArt ? UiAssets.primaryPressed : widget.asset,
-                    fit: BoxFit.fill,
-                  ),
-                ),
+                Positioned.fill(child: Image.asset(asset, fit: BoxFit.fill)),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (widget.leading != null) ...[
-                        Image.asset(widget.leading!, width: 28, height: 28),
+                      if (leading != null) ...[
+                        _KitGlyph(kind: leading, size: 26, color: labelColor),
                         const SizedBox(width: 8),
                       ],
                       Flexible(
@@ -112,18 +111,18 @@ class _DraftImageButtonState extends State<DraftImageButton> {
   }
 }
 
-/// Circular kit icon (`icon_pause_v2`, `icon_settings_v2`, `icon_close_v2`).
+/// Circular icon. Modern kit uses the v2 sprite; classic draws an ink glyph.
 class KitIconButton extends StatelessWidget {
   const KitIconButton({
     super.key,
-    required this.asset,
+    required this.kind,
     required this.onPressed,
     this.feel,
     this.size = 56,
     this.semanticLabel,
   });
 
-  final String asset;
+  final UiIconKind kind;
   final VoidCallback onPressed;
   final FeelBus? feel;
   final double size;
@@ -139,7 +138,56 @@ class KitIconButton extends StatelessWidget {
           feel?.uiTap();
           onPressed();
         },
-        child: Image.asset(asset, width: size, height: size),
+        child: _KitGlyph(kind: kind, size: size),
+      ),
+    );
+  }
+}
+
+class UiGlyph extends StatelessWidget {
+  const UiGlyph({
+    super.key,
+    required this.kind,
+    required this.size,
+    this.color,
+  });
+
+  final UiIconKind kind;
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) =>
+      _KitGlyph(kind: kind, size: size, color: color);
+}
+
+class _KitGlyph extends StatelessWidget {
+  const _KitGlyph({required this.kind, required this.size, this.color});
+
+  final UiIconKind kind;
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final kit = UiKitScope.of(context);
+    final asset = kit.iconAsset(kind);
+    if (asset != null) {
+      return Image.asset(asset, width: size, height: size);
+    }
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: kit.cream,
+        shape: BoxShape.circle,
+        border: Border.all(color: kit.ink, width: 3),
+      ),
+      child: Icon(
+        kit.iconData(kind),
+        color: color ?? kit.ink,
+        size: size * 0.52,
       ),
     );
   }

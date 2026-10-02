@@ -19,9 +19,28 @@ void main() {
       expect(held, 0);
       final rng = math.Random(4);
       for (var i = 0; i < 12; i++) {
-        final step = EnemyAi.sidestep(rng, chance: 1, minDistance: 36, maxDistance: 90);
+        final step = EnemyAi.sidestep(
+          rng,
+          chance: 1,
+          minDistance: 36,
+          maxDistance: 90,
+        );
         expect(step.abs(), inInclusiveRange(36, 90));
       }
+    });
+
+    test('grid steps prefer rows over columns', () {
+      final rng = math.Random(4);
+      var rowSteps = 0;
+      var columnSteps = 0;
+      for (var i = 0; i < 400; i++) {
+        final nudge = EnemyAi.gridNudge(rng);
+        if (nudge.column == 0 && nudge.row != 0) rowSteps++;
+        if (nudge.column != 0) columnSteps++;
+        expect(nudge.column.abs(), lessThanOrEqualTo(1));
+        expect(nudge.row.abs(), lessThanOrEqualTo(2));
+      }
+      expect(rowSteps, greaterThan(columnSteps));
     });
 
     test('aim jitter stays inside the requested angle', () {

@@ -5,7 +5,7 @@ import '../meta/game_settings.dart';
 import 'barrage_colors.dart';
 import 'draft_button.dart';
 import 'kit_panel.dart';
-import 'ui_assets.dart';
+import 'ui_kit.dart';
 
 /// SFX, music, haptics, and a credits stub. Shared by the menu and pause.
 class SettingsOverlay extends StatefulWidget {
@@ -46,9 +46,11 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final width = (size.width - 32).clamp(280.0, 560.0).toDouble();
-    final height = (size.height - 24).clamp(220.0, 420.0).toDouble();
+    final height = (size.height - 24).clamp(220.0, 520.0).toDouble();
+    final kit = UiKit.from(_settings);
     return Material(
-      color: BarrageColors.scrim,
+      key: Key(kit.modern ? 'ui-kit-modern' : 'ui-kit-classic'),
+      color: kit.scrim,
       child: SafeArea(
         child: Center(
           child: SizedBox(
@@ -65,7 +67,7 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                       ),
                       KitIconButton(
                         key: const Key('settings-back'),
-                        asset: UiAssets.iconClose,
+                        kind: UiIconKind.close,
                         semanticLabel: 'Back',
                         size: 48,
                         feel: widget.feel,
@@ -99,19 +101,23 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                             onChanged: (value) =>
                                 _set(_settings.copyWith(hapticsEnabled: value)),
                           ),
+                          _ToggleRow(
+                            label: 'Modern UI',
+                            value: _settings.modernUi,
+                            switchKey: const Key('ui-style-toggle'),
+                            onChanged: (value) =>
+                                _set(_settings.copyWith(modernUi: value)),
+                          ),
                           const SizedBox(height: 6),
                           const Text(
-                            'Sound, music, and haptics for this device.',
+                            'Sound, music, and haptics for this device. Modern UI is the new kit; turn it off for the classic wood look.',
                             textAlign: TextAlign.center,
                             style: BarrageType.muted,
                           ),
                           const SizedBox(height: 12),
                           const Text('Credits', style: BarrageType.heading),
                           const SizedBox(height: 2),
-                          const Text(
-                            'GameLogic',
-                            style: BarrageType.body,
-                          ),
+                          const Text('GameLogic', style: BarrageType.body),
                           const Text('Ethan', style: BarrageType.muted),
                           const Text(
                             'Snowballs and water balloons.',
@@ -145,6 +151,9 @@ class BarrageToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final kit = UiKitScope.of(context);
+    final onAsset = kit.toggleOn;
+    final offAsset = kit.toggleOff;
     return Semantics(
       toggled: value,
       child: GestureDetector(
@@ -154,11 +163,46 @@ class BarrageToggle extends StatelessWidget {
           width: 84,
           height: 48,
           child: Center(
-            child: Image.asset(
-              value ? UiAssets.toggleOn : UiAssets.toggleOff,
-              width: 76,
-              height: 38,
-            ),
+            child: onAsset != null && offAsset != null
+                ? Image.asset(value ? onAsset : offAsset, width: 76, height: 38)
+                : _ClassicSwitch(on: value, ink: kit.ink, cream: kit.cream),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ClassicSwitch extends StatelessWidget {
+  const _ClassicSwitch({
+    required this.on,
+    required this.ink,
+    required this.cream,
+  });
+
+  final bool on;
+  final Color ink;
+  final Color cream;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 76,
+      height: 36,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: on ? ink : cream,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: ink, width: 3),
+      ),
+      child: Align(
+        alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            color: on ? cream : ink,
+            shape: BoxShape.circle,
           ),
         ),
       ),
@@ -186,11 +230,7 @@ class _ToggleRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(label, style: BarrageType.body)),
-          BarrageToggle(
-            key: switchKey,
-            value: value,
-            onChanged: onChanged,
-          ),
+          BarrageToggle(key: switchKey, value: value, onChanged: onChanged),
         ],
       ),
     );

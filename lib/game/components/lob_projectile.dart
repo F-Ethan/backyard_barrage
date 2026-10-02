@@ -65,17 +65,25 @@ class LobProjectile extends SpriteComponent {
 
     for (final target in List<KidComponent>.of(targets)) {
       if (identical(target, owner) || target.isKo) continue;
-      if (ThrowPhysics.circlesOverlap(
+      if (!ThrowPhysics.circlesOverlap(
         position,
         radius,
         target.hitCenter,
         target.hitRadius,
       )) {
+        continue;
+      }
+      final shelter = fort;
+      if (blockedByFort && shelter != null && shelter.shelters(target)) {
         _spent = true;
-        onHit(this, target);
+        onFortHit?.call(this);
         removeFromParent();
         return;
       }
+      _spent = true;
+      onHit(this, target);
+      removeFromParent();
+      return;
     }
 
     if (position.x < -80 ||

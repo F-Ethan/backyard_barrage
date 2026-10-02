@@ -10,6 +10,7 @@ import 'meta/save_store.dart';
 import 'meta/settings_store.dart';
 import 'ui/barrage_colors.dart';
 import 'ui/defeat_overlay.dart';
+import 'ui/ui_kit.dart';
 import 'ui/main_menu.dart';
 import 'ui/match_hud.dart';
 import 'ui/pause_overlay.dart';
@@ -46,15 +47,16 @@ class _BackyardBarrageAppState extends State<BackyardBarrageApp> {
       title: 'Backyard Barrage',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: BarrageColors.player,
-          brightness: Brightness.light,
-        ).copyWith(
-          primary: BarrageColors.player,
-          onPrimary: BarrageColors.onPrimary,
-          surface: BarrageColors.cream,
-          onSurface: BarrageColors.ink,
-        ),
+        colorScheme:
+            ColorScheme.fromSeed(
+              seedColor: BarrageColors.player,
+              brightness: Brightness.light,
+            ).copyWith(
+              primary: BarrageColors.player,
+              onPrimary: BarrageColors.onPrimary,
+              surface: BarrageColors.cream,
+              onSurface: BarrageColors.ink,
+            ),
         scaffoldBackgroundColor: BarrageColors.cream,
         textTheme: Typography.material2021().black.apply(
           bodyColor: BarrageColors.ink,
@@ -62,23 +64,26 @@ class _BackyardBarrageAppState extends State<BackyardBarrageApp> {
         ),
         useMaterial3: true,
       ),
-      home: running == null
-          ? MainMenu(
-              saveStore: _store,
-              settingsStore: _settingsStore,
-              feel: _feel,
-              onPlay: (meta) => setState(() => _running = meta),
-            )
-          : GameScreen(
-              meta: running,
-              saveStore: _store,
-              settingsStore: _settingsStore,
-              feel: _feel,
-              onExit: () {
-                unawaited(_feel.enterMenu());
-                setState(() => _running = null);
-              },
-            ),
+      home: UiKitScope(
+        settings: _feel.settingsListenable,
+        child: running == null
+            ? MainMenu(
+                saveStore: _store,
+                settingsStore: _settingsStore,
+                feel: _feel,
+                onPlay: (meta) => setState(() => _running = meta),
+              )
+            : GameScreen(
+                meta: running,
+                saveStore: _store,
+                settingsStore: _settingsStore,
+                feel: _feel,
+                onExit: () {
+                  unawaited(_feel.enterMenu());
+                  setState(() => _running = null);
+                },
+              ),
+      ),
     );
   }
 }

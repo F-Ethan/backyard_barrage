@@ -7,7 +7,6 @@ import 'coin_amount.dart';
 import 'draft_button.dart';
 import 'kit_panel.dart';
 import 'season_chip.dart';
-import 'ui_assets.dart';
 
 class DefeatOverlay extends StatefulWidget {
   const DefeatOverlay({super.key, required this.game});
@@ -46,10 +45,7 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                 children: [
                   const Text('Crew down', style: BarrageType.title),
                   const SizedBox(height: 4),
-                  const Text(
-                    'Every kid is down.',
-                    style: BarrageType.body,
-                  ),
+                  const Text('Every kid is down.', style: BarrageType.body),
                   const SizedBox(height: 6),
                   Text(
                     'Waves cleared $cleared · Best ${meta.bestWave}',
@@ -90,7 +86,7 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                       DraftImageButton(
                         key: const Key('back-to-menu'),
                         label: 'Menu',
-                        asset: UiAssets.secondary,
+                        secondary: true,
                         onPressed: game.exitToMenu,
                         width: 160,
                         height: 52,

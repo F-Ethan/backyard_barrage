@@ -1,9 +1,13 @@
 import 'package:flame/components.dart';
-import 'package:flutter/painting.dart';
+import 'package:flame/extensions.dart';
 
+import '../arena_grid.dart';
 import '../combat_rules.dart';
+import 'kid_component.dart';
 
-/// Player-side fort. Blocks enemy lobs until its HP is gone for the wave.
+/// Player-side fort. Intact cover hides one or two kids and absorbs enemy
+/// lobs. Damage swaps in the damaged stage art; at 0 HP the collapsed art
+/// stays and the cover is gone until the next wave.
 class FortComponent extends SpriteComponent {
   FortComponent({
     required Sprite sprite,
@@ -14,36 +18,69 @@ class FortComponent extends SpriteComponent {
          position: position,
          size: size,
          anchor: Anchor.bottomCenter,
-         priority: 6,
+         priority: 12,
        );
 
   int stage = 1;
   int maxHp = 1;
   int hp = 1;
+  Sprite? intact;
+  Sprite? damaged;
+  Sprite? collapsed;
+
+  bool get standing => hp > 0;
+
+  bool get showingDamage => hp > 0 && hp < maxHp;
+
+  bool get isCollapsed => hp <= 0;
 
   Rect get hitRect => CombatRules.fortHitRect(
-        stage: stage,
-        anchorBottomCenter: position,
-        spriteSize: size,
-      );
+    stage: stage,
+    anchorBottomCenter: position,
+    spriteSize: size,
+  );
 
-  void applyStage(int nextStage, Sprite nextSprite) {
+  void applyStage({
+    required int nextStage,
+    required Sprite intactSprite,
+    required Sprite damagedSprite,
+    required Sprite collapsedSprite,
+  }) {
     stage = nextStage;
-    sprite = nextSprite;
+    intact = intactSprite;
+    damaged = damagedSprite;
+    collapsed = collapsedSprite;
     maxHp = CombatRules.fortMaxHp(stage);
     hp = maxHp;
     opacity = 1;
+    _syncSprite();
   }
 
   void takeHit() {
     if (hp <= 0) return;
     hp -= 1;
+    _syncSprite();
   }
 
-  @override
-  void update(double dt) {
-    super.update(dt);
-    final target = hp > 0 ? 1.0 : 0.45;
-    if (opacity != target) opacity = target;
+  /// True when [kid] is standing on one of the two cover cells and the fort
+  /// is still up.
+  bool shelters(KidComponent kid) {
+    if (hp <= 0 || kid.isKo || kid.side != KidSide.player) return false;
+    final cell = ArenaGrid.nearestCell(KidSide.player, kid.position);
+    return ArenaGrid.isCoverCell(cell.column, cell.row);
+  }
+
+  void _syncSprite() {
+    if (hp <= 0) {
+      sprite = collapsed ?? sprite;
+      priority = 5;
+      return;
+    }
+    priority = 12;
+    if (hp < maxHp) {
+      sprite = damaged ?? intact ?? sprite;
+      return;
+    }
+    sprite = intact ?? sprite;
   }
 }

@@ -90,10 +90,7 @@ void main() {
         ),
         isFalse,
       );
-      expect(
-        ThrowPhysics.circleHitsRect(Vector2(140, 40), 10, rect),
-        isFalse,
-      );
+      expect(ThrowPhysics.circleHitsRect(Vector2(140, 40), 10, rect), isFalse);
     });
 
     test('taller forts reach higher', () {

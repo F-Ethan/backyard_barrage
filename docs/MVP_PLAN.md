@@ -50,17 +50,17 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | --- | --- |
 | Player starts with | 1 kid |
 | Hits to KO | 2 |
-| Throw | Right-thumb Throw button: hold to charge, release to lob |
+| Throw | Right-thumb stick: hold to charge, release to lob |
 | Charge | Tap ≈ 1/3 power, ~1s ≈ 1/2, ~3s full. Half-bell ease toward max |
-| Throw lane | Peak at most one row above the thrower; landing at most one row below |
+| Throw lane | Aim commits the row (about a ±45° cone). Hits use that row ±1 |
 | Active thrower | One kid charging at a time |
 | Enemy count | Starts ~2–3, scales by wave |
 | Win | All enemies KO’d |
 | Lose | All player kids KO’d |
 
 ### 3.3 Controls (touch, landscape)
-- Left thumb: select a kid and drag to move on your half of the grid. While Throw is held, the same thumb aims. Aim does not have to start on the kid.
-- Right thumb: Throw button. Hold to charge (half-bell: a tap is about 1/3, ~1s is half, ~3s is full), release to lob. Aim stays within one row of the thrower.
+- Left thumb: a stick under the selected kid. Deflect to step one cell at a time, or to aim while charging. A tap or drag only moves the kid when it starts on or near that kid. Aim is clamped to about ±45° from horizontal.
+- Right thumb: a stick, not a labeled button. Hold to charge (half-bell: a tap is about 1/3, ~1s is half, ~3s is full), release to lob. Player lobs keep a slow pace and gain range with charge. Enemy lobs stay on the faster lane arc.
 - Each side stays on its own half. The middle band is neutral.
 - Lock orientation: landscape left/right only  
 

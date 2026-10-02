@@ -34,9 +34,12 @@ class ArenaGrid {
   static const int coverColumnB = 2;
   static const int coverRow = 4;
 
-  /// Vertical drags change rows sooner than the same drag changes columns.
-  static const double rowDrag = 34;
-  static const double columnDrag = 76;
+  /// A move touch has to start this close to the selected kid's body.
+  /// Distant taps must not set a destination across the yard.
+  static const double moveTouchRadius = 104;
+
+  /// Drag this far from the press point before a step is committed.
+  static const double moveDrag = 28;
 
   /// Matches [KidComponent] sprite size so lane Y lines up with hit centers.
   static const double kidSize = 152;

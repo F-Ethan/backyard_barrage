@@ -7,11 +7,13 @@ import 'kid_component.dart';
 
 typedef ProjectileHit = void Function(LobProjectile shot, KidComponent target);
 typedef FortBlocked = void Function(LobProjectile shot);
+typedef ProjectileGround = void Function(LobProjectile shot);
 
 /// Snowball or water balloon.
 ///
-/// Enemy shots integrate gravity and stay in the thrower's row lane.
-/// Player shots follow a scripted lane: constant pace, aim picks the row.
+/// Hit checks follow the existing lane path ([hitPosition]). The sprite
+/// draws a lob that joins that path at a fort and again before the target
+/// half. A miss keeps going until it meets the landing row's ground.
 class LobProjectile extends SpriteComponent {
   LobProjectile({
     required Sprite sprite,
@@ -22,6 +24,7 @@ class LobProjectile extends SpriteComponent {
     this.fort,
     this.forts = const [],
     this.onFortHit,
+    this.onGround,
     this.blockedByFort = false,
     this.radius = 22,
     this.owner,
@@ -43,6 +46,8 @@ class LobProjectile extends SpriteComponent {
   }) : launchVy = launchVy ?? velocity.y,
        originX = position.x,
        originY = position.y,
+       facing = velocity.x < 0 ? -1.0 : 1.0,
+       _hit = position.clone(),
        _scriptRow = landingRow,
        super(
          sprite: sprite,
@@ -58,6 +63,9 @@ class LobProjectile extends SpriteComponent {
   final FortComponent? fort;
   final List<FortComponent> forts;
   final FortBlocked? onFortHit;
+
+  /// Missed every kid and fort. The ball has reached the ground.
+  final ProjectileGround? onGround;
   final bool blockedByFort;
   final double radius;
   final KidComponent? owner;
@@ -70,6 +78,9 @@ class LobProjectile extends SpriteComponent {
   final double launchVy;
   final double originX;
   final double originY;
+
+  /// +1 toward the enemy half, -1 toward the player half.
+  final double facing;
   final bool friendlyFortDamage;
   final bool scripted;
   final double travelSpeed;
@@ -79,8 +90,15 @@ class LobProjectile extends SpriteComponent {
   final double landingY;
   final double apexY;
 
+  /// World point used for kids, forts, and the row lock.
+  Vector2 get hitPosition => _hit;
+
+  final Vector2 _hit;
   int _scriptRow;
   double _traveled = 0;
+  double _age = 0;
+  bool _rangeDone = false;
+  bool _falling = false;
 
   /// Set when this shot strikes a fort, before [onFortHit].
   FortComponent? struckFort;
@@ -108,7 +126,7 @@ class LobProjectile extends SpriteComponent {
       originY: originY,
       apexRise: apexRise,
       landingDrop: landingDrop,
-      y: position.y,
+      y: _hit.y,
       vy: velocity.y,
     );
   }
@@ -122,18 +140,40 @@ class LobProjectile extends SpriteComponent {
     return ThrowPhysics.nearArcPeak(velocityY: velocity.y, launchVy: launchVy);
   }
 
+  bool get _behindFort {
+    final side = owner?.side;
+    if (side == null) return false;
+    return ArenaGrid.columnIsBehindFort(side, throwerColumn);
+  }
+
+  double get _groundY => ThrowPhysics.impactGroundY(landingRow);
+
   @override
   void update(double dt) {
     super.update(dt);
     if (_spent) return;
+    _age += dt;
+    if (_age > 6) {
+      _land();
+      return;
+    }
+
+    if (_falling) {
+      _stepFall(dt);
+      position.setFrom(_hit);
+      if (_hit.y >= _groundY) _land();
+      return;
+    }
 
     if (scripted) {
       _stepScript(dt);
-      if (_spent) return;
     } else {
       velocity.y += ThrowPhysics.gravity * dt;
-      position += velocity * dt;
+      _hit.x += velocity.x * dt;
+      _hit.y += velocity.y * dt;
     }
+    _syncVisual();
+    if (_spent) return;
 
     if (blockedByFort) {
       for (final cover in _fortList) {
@@ -157,7 +197,7 @@ class LobProjectile extends SpriteComponent {
         if (shotRow != targetRow) continue;
       }
       if (!ThrowPhysics.circlesOverlap(
-        position,
+        _hit,
         radius,
         target.hitCenter,
         target.hitRadius,
@@ -170,31 +210,91 @@ class LobProjectile extends SpriteComponent {
         return;
       }
       _spent = true;
+      position.setFrom(_hit);
       onHit(this, target);
       removeFromParent();
       return;
     }
 
-    if (position.x < -80 ||
-        position.x > 1360 ||
-        position.y < -120 ||
-        position.y > 820) {
-      removeFromParent();
+    if (_hit.y >= _groundY) {
+      _land();
+      return;
     }
+    if (_shouldStartFall()) _beginFall();
+  }
+
+  void _syncVisual() {
+    position.setValues(
+      _hit.x,
+      ThrowPhysics.flightVisualY(
+        collisionY: _hit.y,
+        worldX: _hit.x,
+        originX: originX,
+        originY: originY,
+        range: flightRange,
+        facingRight: facing > 0,
+        behindFort: _behindFort,
+        scripted: scripted,
+        apexY: apexY,
+        landingY: landingY,
+        apexFraction: apexFraction,
+        settleFraction: settleFraction,
+      ),
+    );
+  }
+
+  bool _shouldStartFall() {
+    if (_rangeDone) return true;
+    // Past the last place a kid can stand. Drop on-screen instead of
+    // flying out of the yard at body height.
+    if (facing > 0 && _hit.x > ThrowPhysics.yardFarEdge - 16) return true;
+    if (facing < 0 && _hit.x < 16) return true;
+    return false;
+  }
+
+  void _beginFall() {
+    _falling = true;
+    final drop = velocity.y > 40 ? velocity.y : 40.0;
+    velocity.setValues(facing * 80, drop);
+  }
+
+  void _stepFall(double dt) {
+    velocity.y += ThrowPhysics.gravity * dt;
+    _hit.x += velocity.x * dt;
+    _hit.y += velocity.y * dt;
+  }
+
+  void _land() {
+    if (_spent) return;
+    _spent = true;
+    _hit.y = _groundY;
+    position.setFrom(_hit);
+    onGround?.call(this);
+    removeFromParent();
   }
 
   void _stepScript(double dt) {
-    final speed = travelSpeed > 0 ? travelSpeed : velocity.x.abs();
-    final facing = velocity.x < 0 ? -1.0 : 1.0;
-    _traveled += speed * dt;
-    if (_traveled >= flightRange) {
-      _spent = true;
-      removeFromParent();
+    final speed = travelSpeed > 0 ? travelSpeed : facing * velocity.x;
+    final pace = speed.abs();
+    if (flightRange <= 1) {
+      _rangeDone = true;
       return;
     }
-    final u = flightRange <= 1 ? 1.0 : _traveled / flightRange;
-    position.x = originX + facing * _traveled;
-    position.y = ThrowPhysics.playerArcY(
+    final step = pace * dt;
+    if (_traveled + step >= flightRange) {
+      _placeScript(flightRange);
+      _rangeDone = true;
+      return;
+    }
+    _traveled += step;
+    _placeScript(_traveled);
+  }
+
+  void _placeScript(double traveled) {
+    _traveled = traveled;
+    final u = flightRange <= 1 ? 1.0 : traveled / flightRange;
+    _hit.x = originX + facing * traveled;
+    _hit.y = ThrowPhysics.playerArcY(
       originY: originY,
       apexY: apexY,
       landingY: landingY,
@@ -208,9 +308,10 @@ class LobProjectile extends SpriteComponent {
       u: u,
       settleFraction: settleFraction,
     );
+    final pace = travelSpeed > 0 ? travelSpeed : 0.0;
     velocity = ThrowPhysics.playerArcVelocity(
       facing: facing,
-      speed: speed,
+      speed: pace > 0 ? pace : velocity.x.abs(),
       originY: originY,
       apexY: apexY,
       landingY: landingY,
@@ -259,22 +360,22 @@ class LobProjectile extends SpriteComponent {
     _spent = true;
     struckFort = cover;
     fortDamage = damage;
+    position.setFrom(_hit);
     onFortHit?.call(this);
     removeFromParent();
   }
 
   bool _centerInFootprint(FortComponent cover) {
     final box = cover.footprint;
-    return position.x >= box.left &&
-        position.x <= box.right &&
-        position.y >= box.top &&
-        position.y <= box.bottom;
+    return _hit.x >= box.left &&
+        _hit.x <= box.right &&
+        _hit.y >= box.top &&
+        _hit.y <= box.bottom;
   }
 
   bool _apexWillClear(FortComponent cover) {
     final double apexX;
     if (scripted) {
-      final facing = velocity.x < 0 ? -1.0 : 1.0;
       apexX = originX + facing * flightRange * apexFraction;
     } else {
       apexX = ThrowPhysics.apexX(

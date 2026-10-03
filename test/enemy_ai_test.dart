@@ -146,6 +146,32 @@ void main() {
         ),
         (column: 2, row: 5),
       );
+
+      ({int column, int row})? ally({
+        required bool shotFellShort,
+        required bool retreat,
+        int column = 1,
+        int row = 4,
+      }) {
+        return EnemyAi.planBotStep(
+          column: column,
+          row: row,
+          playerRows: const [4],
+          living: const [true],
+          laneEvery: 2,
+          matchPlayerRow: false,
+          throwsCompleted: 2,
+          shotFellShort: shotFellShort,
+          retreat: retreat,
+          approach: 1,
+        );
+      }
+
+      expect(ally(shotFellShort: true, retreat: false), (column: 2, row: 4));
+      expect(
+        ally(shotFellShort: false, retreat: true, column: 2),
+        (column: 1, row: 4),
+      );
     });
 
     test('throw gaps stay inside each difficulty band', () {

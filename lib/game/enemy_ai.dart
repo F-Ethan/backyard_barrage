@@ -70,16 +70,18 @@ class EnemyAi {
     required bool shotFellShort,
     required bool retreat,
     List<({int column, int row})> occupied = const [],
+    int approach = -1,
   }) {
+    final closer = approach == 0 ? -1 : approach;
     if (retreat) {
       final away = _closestFreeStep(
         column: column,
         row: row,
-        goalColumn: column + 1,
+        goalColumn: column - closer,
         goalRow: row,
         occupied: occupied,
       );
-      if (away != null && away.column > column) return away;
+      if (away != null && away.column == column - closer) return away;
       final threat = _goalRow(
         row: row,
         playerRows: playerRows,
@@ -145,11 +147,14 @@ class EnemyAi {
       if (around != null) return around;
     }
 
-    if (shotFellShort && column > 0) {
+    final nextColumn = column + closer;
+    if (shotFellShort &&
+        nextColumn >= 0 &&
+        nextColumn < ArenaGrid.columnsPerSide) {
       return _closestFreeStep(
         column: column,
         row: row,
-        goalColumn: column - 1,
+        goalColumn: nextColumn,
         goalRow: row,
         occupied: occupied,
       );

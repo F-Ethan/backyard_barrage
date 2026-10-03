@@ -70,6 +70,14 @@ class MetaState {
     if (wave > bestWave) bestWave = wave;
   }
 
+  /// Drop coins, crew, fort, and throw rank. Season and best wave stay.
+  void resetRun() {
+    coins = 0;
+    crewSize = 1;
+    fortStage = 1;
+    throwRank = 0;
+  }
+
   /// Soft currency for clearing [wave] (1-based).
   static int coinsForWave(int wave) => 12 + wave * 8;
 

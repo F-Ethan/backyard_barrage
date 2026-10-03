@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../game/backyard_barrage_game.dart';
@@ -36,6 +34,7 @@ class MatchHud extends StatelessWidget {
         return Stack(
           fit: StackFit.expand,
           children: [
+            if (fighting) _PlayZones(game: game),
             if (fighting && modern && charge > 0)
               Positioned.fill(
                 child: IgnorePointer(child: _ChargeGlow(charge: charge)),
@@ -113,7 +112,7 @@ class MatchHud extends StatelessWidget {
                         fit: BoxFit.scaleDown,
                         child: _HudChip(
                           child: Text(
-                            'Hold a kid or right stick to charge  ·  drag or left thumb aims',
+                            'Tap the left side to step  ·  hold the right side to throw',
                             key: Key('hud-hint'),
                             style: BarrageType.muted,
                           ),
@@ -126,23 +125,6 @@ class MatchHud extends StatelessWidget {
                 ),
               ),
             ),
-            if (fighting)
-              SafeArea(
-                child: Stack(
-                  children: [
-                    Positioned(
-                      left: 10,
-                      bottom: modern ? 10 : 46,
-                      child: _MoveStick(game: game),
-                    ),
-                    Positioned(
-                      right: 10,
-                      bottom: modern ? 10 : 46,
-                      child: _ThrowStick(game: game, charge: charge),
-                    ),
-                  ],
-                ),
-              ),
           ],
         );
       },
@@ -266,165 +248,54 @@ class _ChargeGlow extends StatelessWidget {
   }
 }
 
-/// Right thumb. Hold anywhere on the ring to charge; release throws.
-/// A hold on the selected kid does the same thing.
-class _ThrowStick extends StatefulWidget {
-  const _ThrowStick({required this.game, required this.charge});
-
-  final BackyardBarrageGame game;
-  final double charge;
-
-  @override
-  State<_ThrowStick> createState() => _ThrowStickState();
-}
-
-class _ThrowStickState extends State<_ThrowStick> {
-  static const double _size = 148;
-  int _pointers = 0;
-
-  void _down(PointerDownEvent event) {
-    _pointers += 1;
-    if (_pointers == 1) widget.game.pressThrowButton();
-    setState(() {});
-  }
-
-  void _up(PointerEvent event) {
-    _pointers = math.max(0, _pointers - 1);
-    if (_pointers == 0) widget.game.releaseThrowButton();
-    setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final charge = widget.charge.clamp(0.0, 1.0);
-    final held = _pointers > 0 || charge > 0;
-    return Semantics(
-      button: true,
-      label: 'Charge throw',
-      child: Listener(
-        key: const Key('throw-stick'),
-        behavior: HitTestBehavior.opaque,
-        onPointerDown: _down,
-        onPointerUp: _up,
-        onPointerCancel: _up,
-        child: SizedBox(
-          width: _size,
-          height: _size,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(
-                0xFFFFE66D,
-              ).withValues(alpha: held ? 0.16 + charge * 0.28 : 0.10),
-              border: Border.all(
-                color: const Color(
-                  0xFFFFE66D,
-                ).withValues(alpha: held ? 0.85 : 0.45),
-                width: held ? 4 : 3,
-              ),
-            ),
-            child: Center(
-              child: Container(
-                width: 28 + charge * 36,
-                height: 28 + charge * 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(
-                    0xFFFFE66D,
-                  ).withValues(alpha: 0.35 + charge * 0.55),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Left thumb. Deflect to step, or to aim while a charge is held.
-/// Steps are slow: about 1.2 seconds per column.
-class _MoveStick extends StatefulWidget {
-  const _MoveStick({required this.game});
+/// Left two-thirds step the selected kid. The right third charges a throw.
+class _PlayZones extends StatelessWidget {
+  const _PlayZones({required this.game});
 
   final BackyardBarrageGame game;
 
   @override
-  State<_MoveStick> createState() => _MoveStickState();
-}
-
-class _MoveStickState extends State<_MoveStick> {
-  static const double _size = 128;
-  static const double _reach = 36;
-  int? _pointer;
-  Offset _knob = Offset.zero;
-
-  void _down(PointerDownEvent event) {
-    _pointer = event.pointer;
-    _apply(event.localPosition);
-  }
-
-  void _move(PointerMoveEvent event) {
-    if (event.pointer != _pointer) return;
-    _apply(event.localPosition);
-  }
-
-  void _apply(Offset local) {
-    const center = Offset(_size / 2, _size / 2);
-    var delta = local - center;
-    if (delta.distance > _reach) {
-      delta = Offset.fromDirection(delta.direction, _reach);
-    }
-    setState(() => _knob = delta);
-    widget.game.setMoveStick(delta);
-  }
-
-  void _end(PointerEvent event) {
-    if (event.pointer != _pointer) return;
-    _pointer = null;
-    setState(() => _knob = Offset.zero);
-    widget.game.clearMoveStick();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Aim and move',
-      child: Listener(
-        key: const Key('move-stick'),
-        behavior: HitTestBehavior.opaque,
-        onPointerDown: _down,
-        onPointerMove: _move,
-        onPointerUp: _end,
-        onPointerCancel: _end,
-        child: SizedBox(
-          width: _size,
-          height: _size,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(0xFF3D7CFF).withValues(alpha: 0.16),
-              border: Border.all(
-                color: const Color(0xFF3D7CFF).withValues(alpha: 0.55),
-                width: 3,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final chargeWidth =
+            constraints.maxWidth * (1 - BackyardBarrageGame.chargeScreenFraction);
+        return Stack(
+          children: [
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              right: chargeWidth,
+              child: Listener(
+                key: const Key('move-zone'),
+                behavior: HitTestBehavior.opaque,
+                onPointerDown: (event) {
+                  game.pressMoveZone(game.screenToWorld(event.localPosition));
+                },
+                onPointerMove: (event) {
+                  game.dragMoveZone(game.screenToWorld(event.localPosition));
+                },
+                onPointerUp: (_) => game.releaseMoveZone(),
+                onPointerCancel: (_) => game.releaseMoveZone(),
               ),
             ),
-            child: Center(
-              child: Transform.translate(
-                offset: _knob,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF3D7CFF).withValues(alpha: 0.82),
-                  ),
-                ),
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: chargeWidth,
+              child: Listener(
+                key: const Key('charge-zone'),
+                behavior: HitTestBehavior.opaque,
+                onPointerDown: (_) => game.pressChargeZone(),
+                onPointerUp: (_) => game.releaseChargeZone(),
+                onPointerCancel: (_) => game.releaseChargeZone(),
               ),
             ),
-          ),
-        ),
-      ),
+          ],
+        );
+      },
     );
   }
 }

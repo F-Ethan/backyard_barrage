@@ -7,8 +7,9 @@ import 'arena_grid.dart';
 /// What a fort does to a snowball or water balloon that meets it.
 enum FortShotResult { none, blocked, damaged }
 
-/// A lob. Enemy shots are ballistic. Player shots are [scripted]: constant
-/// pace, with aim choosing the row instead of a realistic arc.
+/// A lob. Live shots use a [groundTrack]: constant pace, depth set by aim,
+/// and a drawn loft that meets that track at the hand and at the landing.
+/// [scripted] remains for the older lane path.
 class RowLob {
   const RowLob({
     required this.velocity,
@@ -20,6 +21,7 @@ class RowLob {
     required this.landingDrop,
     required this.range,
     this.scripted = false,
+    this.groundTrack = false,
     this.travelSpeed = 0,
     this.originY = 0,
     this.landingY = 0,
@@ -43,6 +45,9 @@ class RowLob {
 
   /// Player lobs follow [ThrowPhysics.playerArcY] instead of gravity.
   final bool scripted;
+
+  /// Hit path is a straight depth line. The sprite lofts above it.
+  final bool groundTrack;
   final double travelSpeed;
   final double originY;
   final double landingY;
@@ -54,6 +59,10 @@ class RowLob {
   final double settleFraction;
 
   double yAt(double u) {
+    if (groundTrack) {
+      final uu = u.clamp(0.0, 1.0);
+      return originY + (landingY - originY) * uu;
+    }
     if (!scripted) return originY;
     return ThrowPhysics.playerArcY(
       originY: originY,
@@ -66,6 +75,7 @@ class RowLob {
   }
 
   int rowAt(double u) {
+    if (groundTrack) return ArenaGrid.rowForLaneY(yAt(u));
     if (!scripted) return landingRow;
     return ThrowPhysics.playerArcRow(
       throwerRow: throwerRow,
@@ -75,17 +85,17 @@ class RowLob {
     );
   }
 
-  /// World X of the loft peak. Player shots place it on the scripted path.
+  /// World X of the loft peak.
   double apexWorldX(double originX) {
     final facing = velocity.x < 0 ? -1.0 : 1.0;
-    if (!scripted) {
-      return ThrowPhysics.apexX(
-        originX: originX,
-        velocity: velocity,
-        launchVy: velocity.y,
-      );
+    if (scripted || groundTrack) {
+      return originX + facing * range * apexFraction;
     }
-    return originX + facing * range * apexFraction;
+    return ThrowPhysics.apexX(
+      originX: originX,
+      velocity: velocity,
+      launchVy: velocity.y,
+    );
   }
 }
 
@@ -114,6 +124,23 @@ class ThrowPhysics {
   /// A tap dies in the neutral band. Full power is computed so a back-line
   /// throw reaches [yardFarEdge].
   static const double tapRange = 250;
+
+  /// How long one up-and-down swivel takes while a charge is held.
+  static const double swivelPeriod = 1.2;
+
+  /// Where along a ground-track lob the drawn loft peaks.
+  static const double groundApexFraction = 0.5;
+
+  /// A kid's hit circle, as a fraction of sprite width. Small enough that a
+  /// ball can pass the sprite without a touch.
+  static const double kidHitScale = 0.16;
+
+  /// Depth slop, as a fraction of one row. A ground track outside this
+  /// window passes in front of or behind the kid.
+  static const double depthWindowFraction = 0.4;
+
+  /// Rival ground-track pace. Faster than the player's lob.
+  static const double enemyTravelSpeed = 1400;
 
   /// Horizontal pace of every player lob. Throw rank may scale it.
   ///
@@ -242,6 +269,45 @@ class ThrowPhysics {
     return Vector2(forward * math.cos(elevation), -math.sin(elevation));
   }
 
+  /// Elevation while charging. One full cycle of [swivelPeriod] swings from
+  /// straight, to the top of the cone, back through straight, to the bottom.
+  static double swivelElevation(double heldSeconds) {
+    if (swivelPeriod <= 0) return 0;
+    return math.sin(2 * math.pi * heldSeconds / swivelPeriod) * maxAimRadians;
+  }
+
+  /// Forward aim at [elevation] radians. Positive elevation aims up the screen.
+  static Vector2 aimForElevation(
+    double elevation, {
+    required bool facingRight,
+  }) {
+    final clamped = elevation.clamp(-maxAimRadians, maxAimRadians);
+    final forward = facingRight ? 1.0 : -1.0;
+    return Vector2(forward * math.cos(clamped), -math.sin(clamped));
+  }
+
+  /// Drawn loft above the ground track. Zero at the hand and at the landing.
+  static double loftAt(double u, double range) {
+    final uu = u.clamp(0.0, 1.0);
+    final height = (range.abs() * 0.18).clamp(48.0, 120.0);
+    final s = math.sin(math.pi * uu);
+    return height * s * s;
+  }
+
+  /// Contact in ground-track space. The depth window is tighter than the
+  /// circle, so a ball whose track is in front of or behind the kid misses
+  /// even when the drawn sprite crosses the body.
+  static bool snowballContacts({
+    required Vector2 ground,
+    required double shotRadius,
+    required Vector2 kidCenter,
+    required double kidRadius,
+  }) {
+    final window = ArenaGrid.rowStep * depthWindowFraction;
+    if ((ground.y - kidCenter.y).abs() > window) return false;
+    return circlesOverlap(ground, shotRadius, kidCenter, kidRadius);
+  }
+
   /// Radians above horizontal after [clampAimDirection]. Positive is up.
   static double aimElevation(
     Vector2 aimDirection, {
@@ -286,42 +352,28 @@ class ThrowPhysics {
       charge: charge,
     );
     final landingY = ArenaGrid.laneY(landing);
-    final chordHigh = math.min(originY, landingY);
-    final apexY = chordHigh - playerLoft;
-    final rise = originY - apexY;
+    final apexY = math.min(originY, landingY) - playerLoft;
     final range = rangeForCharge(charge);
     final scale = speedScale.clamp(0.2, 3.0);
     final speed = playerTravelSpeed * scale;
     final facing = facingRight ? 1.0 : -1.0;
-    final initialVy = playerArcVelocity(
-      facing: facing,
-      speed: speed,
-      originY: originY,
-      apexY: apexY,
-      landingY: landingY,
-      u: 0,
-      apexFraction: playerApexFraction,
-      settleFraction: playerSettleFraction,
-      range: range,
-    ).y;
-    var peak = math.min(row, landing);
-    if (_chargePower(charge) >= 0.82 && peak > 0) peak -= 1;
+    final loft = loftAt(0.5, range);
     return RowLob(
-      velocity: Vector2(facing * speed, initialVy),
+      velocity: Vector2(facing * speed, 0),
       throwerRow: row,
       throwerColumn: throwerColumn.clamp(0, ArenaGrid.columnsPerSide - 1),
-      peakRow: peak,
+      peakRow: math.min(row, landing),
       landingRow: landing,
-      apexRise: rise < 1 ? 1 : rise,
+      apexRise: loft < 1 ? 1 : loft,
       landingDrop: landingY - originY,
       range: range,
-      scripted: true,
+      groundTrack: true,
       travelSpeed: speed,
       originY: originY,
       landingY: landingY,
       apexY: apexY,
-      apexFraction: playerApexFraction,
-      settleFraction: playerSettleFraction,
+      apexFraction: groundApexFraction,
+      settleFraction: 1,
     );
   }
 
@@ -589,73 +641,29 @@ class ThrowPhysics {
   }) {
     final row = throwerRow.clamp(0, ArenaGrid.rows - 1);
     var landing = targetRow;
-    if (landing < row - laneRows) landing = row - laneRows;
-    if (landing > row + laneRows) landing = row + laneRows;
     if (landing < 0) landing = 0;
     if (landing >= ArenaGrid.rows) landing = ArenaGrid.rows - 1;
-    final peak = row > 0 ? row - 1 : row;
     final range = enemyLobRange(distance: distance, rangeScale: rangeScale);
-    return _buildLob(
-      throwerRow: row,
-      throwerColumn: throwerColumn,
-      peakRow: peak,
-      landingRow: landing,
-      range: range,
-      facingRight: facingRight,
-      originY: originY,
-    );
-  }
-
-  static RowLob _buildLob({
-    required int throwerRow,
-    required int throwerColumn,
-    required int peakRow,
-    required int landingRow,
-    required double range,
-    required bool facingRight,
-    required double originY,
-  }) {
-    var rise = peakRow < throwerRow
-        ? originY - ArenaGrid.laneY(peakRow)
-        : math.min(ArenaGrid.rowStep * 0.22, 10.0);
-    if (rise < 8) rise = 8.0;
-    final drop = ArenaGrid.laneY(landingRow) - originY;
-    if (drop < 0 && rise < -drop + 4) {
-      rise = -drop + 4;
-    }
-    final velocity = _arcVelocity(
-      rise: rise,
-      drop: drop,
-      range: range,
-      facingRight: facingRight,
-    );
+    final facing = facingRight ? 1.0 : -1.0;
+    final landingY = ArenaGrid.laneY(landing);
+    final loft = loftAt(0.5, range);
     return RowLob(
-      velocity: velocity,
-      throwerRow: throwerRow,
-      throwerColumn: throwerColumn,
-      peakRow: peakRow,
-      landingRow: landingRow,
-      apexRise: rise,
-      landingDrop: drop,
+      velocity: Vector2(facing * enemyTravelSpeed, 0),
+      throwerRow: row,
+      throwerColumn: throwerColumn.clamp(0, ArenaGrid.columnsPerSide - 1),
+      peakRow: row,
+      landingRow: landing,
+      apexRise: loft < 1 ? 1 : loft,
+      landingDrop: landingY - originY,
       range: range,
+      groundTrack: true,
+      travelSpeed: enemyTravelSpeed,
+      originY: originY,
+      landingY: landingY,
+      apexY: landingY,
+      apexFraction: groundApexFraction,
+      settleFraction: 1,
     );
-  }
-
-  static Vector2 _arcVelocity({
-    required double rise,
-    required double drop,
-    required double range,
-    required bool facingRight,
-  }) {
-    final h = rise < 8 ? 8.0 : rise;
-    final vy = -math.sqrt(2 * gravity * h);
-    final disc = vy * vy + 2 * gravity * drop;
-    final t = disc <= 0
-        ? (-vy / gravity) * 2
-        : (-vy + math.sqrt(disc)) / gravity;
-    final safeT = t < 0.05 ? 0.05 : t;
-    final vx = range / safeT;
-    return Vector2(facingRight ? vx : -vx, vy);
   }
 
   /// Logical row along a [RowLob]. Stays inside the thrower's ±1 band.

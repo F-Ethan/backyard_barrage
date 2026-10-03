@@ -17,7 +17,7 @@ Playable MVP loop on the gameplay branch:
 - **Haptics.** Charge release, hit, KO, and a successful purchase. Flutter `HapticFeedback`, no-op when the toggle is off or the platform has no vibrator.
 - **UI kit v2.** Menus, shop, pause, settings, and the fight HUD use `assets/images/ui_modern/` by default (pill buttons, soft sheet, season chips, glass HUD, image toggles). Hearts, coins, the fort meter, the wave label, Pause, and the two thumb sticks are Flutter overlays so they stay screen-sized on the letterboxed yard. Settings → Modern UI (stored with the other toggles in `backyard_barrage_settings_v1`) flips those screens to the classic wood kit in `assets/images/ui/` without leaving the match. Classic fight HUD keeps a literal power bar; modern replaces it with the charge glow.
 - **Audio.** Studio procedural pack is wired through `flame_audio` (not stubbed): throw whoosh, seasonal impact (snow / wet), hit, KO, win / lose stingers, UI tap, purchase coin, menu loop, `battle_loop_winter.wav` in winter, and `battle_loop_summer.wav` in summer. Toggles gate playback. Music beds were refreshed in place (menu ~7.83s, winter battle ~6.92s, summer battle ~6.67s). Filenames and playback paths are unchanged. All 12 files are present (9 sfx, 3 music).
-- **App icon E2b.** Studio master (908081 bytes, identical pixels) at `assets/images/ui/app_icon_1024.png` and `app_icon_1024_draft.png`. Half snowball | half water balloon on a winter/summer split. iOS AppIcon, Android `ic_launcher` mipmaps, and macOS AppIcon are resized from that file. The 1024 platform slots are the same bytes.
+- **App icon.** Locked summer|winter clash master (1947595 bytes, SHA-256 `86621c0890c82418a4260b93b956927495c01653ae08034704f5e377d992ff1f`) at `assets/images/ui/app_icon_1024.png` and `app_icon_1024_draft.png`. The square is a center crop of the portrait clash art. iOS AppIcon, Android `ic_launcher` mipmaps, and macOS AppIcon are resized from that file. The 1024 platform slots are the same bytes.
 
 ## Known gaps
 
@@ -31,9 +31,11 @@ Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you n
 - **Player and enemy lobs do not share a collision flight model.** Player shots stay scripted (pace `ThrowPhysics.playerTravelSpeed`, range from charge, row from aim). Enemy shots stay on the ballistic lane. Both draw a lob that meets that hit path at contact and splat on the landing row's ground if they miss. Tuning the collision constants is a feel pass, not a second control scheme.
 - **App icon still lives under the classic UI folder.** `assets/images/ui/app_icon_1024.png` is the launcher icon. Game screens use that folder only when Settings → Modern UI is off.
 - **Props folders are empty.** `assets/images/props/winter/` and `props/summer/` exist so the asset list analyzes, but they have no sprites yet.
-- **App icon is unused inside the game UI.** E2b is the store/launcher icon only. `web/favicon.png` and `web/icons/` are still the Flutter defaults.
+- **App icon is unused inside the game UI.** The clash icon is the store/launcher icon only. `web/favicon.png` and `web/icons/` are still the Flutter defaults.
+- **MVP draft generator still paints a placeholder app icon.** `scripts/generate_mvp_drafts.py` writes `ui/app_icon_1024_draft.png`. Re-running it would replace the locked clash bytes.
 - **Walk and throw are single frames.** No multi-frame cycles yet (`docs/STATUS.md`).
 - **No CI yet.** No `.github/workflows` — analyze/test are local (`flutter analyze`, `flutter test`).
+- **`flutter analyze` reports one pre-existing info.** `prefer_initializing_formals` in `lib/feel/feel_bus.dart`. It is already on `main` and is not part of the icon change.
 - **Classic kit has no icon, toggle, or HUD-chip sprites.** Pause, settings, close, and the on/off switches are drawn in the classic ink/cream style when Modern UI is off. Buttons, panels, chips, hearts, coins, the wordmark, shop cards, and the fort meter use the classic PNGs.
 - **Draft art otherwise.** Other PNGs are still `*_draft.png` until approved finals replace them (`docs/STATUS.md`). The app icon final name is the exception above.
 - **README was art-pack oriented.** Rewritten as a game README in the agent-docs bootstrap; keep it game-focused if you touch it again.

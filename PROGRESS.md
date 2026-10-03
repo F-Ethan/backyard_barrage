@@ -35,6 +35,7 @@ Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you n
 - **MVP draft generator still paints a placeholder app icon.** `scripts/generate_mvp_drafts.py` writes `ui/app_icon_1024_draft.png`. Re-running it would replace the locked clash bytes.
 - **Walk and throw are single frames.** No multi-frame cycles yet (`docs/STATUS.md`).
 - **No CI yet.** No `.github/workflows` — analyze/test are local (`flutter analyze`, `flutter test`).
+- **`flutter analyze` reports one pre-existing info.** `prefer_initializing_formals` in `lib/feel/feel_bus.dart`. It is already on `main` and is not part of the icon change.
 - **Classic kit has no icon, toggle, or HUD-chip sprites.** Pause, settings, close, and the on/off switches are drawn in the classic ink/cream style when Modern UI is off. Buttons, panels, chips, hearts, coins, the wordmark, shop cards, and the fort meter use the classic PNGs.
 - **Draft art otherwise.** Other PNGs are still `*_draft.png` until approved finals replace them (`docs/STATUS.md`). The app icon final name is the exception above.
 - **README was art-pack oriented.** Rewritten as a game README in the agent-docs bootstrap; keep it game-focused if you touch it again.

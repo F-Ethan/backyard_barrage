@@ -33,26 +33,118 @@ void main() {
       expect(columnSteps, greaterThan(0));
     });
 
-    test('rivals step once every few throws, more often on hard', () {
-      expect(EnemyAi.shouldGridStep(0, 3), isFalse);
-      expect(EnemyAi.shouldGridStep(1, 3), isFalse);
-      expect(EnemyAi.shouldGridStep(2, 3), isFalse);
-      expect(EnemyAi.shouldGridStep(3, 3), isTrue);
-      expect(EnemyAi.shouldGridStep(4, 3), isFalse);
-      expect(EnemyAi.shouldGridStep(6, 3), isTrue);
+    test('lane checks follow the difficulty, and steps chase or fall back', () {
+      expect(EnemyAi.shouldAdjustLane(0, 2), isFalse);
+      expect(EnemyAi.shouldAdjustLane(1, 2), isFalse);
+      expect(EnemyAi.shouldAdjustLane(2, 2), isTrue);
+      expect(EnemyAi.shouldAdjustLane(3, 2), isFalse);
+      expect(EnemyAi.shouldAdjustLane(1, 1), isTrue);
 
       final easy = DifficultyTuning.of(Difficulty.easy);
       final normal = DifficultyTuning.of(Difficulty.normal);
       final hard = DifficultyTuning.of(Difficulty.hard);
       expect(easy.throwsPerStep, greaterThan(normal.throwsPerStep));
-      expect(hard.throwsPerStep, lessThan(normal.throwsPerStep));
+      expect(normal.throwsPerStep, 1);
+      expect(hard.throwsPerStep, 1);
+      expect(easy.matchPlayerRow, isFalse);
+      expect(normal.matchPlayerRow, isFalse);
+      expect(hard.matchPlayerRow, isTrue);
+
+      ({int column, int row})? step({
+        required DifficultyTuning profile,
+        required int throwsCompleted,
+        int column = 2,
+        int row = 4,
+        List<int> playerRows = const [1],
+        bool shotFellShort = false,
+        bool retreat = false,
+        List<({int column, int row})> occupied = const [],
+      }) {
+        return EnemyAi.planBotStep(
+          column: column,
+          row: row,
+          playerRows: playerRows,
+          living: [for (var i = 0; i < playerRows.length; i++) true],
+          laneEvery: profile.throwsPerStep,
+          matchPlayerRow: profile.matchPlayerRow,
+          throwsCompleted: throwsCompleted,
+          shotFellShort: shotFellShort,
+          retreat: retreat,
+          occupied: occupied,
+        );
+      }
+
+      expect(step(profile: easy, throwsCompleted: 1), isNull);
+      expect(step(profile: easy, throwsCompleted: 1, shotFellShort: true), (
+        column: 1,
+        row: 4,
+      ));
+      expect(step(profile: easy, throwsCompleted: 2), (column: 2, row: 3));
       expect(
-        EnemyAi.shouldGridStep(hard.throwsPerStep, hard.throwsPerStep),
-        isTrue,
+        step(profile: normal, throwsCompleted: 1, playerRows: const [4]),
+        isNull,
       );
       expect(
-        EnemyAi.shouldGridStep(hard.throwsPerStep - 1, hard.throwsPerStep),
-        isFalse,
+        step(profile: normal, throwsCompleted: 1, playerRows: const [5]),
+        isNull,
+      );
+      expect(step(profile: normal, throwsCompleted: 1), (column: 2, row: 3));
+      expect(step(profile: hard, throwsCompleted: 1, playerRows: const [5]), (
+        column: 2,
+        row: 5,
+      ));
+      expect(
+        step(profile: hard, throwsCompleted: 1, playerRows: const [4]),
+        isNull,
+      );
+      expect(
+        step(
+          profile: normal,
+          throwsCompleted: 1,
+          playerRows: const [4],
+          shotFellShort: true,
+        ),
+        (column: 1, row: 4),
+      );
+      expect(
+        step(
+          profile: normal,
+          throwsCompleted: 1,
+          column: 0,
+          playerRows: const [4],
+          shotFellShort: true,
+        ),
+        isNull,
+      );
+      expect(step(profile: normal, throwsCompleted: 1, retreat: true), (
+        column: 3,
+        row: 4,
+      ));
+      expect(
+        step(
+          profile: normal,
+          throwsCompleted: 1,
+          column: 3,
+          retreat: true,
+          playerRows: const [4],
+        ),
+        (column: 3, row: 5),
+      );
+      final blocked = step(
+        profile: normal,
+        throwsCompleted: 1,
+        occupied: const [(column: 2, row: 3)],
+      );
+      expect(blocked, isNotNull);
+      expect(blocked, isNot(equals((column: 2, row: 3))));
+      expect(
+        step(
+          profile: normal,
+          throwsCompleted: 1,
+          playerRows: const [1, 6],
+          occupied: const [(column: 1, row: 1)],
+        ),
+        (column: 2, row: 5),
       );
     });
 

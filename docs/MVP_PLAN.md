@@ -69,7 +69,9 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 ### 3.4 AI (simple)
 - Target a living player kid in the thrower's row lane when one is there
 - Throw about every 1.5–3s on Normal (slower on Easy, about 1–1.5s on Hard)
-- One grid step every few throws (less often on Easy, more often on Hard)
+- After a throw, step one row toward a living player if nobody is within one row. Easy does that every other throw. Normal does it every throw. Hard steps onto the closest player's exact row every throw
+- A lob that falls short steps one column closer. A hit steps one column back, or off that row if they are already at the back line
+- They will not step onto a teammate, and they drift toward a player who is not already covered
 - Per-wave: slightly shorter gaps and tighter landing scatter  
 
 ### 3.5 Upgrades (between waves)

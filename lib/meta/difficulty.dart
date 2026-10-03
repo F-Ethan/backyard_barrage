@@ -8,6 +8,7 @@ class DifficultyTuning {
     required this.throwGapMin,
     required this.throwGapMax,
     required this.throwsPerStep,
+    required this.matchPlayerRow,
     required this.playerMoveScale,
     required this.friendlyFortDamage,
     required this.enemyStepSpeed,
@@ -17,8 +18,12 @@ class DifficultyTuning {
   final double throwGapMin;
   final double throwGapMax;
 
-  /// One grid step after this many throws. Higher means less chasing.
+  /// Throws between lane checks. 1 checks every throw. Easy uses 2.
   final int throwsPerStep;
+
+  /// Hard steps onto the closest player's exact row. Easy and Normal
+  /// hold still once a living player is already within one row.
+  final bool matchPlayerRow;
 
   /// Multiplier on the player's walk cap. 1 matches snowball pace.
   final double playerMoveScale;
@@ -37,7 +42,8 @@ class DifficultyTuning {
         return DifficultyTuning(
           throwGapMin: 3,
           throwGapMax: max,
-          throwsPerStep: 6,
+          throwsPerStep: 2,
+          matchPlayerRow: false,
           playerMoveScale: 1.12,
           friendlyFortDamage: false,
           enemyStepSpeed: 120,
@@ -47,7 +53,8 @@ class DifficultyTuning {
         return DifficultyTuning(
           throwGapMin: 1,
           throwGapMax: max,
-          throwsPerStep: 2,
+          throwsPerStep: 1,
+          matchPlayerRow: true,
           playerMoveScale: 0.88,
           friendlyFortDamage: true,
           enemyStepSpeed: 170,
@@ -57,7 +64,8 @@ class DifficultyTuning {
         return DifficultyTuning(
           throwGapMin: 1.5,
           throwGapMax: max,
-          throwsPerStep: 3,
+          throwsPerStep: 1,
+          matchPlayerRow: false,
           playerMoveScale: 1,
           friendlyFortDamage: false,
           enemyStepSpeed: 150,

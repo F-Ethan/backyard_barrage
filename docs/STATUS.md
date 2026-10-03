@@ -1,9 +1,9 @@
 # Backyard Barrage — Art Pack Status
 
-**Updated:** 2026-10-01  
+**Updated:** 2026-10-03  
 **Pack:** MVP draft + character pose polish + **UI kit pass**
 
-**Game wiring:** The arena loads both seasons (backgrounds, idle/walk/charge/throw/hit/KO poses, snowball vs water balloon, snow vs splash) and fort stages 1–3. Flutter menus, shop, pause, settings, and the screen-space HUD use **`assets/images/ui_modern/`** (see `docs/UI_MODERN.md`). The legacy wood/comic kit under `assets/images/ui/` is kept, including the E2b app icon; those draft buttons, chips, and frames are no longer on the live screens.  
+**Game wiring:** The arena loads both seasons (backgrounds, idle/walk/charge/throw/hit/KO poses, snowball vs water balloon, snow vs splash) and fort stages 1–3. Flutter menus, shop, pause, settings, and the screen-space HUD use **`assets/images/ui_modern/`** (see `docs/UI_MODERN.md`). The legacy wood/comic kit under `assets/images/ui/` is kept, including the locked app icon; those draft buttons, chips, and frames are no longer on the live screens.  
 **Style source:** `docs/STYLE.md` (followed)  
 **Generators:**
 - `scripts/generate_mvp_drafts.py` — world/forts/VFX/UI basics + shared character import
@@ -23,8 +23,8 @@ All under `assets/images/ui/`. Shared language: ink `#2C3E50` ~4–6px outline, 
 | File | Size | Status | Notes |
 |------|------|--------|-------|
 | `wordmark_backyard_barrage_draft.png` | 1024×384 | draft (kept) | Existing wordmark |
-| `app_icon_1024.png` | 1024×1024 | locked E2b | Studio master, 908081 bytes. Half snowball / half water balloon, winter/summer split. |
-| `app_icon_1024_draft.png` | 1024×1024 | locked E2b (same pixels) | Identical Studio bytes (908081). Draft filename kept for pipeline continuity. |
+| `app_icon_1024.png` | 1024×1024 | locked | Summer\|winter clash master, 1947595 bytes. Center crop of the portrait source. SHA-256 `86621c0890c82418a4260b93b956927495c01653ae08034704f5e377d992ff1f`. |
+| `app_icon_1024_draft.png` | 1024×1024 | locked (same pixels) | Identical bytes (1947595). Draft filename kept for pipeline continuity. |
 | `btn_primary_draft.png` | 512×160 | **improved draft** | Cream + ink + 3D lip; re-exported |
 | `btn_primary_pressed_draft.png` | 512×160 | **new draft** | Sunk / dim cream pressed |
 | `btn_secondary_draft.png` | 512×160 | **new draft** | Quieter lip + inner hairline |
@@ -41,7 +41,7 @@ All under `assets/images/ui/`. Shared language: ink `#2C3E50` ~4–6px outline, 
 | `coin_draft.png` | 256×256 | **improved draft** | Same outline weight; re-exported |
 | `panel_modal_draft.png` | 1024×768 | **new draft** | Cream modal, 9-slice friendly |
 
-**Intended-final:** none yet — all filenames still `_draft`.
+**Intended-final:** `app_icon_1024.png` is the locked launcher master. Other filenames in this table are still `_draft`.
 
 ---
 

@@ -126,7 +126,8 @@ void main() {
         facingRight: true,
         originY: from.y,
       );
-      expect(full.scripted, isTrue);
+      expect(full.groundTrack, isTrue);
+      expect(full.scripted, isFalse);
       expect(
         from.x + full.range,
         greaterThanOrEqualTo(ThrowPhysics.yardFarEdge),
@@ -214,7 +215,7 @@ void main() {
       },
     );
 
-    test('a player lob keeps its pace and locks onto the aimed row', () {
+    test('a player lob keeps its pace and slides to the aimed depth', () {
       final from = ArenaGrid.throwOrigin(
         KidSide.player,
         ArenaGrid.cellCenter(KidSide.player, 0, 4),
@@ -243,12 +244,15 @@ void main() {
         final low = math.min(4, lob.landingRow);
         final high = math.max(4, lob.landingRow);
         expect(row, inInclusiveRange(low, high));
-        if (u >= lob.settleFraction) {
+        if (u >= 1) {
           expect(row, lob.landingRow);
           expect(y, closeTo(lob.landingY, 0.01));
         }
         previousX = x;
       }
+      expect(ThrowPhysics.loftAt(0.5, lob.range), greaterThan(40));
+      expect(ThrowPhysics.loftAt(0, lob.range), closeTo(0, 0.001));
+      expect(ThrowPhysics.loftAt(1, lob.range), closeTo(0, 0.001));
     });
 
     test('a short enemy lob is the cue to step closer', () {
@@ -510,6 +514,80 @@ void main() {
       expect(visualAt(open), lessThan(originY - 24));
       expect(visualAt(ArenaGrid.playerRight - 12), closeTo(originY, 0.01));
       expect(visualAt(originX), closeTo(originY, 0.01));
+    });
+
+    test('charge swivel swings the cone and release timing picks the depth', () {
+      expect(ThrowPhysics.swivelElevation(0), closeTo(0, 0.001));
+      expect(
+        ThrowPhysics.swivelElevation(ThrowPhysics.swivelPeriod / 4),
+        closeTo(ThrowPhysics.maxAimRadians, 0.001),
+      );
+      expect(
+        ThrowPhysics.swivelElevation(ThrowPhysics.swivelPeriod / 2),
+        closeTo(0, 0.001),
+      );
+      expect(
+        ThrowPhysics.swivelElevation(ThrowPhysics.swivelPeriod * 0.75),
+        closeTo(-ThrowPhysics.maxAimRadians, 0.001),
+      );
+      final up = ThrowPhysics.planPlayerLob(
+        throwerRow: 4,
+        throwerColumn: 1,
+        aimDirection: ThrowPhysics.aimForElevation(
+          ThrowPhysics.maxAimRadians,
+          facingRight: true,
+        ),
+        charge: 1,
+        facingRight: true,
+        originY: ArenaGrid.laneY(4),
+      );
+      final down = ThrowPhysics.planPlayerLob(
+        throwerRow: 4,
+        throwerColumn: 1,
+        aimDirection: ThrowPhysics.aimForElevation(
+          -ThrowPhysics.maxAimRadians,
+          facingRight: true,
+        ),
+        charge: 1,
+        facingRight: true,
+        originY: ArenaGrid.laneY(4),
+      );
+      expect(up.landingRow, lessThan(4));
+      expect(down.landingRow, greaterThan(4));
+    });
+
+    test('a small depth window lets a ball pass in front or behind', () {
+      final kid = Vector2(400, ArenaGrid.laneY(4));
+      const shot = 22.0;
+      final body = ArenaGrid.kidSize * ThrowPhysics.kidHitScale;
+      expect(
+        ThrowPhysics.snowballContacts(
+          ground: Vector2(400, kid.y),
+          shotRadius: shot,
+          kidCenter: kid,
+          kidRadius: body,
+        ),
+        isTrue,
+      );
+      final window = ArenaGrid.rowStep * ThrowPhysics.depthWindowFraction;
+      expect(
+        ThrowPhysics.snowballContacts(
+          ground: Vector2(400, kid.y + window + 4),
+          shotRadius: shot,
+          kidCenter: kid,
+          kidRadius: body,
+        ),
+        isFalse,
+      );
+      expect(
+        ThrowPhysics.snowballContacts(
+          ground: Vector2(400 + shot + body + 8, kid.y),
+          shotRadius: shot,
+          kidCenter: kid,
+          kidRadius: body,
+        ),
+        isFalse,
+      );
     });
 
     test('a miss lands on that row’s feet, not the bottom of the screen', () {

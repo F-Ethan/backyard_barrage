@@ -48,6 +48,24 @@ void main() {
       expect(meta.coins, greaterThanOrEqualTo(0));
     });
 
+    test('a defeat wipe clears the run and keeps season and best wave', () {
+      final meta = MetaState(
+        coins: 80,
+        crewSize: 3,
+        fortStage: 3,
+        throwRank: 4,
+        season: Season.summer,
+        bestWave: 6,
+      );
+      meta.resetRun();
+      expect(meta.coins, 0);
+      expect(meta.crewSize, 1);
+      expect(meta.fortStage, 1);
+      expect(meta.throwRank, 0);
+      expect(meta.season, Season.summer);
+      expect(meta.bestWave, 6);
+    });
+
     test('wave rewards grow and best wave only moves forward', () {
       expect(MetaState.coinsForWave(2), greaterThan(MetaState.coinsForWave(1)));
       final meta = MetaState();

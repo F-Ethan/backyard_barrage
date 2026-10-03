@@ -27,6 +27,10 @@ class EnemyController extends Component {
     required this.isFighting,
     required this.tuning,
     required double initialDelay,
+    this.side = KidSide.enemy,
+    this.approachColumn = -1,
+    this.isManual,
+    this.currentWave,
   }) : _cycle = initialDelay,
        _seenHp = host.hp;
 
@@ -38,6 +42,18 @@ class EnemyController extends Component {
   final EnemyFire onFire;
   final bool Function() isFighting;
   final DifficultyTuning Function() tuning;
+
+  /// Which half this kid steps on. Rivals use the enemy half.
+  final KidSide side;
+
+  /// Column delta that moves closer to the other team. Rivals use -1.
+  final int approachColumn;
+
+  /// When true, the player is driving this kid. The brain waits.
+  final bool Function()? isManual;
+
+  /// Live wave, for kids who stay across waves. Falls back to [wave].
+  final int Function()? currentWave;
 
   _AiPhase _phase = _AiPhase.wait;
   double _cycle;
@@ -58,6 +74,16 @@ class EnemyController extends Component {
   void update(double dt) {
     super.update(dt);
     _watchHp();
+    if (isManual?.call() ?? false) {
+      if (_phase != _AiPhase.wait || _moveTarget != null) {
+        _moveTarget = null;
+        _phase = _AiPhase.wait;
+        _elapsed = 0;
+        host.setWalking(false);
+        host.clearChargePose();
+      }
+      return;
+    }
     if (!isFighting() || host.isKo) {
       host.setWalking(false);
       host.clearChargePose();
@@ -129,7 +155,7 @@ class EnemyController extends Component {
   }
 
   void _fire() {
-    final cell = ArenaGrid.nearestCell(KidSide.enemy, host.position);
+    final cell = ArenaGrid.nearestCell(side, host.position);
     final rows = [
       for (final kid in players)
         ArenaGrid.nearestCell(kid.side, kid.position).row,
@@ -139,7 +165,7 @@ class EnemyController extends Component {
     final target = index == null ? null : players[index];
     final scatter = EnemyAi.rangeScatter(
       rng,
-      CombatRules.enemyAimJitterRadians(wave),
+      CombatRules.enemyAimJitterRadians(currentWave?.call() ?? wave),
     );
     var fellShort = false;
     if (target != null) {
@@ -180,7 +206,7 @@ class EnemyController extends Component {
     required bool shotFellShort,
   }) {
     final profile = tuning();
-    final cell = ArenaGrid.nearestCell(KidSide.enemy, host.position);
+    final cell = ArenaGrid.nearestCell(side, host.position);
     return EnemyAi.planBotStep(
       column: cell.column,
       row: cell.row,
@@ -195,6 +221,7 @@ class EnemyController extends Component {
       shotFellShort: shotFellShort,
       retreat: retreat,
       occupied: _occupied(),
+      approach: approachColumn,
     );
   }
 
@@ -202,7 +229,7 @@ class EnemyController extends Component {
     final spots = <({int column, int row})>[];
     for (final kid in rivals) {
       if (identical(kid, host) || kid.isKo) continue;
-      final cell = ArenaGrid.nearestCell(KidSide.enemy, kid.position);
+      final cell = ArenaGrid.nearestCell(side, kid.position);
       spots.add((column: cell.column, row: cell.row));
     }
     return spots;
@@ -210,7 +237,7 @@ class EnemyController extends Component {
 
   void _applyStep(({int column, int row})? next) {
     if (next == null) return;
-    final dest = ArenaGrid.cellCenter(KidSide.enemy, next.column, next.row);
+    final dest = ArenaGrid.cellCenter(side, next.column, next.row);
     if (dest.distanceTo(host.position) < 1) return;
     _moveTarget = dest;
     _phase = _AiPhase.step;

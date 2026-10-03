@@ -41,7 +41,7 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 ### 3.1 Match loop
 1. Pick season (Winter / Summer) — or default last played  
 2. Enter backyard arena (landscape)  
-3. Control your living kids; charge → aim → release to throw  
+3. Control one kid; hold to charge, release on the swivel to throw  
 4. KO all enemies → win round → earn currency → upgrade shop → next wave  
 5. Lose all kids → run over → summary + retry  
 
@@ -50,28 +50,31 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | --- | --- |
 | Player starts with | 1 kid |
 | Hits to KO | 3. Enemy: brush-off (~1s), knockdown then up, then out. Ally: a hit stuns ~7.5s; a second hit during that stun KOs |
-| Throw | Hold the selected kid or the right stick to charge; drag or the left thumb aims; release lobs |
-| Charge | Tap ≈ 1/3 power, ~1s ≈ 1/2, ~3s full. Half-bell ease toward max |
-| Throw lane | Aim commits the row (about a ±20° cone). A hit requires the kid on the ball's current row |
-| Walk | About 1.2s per column (left stick). Enemy step timing stays on the difficulty profile |
-| Active thrower | One kid charging at a time |
+| Throw | Hold the right third of the screen to charge. Release throws. There is no aim stick |
+| Charge | Tap ≈ 1/3 power, ~1s ≈ 1/2, ~3s full. Half-bell ease toward max. While held, aim swivels through ±20° |
+| Throw depth | Release samples the swivel. The ball's ground track slides to that depth. Power sets how far it goes |
+| Hit | A small body hitbox. The ball can pass in front of or behind a kid. Overlap of the ground track is what counts |
+| Walk | Left two-thirds of the screen. A tap steps one row toward the touch. A hold keeps stepping. About 1.2s per column of distance |
+| Active thrower | One kid is selected and shows a soft glow. The others throw on Easy |
 | Enemy count | Starts ~2–3, scales by wave |
 | Win | All enemies KO’d |
 | Lose | All player kids KO’d |
 
 ### 3.3 Controls (touch, landscape)
-- Hold on the selected kid: power charges while the finger is down, drag sets the aim, release throws. A short tap is still about 1/3 power. Grabbing another living kid selects them and starts that same charge.
-- Left thumb: a stick. Deflect to step one cell at a time (about 1.2 seconds per column), or to aim while a charge is held. Aim is clamped to about ±20° from horizontal.
-- Right thumb: a stick, not a labeled button. Hold to charge (half-bell: a tap is about 1/3, ~1s is half, ~3s is full), release to lob. Same charge as holding the kid. Player lobs keep a slow pace and gain range with charge. Enemy lobs stay on the faster lane arc.
-- Each side stays on its own half. The middle band is neutral.
+- Right third of the screen: hold to charge the selected kid, release to throw. A short hold is still about 1/3 power. While the hold lasts, the kid swivels through about ±20°. Letting go samples that angle, so timing sets the depth and the charge sets the distance.
+- Left two-thirds: the move box for the selected kid. A tap steps one row toward the touch (down when the touch is below the kid, up when it is above). A hold keeps stepping toward the finger. Their column does not change. A tap on a living kid selects them.
+- Kids you are not controlling throw and step like Easy rivals.
+- Each side stays on its own half. The middle band is neutral. The yard grid still places kids. It does not lock the snowball's hit row.
+- A loss wipes the run: coins, crew, fort, and throw rank go back to a new game. Season and best wave stay. Retry starts at wave 1.
 - Lock orientation: landscape left/right only  
 
 ### 3.4 AI (simple)
-- Target a living player kid in the thrower's row lane when one is there
+- Rivals target a living player kid, throw on the difficulty timer, and step with the Easy / Normal / Hard lane rules
 - Throw about every 1.5–3s on Normal (slower on Easy, about 1–1.5s on Hard)
-- After a throw, step one row toward a living player if nobody is within one row. Easy does that every other throw. Normal does it every throw. Hard steps onto the closest player's exact row every throw
+- After a throw, step one row toward a living opponent if nobody is within one row. Easy does that every other throw. Normal does it every throw. Hard steps onto the closest opponent's exact row every throw
 - A lob that falls short steps one column closer. A hit steps one column back, or off that row if they are already at the back line
-- They will not step onto a teammate, and they drift toward a player who is not already covered
+- They will not step onto a teammate
+- Player kids who are not selected use that same Easy brain, mirrored so "closer" is toward the rivals
 - Per-wave: slightly shorter gaps and tighter landing scatter  
 
 ### 3.5 Upgrades (between waves)

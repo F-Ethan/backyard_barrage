@@ -178,12 +178,31 @@ void main() {
   });
 
   testWidgets('a wiped crew can retry at full HP', (tester) async {
-    final game = (await boot(tester, MetaState(crewSize: 1))).game;
-    final kid = game.players.single;
-    kid.takeHit();
-    kid.takeHit();
+    final game = (await boot(
+      tester,
+      MetaState(
+        coins: 40,
+        crewSize: 2,
+        fortStage: 2,
+        throwRank: 2,
+        bestWave: 3,
+        season: Season.summer,
+      ),
+    )).game;
+    expect(game.wave, 1);
+    for (final kid in game.players) {
+      kid.takeHit();
+      kid.takeHit();
+    }
     game.resolveKnockouts();
     expect(game.phase, MatchPhase.defeat);
+    expect(game.meta.coins, 0);
+    expect(game.meta.crewSize, 1);
+    expect(game.meta.fortStage, 1);
+    expect(game.meta.throwRank, 0);
+    expect(game.meta.bestWave, 3);
+    expect(game.meta.season, Season.summer);
+    expect(game.wave, 1);
 
     game.update(0.7);
     await tester.pump();
@@ -192,6 +211,7 @@ void main() {
     await tester.tap(find.byKey(const Key('retry')));
     await tester.pump();
     expect(game.wave, 1);
+    expect(game.players, hasLength(1));
     expect(game.players.single.hp, CombatRules.hitsToKo);
     expect(game.phase, MatchPhase.fight);
     expect(game.enemies, hasLength(2));
@@ -245,22 +265,20 @@ void main() {
     expect(booted.playback.loops, contains('music/battle_loop_winter.wav'));
   });
 
-  testWidgets('throw stick charges; modern UI glows and classic keeps a bar', (
+  testWidgets('right side charges; modern UI glows and classic keeps a bar', (
     tester,
   ) async {
     final game = (await boot(tester, MetaState())).game;
     await tester.pump();
-    expect(find.byKey(const Key('throw-stick')), findsOneWidget);
-    expect(find.byKey(const Key('move-stick')), findsOneWidget);
+    expect(find.byKey(const Key('charge-zone')), findsOneWidget);
+    expect(find.byKey(const Key('move-zone')), findsOneWidget);
     expect(find.byKey(const Key('power-bar')), findsNothing);
     expect(
-      find.text(
-        'Hold a kid or right stick to charge  ·  drag or left thumb aims',
-      ),
+      find.text('Tap the left side to step  ·  hold the right side to throw'),
       findsOneWidget,
     );
 
-    game.pressThrowButton();
+    game.pressChargeZone();
     game.update(0.12);
     await tester.pump();
     expect(game.charge, closeTo(1 / 3, 0.04));
@@ -275,59 +293,60 @@ void main() {
     expect(game.charge, closeTo(0.5, 0.06));
     game.update(2);
     expect(game.charge, greaterThan(0.98));
-    game.releaseThrowButton();
+    game.releaseChargeZone();
     expect(game.charge, 0);
   });
 
-  testWidgets('left stick steps one slow cell and distant taps do not', (
+  testWidgets('a tap steps one row and a hold keeps walking that way', (
     tester,
   ) async {
     final game = (await boot(tester, MetaState(crewSize: 2))).game;
     final kid = game.players.first;
     final start = kid.position.clone();
-    final far = Vector2(700, 400);
-    game.debugPointerDown(far);
-    game.debugPointerMove(far + Vector2(0, -180));
-    game.update(0.5);
-    game.debugPointerUp();
-    expect(game.isCharging, isFalse);
-    expect(kid.position.x, closeTo(start.x, 0.5));
-    expect(kid.position.y, closeTo(start.y, 0.5));
+    final cell = ArenaGrid.nearestCell(KidSide.player, start);
+    final below = ArenaGrid.cellCenter(
+      KidSide.player,
+      cell.column,
+      cell.row + 3,
+    );
 
-    game.setMoveStick(const Offset(36, 0));
+    game.pressMoveZone(below);
+    game.releaseMoveZone();
     game.update(0.05);
     final cap = ThrowPhysics.kidMoveSpeed() * 0.05 + 1.5;
-    expect(start.distanceTo(kid.position), greaterThan(0));
+    expect((kid.position.y - start.y).abs(), greaterThan(0));
     expect(start.distanceTo(kid.position), lessThanOrEqualTo(cap));
-    final hopped = kid.position.clone();
-    game.update(1);
-    expect(
-      hopped.distanceTo(kid.position),
-      lessThanOrEqualTo(ArenaGrid.columnStep + 1.5),
-    );
+    expect(kid.position.x, closeTo(start.x, 0.5));
 
-    final beforeLong = kid.position.clone();
     game.update(2);
-    expect(
-      (kid.position.x - beforeLong.x).abs(),
-      lessThanOrEqualTo(ArenaGrid.columnStep + 1),
+    final oneRow = ArenaGrid.cellCenter(
+      KidSide.player,
+      cell.column,
+      cell.row + 1,
     );
-    expect(kid.position.x, greaterThan(start.x + 10));
-    expect(kid.position.x, lessThanOrEqualTo(ArenaGrid.playerRight + 0.1));
-    expect(ArenaGrid.inNeutral(kid.position.x), isFalse);
-    game.clearMoveStick();
+    expect(kid.position.x, closeTo(oneRow.x, 0.5));
+    expect(kid.position.y, closeTo(oneRow.y, 0.5));
 
-    final held = kid.position.clone();
-    game.pressThrowButton();
+    final heldFrom = kid.position.clone();
+    game.pressMoveZone(below);
+    game.update(0.05);
+    game.update(2);
+    game.update(2);
+    expect(kid.position.y, greaterThan(heldFrom.y + ArenaGrid.rowStep));
+    expect(kid.position.y, closeTo(below.y, 0.5));
+    game.releaseMoveZone();
+
+    final frozen = kid.position.clone();
+    game.pressChargeZone();
     game.update(0.3);
     expect(game.isCharging, isTrue);
-    expect(kid.position.x, closeTo(held.x, 0.5));
-    expect(kid.position.y, closeTo(held.y, 0.5));
-    game.releaseThrowButton();
+    expect(kid.position.x, closeTo(frozen.x, 0.5));
+    expect(kid.position.y, closeTo(frozen.y, 0.5));
+    game.releaseChargeZone();
     expect(game.charge, 0);
   });
 
-  testWidgets('holding the selected kid charges, drag aims, release throws', (
+  testWidgets('release during the swivel picks the throw depth', (
     tester,
   ) async {
     final game = (await boot(tester, MetaState())).game;
@@ -335,29 +354,21 @@ void main() {
     final start = kid.position.clone();
     final row = ArenaGrid.nearestCell(KidSide.player, start).row;
 
-    game.debugPointerDown(kid.hitCenter);
-    expect(game.isCharging, isTrue);
-    game.debugPointerMove(kid.throwOrigin + Vector2(30, -220));
-    game.update(0.2);
-    expect(kid.position.x, closeTo(start.x, 0.5));
-    expect(kid.position.y, closeTo(start.y, 0.5));
-    expect(game.charge, greaterThan(0.3));
-    expect(game.charge, lessThan(0.5));
-    game.debugPointerUp();
+    game.pressMoveZone(kid.hitCenter);
     expect(game.isCharging, isFalse);
-    expect(game.charge, 0);
+    expect(game.selectedKid, kid);
+
+    game.pressChargeZone();
+    game.update(ThrowPhysics.swivelPeriod / 4);
+    expect(game.charge, greaterThan(0.3));
+    game.releaseChargeZone();
+    expect(game.isCharging, isFalse);
     game.update(0);
 
     final lob = game.world.children.whereType<LobProjectile>().single;
+    expect(lob.groundTrack, isTrue);
     expect(lob.landingRow, lessThan(row));
-
-    game.pressThrowButton();
-    game.setMoveStick(const Offset(4, -36));
-    game.releaseThrowButton();
-    game.clearMoveStick();
-    game.update(0);
-    final aimed = game.world.children.whereType<LobProjectile>().last;
-    expect(aimed.landingRow, lessThan(row));
+    expect(kid.angle, closeTo(0, 0.001));
   });
 
   testWidgets('rivals take three hits; an ally stun can end on the next hit', (
@@ -410,17 +421,21 @@ void main() {
     lead.takeHit();
     expect(lead.isKo, isFalse);
     expect(lead.isFragile, isTrue);
-    game.debugPointerDown(lead.hitCenter);
-    game.debugPointerUp();
+    game.pressMoveZone(lead.hitCenter);
+    game.releaseMoveZone();
     expect(game.selectedKid, lead);
     expect(game.isCharging, isFalse);
     final pos = lead.position.clone();
-    game.setMoveStick(const Offset(36, 0));
-    game.pressThrowButton();
+    final cell = ArenaGrid.nearestCell(KidSide.player, pos);
+    game.pressMoveZone(
+      ArenaGrid.cellCenter(KidSide.player, cell.column, cell.row + 1),
+    );
+    game.pressChargeZone();
     expect(game.isCharging, isFalse);
     game.update(0.4);
     expect(lead.position.x, closeTo(pos.x, 0.5));
-    game.clearMoveStick();
+    expect(lead.position.y, closeTo(pos.y, 0.5));
+    game.releaseMoveZone();
 
     lead.update(CombatRules.allyStunSeconds);
     expect(lead.isStunned, isFalse);

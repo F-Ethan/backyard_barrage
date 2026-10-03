@@ -31,7 +31,7 @@ enum MatchPhase { fight, clearing, defeat, shop, paused }
 
 enum _Banner { none, waveKo, waveDone, defeatKo }
 
-/// Landscape backyard arena: charge, aim, lob, then shop between waves.
+/// Landscape backyard arena: charge on the swivel, lob, then shop between waves.
 class BackyardBarrageGame extends FlameGame {
   BackyardBarrageGame({
     required this.meta,
@@ -105,16 +105,21 @@ class BackyardBarrageGame extends FlameGame {
   int wave = 1;
   int lastReward = 0;
 
-  bool _pointerDown = false;
-  bool _yardHolding = false;
-  bool _stickHolding = false;
+  /// Right-hand share of the screen. A hold there charges; release throws.
+  static const double chargeScreenFraction = 2 / 3;
+
+  /// A touch this close to a kid's body selects them instead of stepping.
+  static const double selectRadius = 72;
+
+  bool _chargeHolding = false;
+  bool _moveHolding = false;
   bool _charging = false;
-  bool _aimAdjusted = false;
   double _charge = 0;
   double _chargeHeld = 0;
+  double _swivel = 0;
   Vector2 _aimDir = Vector2(1, 0);
-  Vector2? _moveStick;
   Vector2? _moveTarget;
+  int? _moveGoalRow;
   _Banner _pendingBanner = _Banner.none;
   double _bannerTime = 0;
   OverlayBanner? _banner;
@@ -252,6 +257,9 @@ class BackyardBarrageGame extends FlameGame {
     _clearEnemies();
     phase = MatchPhase.fight;
 
+    while (players.length > meta.crewSize) {
+      players.removeLast().removeFromParent();
+    }
     while (players.length < meta.crewSize) {
       final kid = _makeKid(KidSide.player, players.length);
       players.add(kid);
@@ -263,6 +271,7 @@ class BackyardBarrageGame extends FlameGame {
       kid.revive();
     }
     _setSelected(_firstLiving(players));
+    _ensureAllyBrains();
 
     final count = CombatRules.enemyCountForWave(wave);
     for (var i = 0; i < count; i++) {
@@ -412,6 +421,9 @@ class BackyardBarrageGame extends FlameGame {
     _endActiveThrow();
     _clearShots();
     feel.defeated();
+    meta.resetRun();
+    unawaited(persist());
+    _publishHud();
     _showBanner(
       'Crew down',
       subtitle: 'Every kid is down.',
@@ -500,14 +512,111 @@ class BackyardBarrageGame extends FlameGame {
     _spawnShot(owner: enemy, lob: lob, targets: players);
   }
 
-  /// Right thumb, or a hold on the selected kid. Release throws.
-  void pressThrowButton() {
-    if (phase != MatchPhase.fight || _stickHolding) return;
+  void _onAllyFire(
+    KidComponent ally,
+    KidComponent? target,
+    double rangeScale,
+  ) {
+    if (phase != MatchPhase.fight || ally.isKo || identical(ally, _selected)) {
+      return;
+    }
+    feel.playerReleased();
+    final cell = ArenaGrid.nearestCell(KidSide.player, ally.position);
+    final targetRow = target == null
+        ? cell.row
+        : ArenaGrid.nearestCell(target.side, target.position).row;
+    final distance = target == null
+        ? 640.0
+        : (ally.throwOrigin.x - target.hitCenter.x).abs();
+    final lob = ThrowPhysics.planEnemyLob(
+      throwerRow: cell.row,
+      throwerColumn: cell.column,
+      targetRow: targetRow,
+      distance: distance,
+      rangeScale: rangeScale,
+      facingRight: true,
+      originY: ally.throwOrigin.y,
+    );
+    _spawnShot(owner: ally, lob: lob, targets: enemies);
+  }
+
+  void _ensureAllyBrains() {
+    for (var i = 0; i < players.length; i++) {
+      final kid = players[i];
+      if (kid.children.whereType<EnemyController>().isNotEmpty) continue;
+      final profile = DifficultyTuning.of(Difficulty.easy, wave: wave);
+      kid.add(
+        EnemyController(
+          host: kid,
+          players: enemies,
+          rivals: players,
+          wave: wave,
+          rng: _rng,
+          tuning: () => DifficultyTuning.of(Difficulty.easy, wave: wave),
+          initialDelay: profile.throwGap((0.35 + i * 0.2).clamp(0.0, 1.0)),
+          onFire: _onAllyFire,
+          isFighting: () => phase == MatchPhase.fight,
+          side: KidSide.player,
+          approachColumn: 1,
+          isManual: () => identical(_selected, kid),
+          currentWave: () => wave,
+        ),
+      );
+    }
+  }
+
+  /// Canvas point to the backyard. The fight overlay uses the same space
+  /// as the letterboxed game.
+  Vector2 screenToWorld(Offset local) {
+    return camera.globalToLocal(Vector2(local.dx, local.dy));
+  }
+
+  /// Hold on the right third of the screen. Release throws.
+  void pressChargeZone() {
+    if (phase != MatchPhase.fight || _chargeHolding) return;
     final kid = _readyThrower();
     if (kid == null) return;
-    _stickHolding = true;
+    _chargeHolding = true;
+    _moveHolding = false;
+    _moveGoalRow = null;
     _setSelected(kid);
     _beginCharge();
+  }
+
+  void releaseChargeZone() {
+    if (!_chargeHolding) return;
+    _chargeHolding = false;
+    if (_charging) _releaseThrow();
+  }
+
+  /// Left side of the screen. A tap steps one row toward the touch.
+  /// A hold keeps stepping until the finger lifts or the kid arrives.
+  void pressMoveZone(Vector2 world) {
+    if (phase != MatchPhase.fight || _charging) return;
+    final tapped = _nearestLiving(
+      players,
+      world,
+      maxDistance: selectRadius,
+    );
+    if (tapped != null) {
+      _setSelected(tapped);
+      _moveHolding = false;
+      _moveGoalRow = null;
+      return;
+    }
+    _moveHolding = true;
+    _moveGoalRow = _rowForFeetY(world.y);
+    _queueRowStep();
+  }
+
+  void dragMoveZone(Vector2 world) {
+    if (!_moveHolding || _charging || phase != MatchPhase.fight) return;
+    _moveGoalRow = _rowForFeetY(world.y);
+    _queueRowStep();
+  }
+
+  void releaseMoveZone() {
+    _moveHolding = false;
   }
 
   void _beginCharge() {
@@ -521,44 +630,15 @@ class BackyardBarrageGame extends FlameGame {
     _charging = true;
     _chargeHeld = 0;
     _charge = ThrowPhysics.minThrowCharge;
+    _swivel = 0;
     _moveTarget = null;
+    _moveHolding = false;
     kid.setWalking(false);
-    final stick = _moveStick;
-    if (stick != null && stick.length >= 10) {
-      _aimAdjusted = true;
-      _aimDir = ThrowPhysics.clampAimDirection(stick, facingRight: true);
-    } else if (!_aimAdjusted) {
-      _aimAtNearest();
-    }
+    _aimDir = ThrowPhysics.aimForElevation(0, facingRight: true);
+    kid.setSwivel(0);
     kid.showChargePose();
     _syncChargeHud();
     _publishCharge();
-  }
-
-  /// Left-stick deflection in screen space (y grows downward).
-  /// While charging this aims; otherwise it walks one cell at a time.
-  void setMoveStick(Offset deflection) {
-    if (deflection.distance < 16) {
-      _moveStick = null;
-      return;
-    }
-    final dir = Vector2(deflection.dx, deflection.dy);
-    _moveStick = dir;
-    if (!_charging) return;
-    _aimAdjusted = true;
-    _aimDir = ThrowPhysics.clampAimDirection(dir, facingRight: true);
-    _syncChargeHud();
-  }
-
-  void clearMoveStick() {
-    _moveStick = null;
-  }
-
-  void releaseThrowButton() {
-    if (!_stickHolding) return;
-    _stickHolding = false;
-    if (_yardHolding || !_charging) return;
-    _releaseThrow();
   }
 
   void _releaseThrow() {
@@ -570,8 +650,10 @@ class BackyardBarrageGame extends FlameGame {
     _charging = false;
     _chargeHeld = 0;
     _charge = 0;
+    _swivel = 0;
     chargeHud.visibleCharge = false;
     _publishCharge();
+    kid?.setSwivel(0);
     if (kid == null || kid.isKo || kid.isStunned || phase != MatchPhase.fight) {
       kid?.clearChargePose();
       return;
@@ -606,6 +688,7 @@ class BackyardBarrageGame extends FlameGame {
         blockedByFort: true,
         forts: [fort, enemyFort],
         friendlyFortDamage: _tuning().friendlyFortDamage,
+        groundTrack: lob.groundTrack,
         throwerRow: lob.throwerRow,
         throwerColumn: lob.throwerColumn,
         peakRow: lob.peakRow,
@@ -665,82 +748,23 @@ class BackyardBarrageGame extends FlameGame {
 
   void debugPointerUp() => _onPointerUp();
 
-  void _onPointerDown(Vector2 point) {
-    if (phase != MatchPhase.fight) return;
-    _pointerDown = true;
-    final selected = _selected;
-    final onSelected =
-        selected != null &&
-        !selected.isKo &&
-        point.distanceTo(selected.hitCenter) <= ArenaGrid.moveTouchRadius;
-    if (!onSelected) {
-      final tapped = _nearestLiving(
-        players,
-        point,
-        maxDistance: ArenaGrid.moveTouchRadius,
-      );
-      if (tapped != null) _setSelected(tapped);
-    }
-    final kid = _selected;
-    final grabbed =
-        kid != null &&
-        !kid.isKo &&
-        !kid.isStunned &&
-        point.distanceTo(kid.hitCenter) <= ArenaGrid.moveTouchRadius;
-    if (grabbed) {
-      _yardHolding = true;
-      _beginCharge();
-      return;
-    }
-    if (_charging) _applyAimAt(point);
-  }
+  void _onPointerDown(Vector2 point) => pressMoveZone(point);
 
-  void _onPointerMove(Vector2 point) {
-    if (!_pointerDown || phase != MatchPhase.fight) return;
-    if (_charging) _applyAimAt(point);
-  }
+  void _onPointerMove(Vector2 point) => dragMoveZone(point);
 
-  void _onPointerUp() {
-    final yard = _yardHolding;
-    _pointerDown = false;
-    _yardHolding = false;
-    if (yard && !_stickHolding && _charging) {
-      _releaseThrow();
-      return;
-    }
-    final kid = _selected;
-    if (!_charging && kid != null && !kid.isKo && _moveTarget == null) {
-      kid.setWalking(false);
-    }
-  }
+  void _onPointerUp() => releaseMoveZone();
 
-  void _applyAimAt(Vector2 point) {
-    final kid = _selected;
-    if (kid == null) return;
-    final dir = point - kid.throwOrigin;
-    if (dir.length < 8) return;
-    _aimAdjusted = true;
-    _aimDir = ThrowPhysics.clampAimDirection(dir, facingRight: true);
-    _syncChargeHud();
-  }
-
-  void _aimAtNearest() {
-    final kid = _selected;
-    if (kid == null) return;
-    KidComponent? target;
-    var best = double.infinity;
-    for (final enemy in enemies) {
-      if (enemy.isKo) continue;
-      final distance = enemy.hitCenter.distanceToSquared(kid.throwOrigin);
-      if (distance < best) {
-        best = distance;
-        target = enemy;
+  int _rowForFeetY(double y) {
+    var best = 0;
+    var bestDistance = double.infinity;
+    for (var row = 0; row < ArenaGrid.rows; row++) {
+      final distance = (ArenaGrid.rowY(row) - y).abs();
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = row;
       }
     }
-    final dir = target == null
-        ? Vector2(1, 0)
-        : target.hitCenter - kid.throwOrigin;
-    _aimDir = ThrowPhysics.clampAimDirection(dir, facingRight: true);
+    return best;
   }
 
   void _syncChargeHud() {
@@ -767,12 +791,15 @@ class BackyardBarrageGame extends FlameGame {
     if (kid.isStunned || _charging) {
       if (_moveTarget != null) {
         _moveTarget = null;
+        _moveHolding = false;
         kid.setWalking(false);
       }
       return;
     }
-    if (_moveTarget == null) _tryStartStep(kid);
-    _advanceStep(kid, dt);
+    final arrived = _advanceStep(kid, dt);
+    if (arrived && _moveTarget == null && _moveHolding) {
+      _queueRowStep();
+    }
   }
 
   /// Moves toward the current cell. Returns true when that consumed the
@@ -797,62 +824,49 @@ class BackyardBarrageGame extends FlameGame {
     return true;
   }
 
-  void _tryStartStep(KidComponent kid) {
-    final dir = _activeMoveDir();
-    if (dir == null) return;
-    final step = _stepFrom(dir);
-    if (step == null) return;
+  /// One row toward the finger. Column stays put. Does nothing while a
+  /// step is already in progress, so a tap cannot chain into a second cell.
+  void _queueRowStep() {
+    if (_moveTarget != null) return;
+    final kid = _selected;
+    final goal = _moveGoalRow;
+    if (kid == null || goal == null || kid.isKo || kid.isStunned || _charging) {
+      return;
+    }
     final cell = ArenaGrid.nearestCell(KidSide.player, kid.position);
-    final next = ArenaGrid.clampCell(
-      cell.column + step.column,
-      cell.row + step.row,
-    );
-    if (next.column == cell.column && next.row == cell.row) return;
-    final dest = ArenaGrid.cellCenter(KidSide.player, next.column, next.row);
+    if (goal == cell.row) return;
+    final nextRow = cell.row + (goal > cell.row ? 1 : -1);
+    if (_playerCellTaken(cell.column, nextRow, kid)) return;
+    final dest = ArenaGrid.cellCenter(KidSide.player, cell.column, nextRow);
     if (dest.distanceTo(kid.position) < 1) return;
     _moveTarget = dest;
     kid.setWalking(true);
   }
 
-  Vector2? _activeMoveDir() {
-    final stick = _moveStick;
-    if (stick != null && stick.length >= 16) return stick;
-    return null;
-  }
-
-  /// One neighboring cell. Both axes can change, never by more than one.
-  ({int column, int row})? _stepFrom(Vector2 dir) {
-    if (dir.length2 < 1) return null;
-    final length = dir.length;
-    final nx = dir.x / length;
-    final ny = dir.y / length;
-    var column = 0;
-    var row = 0;
-    if (nx.abs() >= 0.38) column = nx > 0 ? 1 : -1;
-    if (ny.abs() >= 0.38) row = ny > 0 ? 1 : -1;
-    if (column == 0 && row == 0) {
-      if (nx.abs() >= ny.abs()) {
-        column = nx > 0 ? 1 : -1;
-      } else {
-        row = ny > 0 ? 1 : -1;
-      }
+  bool _playerCellTaken(int column, int row, KidComponent self) {
+    for (final kid in players) {
+      if (identical(kid, self) || kid.isKo) continue;
+      final cell = ArenaGrid.nearestCell(KidSide.player, kid.position);
+      if (cell.column == column && cell.row == row) return true;
     }
-    return (column: column, row: row);
+    return false;
   }
 
   void _endActiveThrow() {
-    _pointerDown = false;
-    _yardHolding = false;
-    _stickHolding = false;
+    _chargeHolding = false;
+    _moveHolding = false;
+    _moveGoalRow = null;
     _charging = false;
     _charge = 0;
     _chargeHeld = 0;
+    _swivel = 0;
     _moveTarget = null;
     chargeHud.visibleCharge = false;
     _publishCharge();
     final kid = _selected;
     if (kid != null && !kid.isKo) {
       kid.setWalking(false);
+      kid.setSwivel(0);
       kid.clearChargePose();
     }
   }
@@ -926,6 +940,9 @@ class BackyardBarrageGame extends FlameGame {
           _chargeHeld,
           CombatRules.playerChargeSeconds(meta.throwRank),
         );
+        _swivel = ThrowPhysics.swivelElevation(_chargeHeld);
+        _aimDir = ThrowPhysics.aimForElevation(_swivel, facingRight: true);
+        kid.setSwivel(_swivel);
         kid.showChargePose();
         _syncChargeHud();
         _publishCharge();

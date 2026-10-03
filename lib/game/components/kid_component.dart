@@ -4,6 +4,7 @@ import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 
 import '../combat_rules.dart';
+import '../throw_physics.dart';
 
 enum KidSide { player, enemy }
 
@@ -257,7 +258,13 @@ class KidComponent extends SpriteComponent {
 
   Vector2 get hitCenter => position + Vector2(0, -size.y * 0.45);
 
-  double get hitRadius => size.x * 0.28;
+  /// Small body circle. A snowball can pass the sprite and still miss.
+  double get hitRadius => size.x * ThrowPhysics.kidHitScale;
+
+  /// Rock the charge pose. Positive [radians] tips the head up the screen.
+  void setSwivel(double radians) {
+    angle = -radians;
+  }
 
   @override
   void update(double dt) {
@@ -291,6 +298,16 @@ class KidComponent extends SpriteComponent {
 
   @override
   void render(Canvas canvas) {
+    if (selected && !isKo) {
+      final glow = Paint()
+        ..color = const Color(0x663D7CFF)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
+      canvas.drawCircle(
+        Offset(size.x / 2, size.y * 0.58),
+        size.x * 0.46,
+        glow,
+      );
+    }
     canvas.save();
     if (isKo) {
       canvas.translate(0, 40);

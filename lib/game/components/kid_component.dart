@@ -18,6 +18,9 @@ class KidPoseSprites {
     required this.hit,
     required this.ko,
     required this.pickup,
+    required this.turnBack,
+    required this.turnQuarter,
+    required this.turnFront,
   });
 
   Sprite idle;
@@ -27,6 +30,9 @@ class KidPoseSprites {
   Sprite hit;
   Sprite ko;
   Sprite pickup;
+  Sprite turnBack;
+  Sprite turnQuarter;
+  Sprite turnFront;
 }
 
 /// Kid sprite with idle / walk / charge / throw / hit / KO poses.
@@ -45,6 +51,9 @@ class KidComponent extends SpriteComponent {
        hitSprite = poses.hit,
        koSprite = poses.ko,
        pickupSprite = poses.pickup,
+       turnBackSprite = poses.turnBack,
+       turnQuarterSprite = poses.turnQuarter,
+       turnFrontSprite = poses.turnFront,
        super(
          sprite: poses.idle,
          position: position,
@@ -61,6 +70,9 @@ class KidComponent extends SpriteComponent {
   Sprite hitSprite;
   Sprite koSprite;
   Sprite pickupSprite;
+  Sprite turnBackSprite;
+  Sprite turnQuarterSprite;
+  Sprite turnFrontSprite;
   final int maxHp;
   int hp;
   bool _selected = false;
@@ -121,6 +133,11 @@ class KidComponent extends SpriteComponent {
   bool _fragile = false;
   bool _chargingPose = false;
   bool _walking = false;
+  ChargeYaw _chargeYaw = ChargeYaw.across;
+
+  /// Yaw shown while this kid is in the charge pose. Across is the
+  /// side-profile charge sprite. The other three are the Studio turn poses.
+  ChargeYaw get chargeYaw => _chargeYaw;
 
   void applyPoses(KidPoseSprites poses) {
     idleSprite = poses.idle;
@@ -130,14 +147,23 @@ class KidComponent extends SpriteComponent {
     hitSprite = poses.hit;
     koSprite = poses.ko;
     pickupSprite = poses.pickup;
+    turnBackSprite = poses.turnBack;
+    turnQuarterSprite = poses.turnQuarter;
+    turnFrontSprite = poses.turnFront;
     _refreshSprite();
   }
 
   void showChargePose() {
+    showChargeYaw(ChargeYaw.across);
+  }
+
+  /// Upright charge pose for this sweep angle. Sprites are not mirrored.
+  void showChargeYaw(ChargeYaw yaw) {
     if (isKo) return;
     _chargingPose = true;
     _walking = false;
     _throwPoseTimer = 0;
+    _chargeYaw = yaw;
     _refreshSprite();
   }
 
@@ -236,7 +262,12 @@ class KidComponent extends SpriteComponent {
       return;
     }
     if (_chargingPose) {
-      sprite = chargeSprite;
+      sprite = switch (_chargeYaw) {
+        ChargeYaw.back => turnBackSprite,
+        ChargeYaw.across => chargeSprite,
+        ChargeYaw.quarter => turnQuarterSprite,
+        ChargeYaw.front => turnFrontSprite,
+      };
       return;
     }
     if (_throwPoseTimer > 0) {
@@ -297,11 +328,7 @@ class KidComponent extends SpriteComponent {
       final glow = Paint()
         ..color = const Color(0x663D7CFF)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
-      canvas.drawCircle(
-        Offset(size.x / 2, size.y * 0.58),
-        size.x * 0.46,
-        glow,
-      );
+      canvas.drawCircle(Offset(size.x / 2, size.y * 0.58), size.x * 0.46, glow);
     }
     canvas.save();
     if (isKo) {

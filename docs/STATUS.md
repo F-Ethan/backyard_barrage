@@ -3,7 +3,7 @@
 **Updated:** 2026-10-03  
 **Pack:** MVP draft + character pose polish + **UI kit pass**
 
-**Game wiring:** The arena loads both seasons (backgrounds, idle/walk/charge/throw/hit/KO poses, snowball vs water balloon, snow vs splash) and fort stages 1–3. Flutter menus, shop, pause, settings, and the screen-space HUD use **`assets/images/ui_modern/`** (see `docs/UI_MODERN.md`). The legacy wood/comic kit under `assets/images/ui/` is kept, including the locked app icon; those draft buttons, chips, and frames are no longer on the live screens.  
+**Game wiring:** The arena loads both seasons (backgrounds, idle/walk/charge/throw/hit/KO/turn poses, snowball vs water balloon, snow vs splash) and fort stages 1–3. The charge sweep swaps turn-back, the charge pose, turn-quarter, and turn-front. Flutter menus, shop, pause, settings, and the screen-space HUD use **`assets/images/ui_modern/`** (see `docs/UI_MODERN.md`). The legacy wood/comic kit under `assets/images/ui/` is kept, including the locked app icon; those draft buttons, chips, and frames are no longer on the live screens.  
 **Style source:** `docs/STYLE.md` (followed)  
 **Generators:**
 - `scripts/generate_mvp_drafts.py` — world/forts/VFX/UI basics + shared character import
@@ -23,8 +23,9 @@ All under `assets/images/ui/`. Shared language: ink `#2C3E50` ~4–6px outline, 
 | File | Size | Status | Notes |
 |------|------|--------|-------|
 | `wordmark_backyard_barrage_draft.png` | 1024×384 | draft (kept) | Existing wordmark |
-| `app_icon_1024.png` | 1024×1024 | locked | Summer\|winter clash master, 1947595 bytes. Center crop of the portrait source. SHA-256 `86621c0890c82418a4260b93b956927495c01653ae08034704f5e377d992ff1f`. |
+| `app_icon_1024.png` | 1024×1024 | locked | Summer\|winter clash master, 1947595 bytes. Center crop of the portrait source. SHA-256 `86621c0890c82418a4260b93b956927495c01653ae08034704f5e377d992ff1f`. Not the launcher source. |
 | `app_icon_1024_draft.png` | 1024×1024 | locked (same pixels) | Identical bytes (1947595). Draft filename kept for pipeline continuity. |
+| `app_icon_1024_fill.png` | 1024×1024 | playtest | Same clash with the navy side bars cropped out. Source for iOS, Android, and macOS launcher sizes. The 1024 slots are these bytes. |
 | `btn_primary_draft.png` | 512×160 | **improved draft** | Cream + ink + 3D lip; re-exported |
 | `btn_primary_pressed_draft.png` | 512×160 | **new draft** | Sunk / dim cream pressed |
 | `btn_secondary_draft.png` | 512×160 | **new draft** | Quieter lip + inner hairline |
@@ -41,11 +42,11 @@ All under `assets/images/ui/`. Shared language: ink `#2C3E50` ~4–6px outline, 
 | `coin_draft.png` | 256×256 | **improved draft** | Same outline weight; re-exported |
 | `panel_modal_draft.png` | 1024×768 | **new draft** | Cream modal, 9-slice friendly |
 
-**Intended-final:** `app_icon_1024.png` is the locked launcher master. Other filenames in this table are still `_draft`.
+**Intended-final:** `app_icon_1024.png` is the locked master and stays byte-identical. Launcher slots are resizes of `app_icon_1024_fill.png`. Other filenames in this table are still `_draft`.
 
 ---
 
-## Character pose pack (24/24) — polish pass 2026-10-01
+## Character pose pack — polish pass 2026-10-01, turn yaws 2026-10-04
 
 All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet `#9B59B6`). Outline `#2C3E50` ~3–4px. Winter = coat+beanie+pom; summer = tee (balloon projectile on charge/throw). Soft ground contact shadow + 1 soft body shade plane.
 
@@ -67,6 +68,12 @@ All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet
 | `player_ko_summer_draft.png` | **new draft** | Slump + swirl + stars, tee |
 | `player_pickup_winter_draft.png` | **playtest draft** | Selected / held-up pose (Studio) |
 | `player_pickup_summer_draft.png` | **playtest draft** | Selected / held-up pose, tee |
+| `player_turn_back_winter_draft.png` | **playtest draft** | Far end of the row, back of the coat (Studio) |
+| `player_turn_back_summer_draft.png` | **playtest draft** | Same yaw, tee |
+| `player_turn_quarter_winter_draft.png` | **playtest draft** | Halfway toward the camera |
+| `player_turn_quarter_summer_draft.png` | **playtest draft** | Same yaw, tee |
+| `player_turn_front_winter_draft.png` | **playtest draft** | Chest and face toward the camera |
+| `player_turn_front_summer_draft.png` | **playtest draft** | Same yaw, tee |
 
 ### Enemy (`assets/images/characters/enemy/`)
 
@@ -86,6 +93,12 @@ All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet
 | `enemy_ko_summer_draft.png` | **new draft** | Slump + swirl, tee |
 | `enemy_pickup_winter_draft.png` | **playtest draft** | Held-up pose, loaded with the enemy sheet |
 | `enemy_pickup_summer_draft.png` | **playtest draft** | Held-up pose, tee |
+| `enemy_turn_back_winter_draft.png` | **playtest draft** | Far end of the row. Already aimed the other way; not mirrored |
+| `enemy_turn_back_summer_draft.png` | **playtest draft** | Same yaw, tee |
+| `enemy_turn_quarter_winter_draft.png` | **playtest draft** | Halfway toward the camera |
+| `enemy_turn_quarter_summer_draft.png` | **playtest draft** | Same yaw, tee |
+| `enemy_turn_front_winter_draft.png` | **playtest draft** | Chest and face toward the camera |
+| `enemy_turn_front_summer_draft.png` | **playtest draft** | Same yaw, tee |
 
 ---
 

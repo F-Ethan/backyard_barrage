@@ -533,6 +533,35 @@ void main() {
           ThrowPhysics.swivelElevation(ThrowPhysics.swivelPeriod * 0.75),
           closeTo(-ThrowPhysics.maxAimRadians, 0.001),
         );
+        expect(
+          ThrowPhysics.chargeYaw(ThrowPhysics.maxAimRadians),
+          ChargeYaw.back,
+        );
+        expect(
+          ThrowPhysics.chargeYaw(ThrowPhysics.maxAimRadians * 0.5),
+          ChargeYaw.back,
+        );
+        expect(
+          ThrowPhysics.chargeYaw(ThrowPhysics.maxAimRadians * 0.49),
+          ChargeYaw.across,
+        );
+        expect(ThrowPhysics.chargeYaw(0), ChargeYaw.across);
+        expect(
+          ThrowPhysics.chargeYaw(-ThrowPhysics.maxAimRadians * 0.01),
+          ChargeYaw.quarter,
+        );
+        expect(
+          ThrowPhysics.chargeYaw(-ThrowPhysics.maxAimRadians * 0.5),
+          ChargeYaw.quarter,
+        );
+        expect(
+          ThrowPhysics.chargeYaw(-ThrowPhysics.maxAimRadians * 0.51),
+          ChargeYaw.front,
+        );
+        expect(
+          ThrowPhysics.chargeYaw(-ThrowPhysics.maxAimRadians),
+          ChargeYaw.front,
+        );
         final up = ThrowPhysics.planPlayerLob(
           throwerRow: 4,
           throwerColumn: 1,

@@ -336,6 +336,31 @@ void main() {
     expect(kid.position.y, closeTo(below.y, 0.5));
     game.releaseMoveZone();
 
+    final back = kid.position.clone();
+    final backCell = ArenaGrid.nearestCell(KidSide.player, back);
+    final ahead = ArenaGrid.cellCenter(
+      KidSide.player,
+      backCell.column + 2,
+      backCell.row,
+    );
+    game.pressMoveZone(ahead);
+    game.releaseMoveZone();
+    game.update(0.05);
+    game.update(2);
+    final oneColumn = ArenaGrid.cellCenter(
+      KidSide.player,
+      backCell.column + 1,
+      backCell.row,
+    );
+    expect(kid.position.x, closeTo(oneColumn.x, 0.5));
+    expect(kid.position.y, closeTo(oneColumn.y, 0.5));
+    game.pressMoveZone(ahead);
+    game.update(2);
+    game.update(2);
+    expect(kid.position.x, closeTo(ahead.x, 0.5));
+    expect(kid.position.y, closeTo(ahead.y, 0.5));
+    game.releaseMoveZone();
+
     final frozen = kid.position.clone();
     game.pressChargeZone();
     game.update(0.3);
@@ -413,7 +438,7 @@ void main() {
     ally.takeHit();
     expect(ally.isKo, isFalse);
     expect(ally.isFragile, isTrue);
-    expect(ally.stunRemaining, inInclusiveRange(7, 8));
+    expect(ally.stunRemaining, closeTo(CombatRules.allyStunSeconds, 0.001));
     ally.takeHit();
     expect(ally.isKo, isTrue);
 

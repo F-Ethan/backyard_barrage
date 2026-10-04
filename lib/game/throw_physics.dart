@@ -125,8 +125,9 @@ class ThrowPhysics {
   /// throw reaches [yardFarEdge].
   static const double tapRange = 250;
 
-  /// How long one up-and-down swivel takes while a charge is held.
-  static const double swivelPeriod = 1.2;
+  /// How long one up-and-down aim sweep takes while a charge is held.
+  /// One third of the old 1.2s rate, so the release window is wider.
+  static const double swivelPeriod = 3.6;
 
   /// Where along a ground-track lob the drawn loft peaks.
   static const double groundApexFraction = 0.5;

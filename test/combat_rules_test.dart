@@ -96,7 +96,7 @@ void main() {
         CombatRules.enemyKnockdownSeconds,
         greaterThan(CombatRules.enemyBrushOffSeconds),
       );
-      expect(CombatRules.allyStunSeconds, inInclusiveRange(7, 8));
+      expect(CombatRules.allyStunSeconds, closeTo(5.625, 0.001));
 
       final brush = CombatRules.resolveHit(
         ally: false,

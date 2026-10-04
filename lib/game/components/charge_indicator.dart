@@ -6,7 +6,7 @@ import 'package:flutter/painting.dart';
 class ChargeIndicator extends PositionComponent {
   ChargeIndicator({Sprite? glowSprite})
     : _glowSprite = glowSprite,
-      super(priority: 30);
+      super(priority: 2000);
 
   final Sprite? _glowSprite;
   double charge = 0;

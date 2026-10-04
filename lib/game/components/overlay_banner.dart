@@ -13,7 +13,7 @@ class OverlayBanner extends PositionComponent {
          position: position,
          size: Vector2(760, subtitle == null ? 108 : 140),
          anchor: Anchor.center,
-         priority: 100,
+         priority: 4000,
        );
 
   String label;

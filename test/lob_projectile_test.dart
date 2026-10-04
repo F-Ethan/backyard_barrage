@@ -71,32 +71,83 @@ void main() {
     expect(splats, 1);
   });
 
-  test('a fast miss still splats on the ground instead of vanishing in the air', () {
-    final lane = ArenaGrid.laneY(3);
-    var splats = 0;
-    Vector2? splatAt;
-    final shot = LobProjectile(
-      sprite: sprite,
-      position: Vector2(1100, lane),
-      velocity: Vector2(-2400, -40),
-      targets: <KidComponent>[],
-      onHit: (_, _) {},
-      onGround: (lob) {
-        splats += 1;
-        splatAt = lob.position.clone();
-      },
-      flightRange: 900,
-      throwerRow: 3,
-      landingRow: 3,
-      landingY: lane,
-    );
+  test(
+    'a fast miss still splats on the ground instead of vanishing in the air',
+    () {
+      final lane = ArenaGrid.laneY(3);
+      var splats = 0;
+      Vector2? splatAt;
+      final shot = LobProjectile(
+        sprite: sprite,
+        position: Vector2(1100, lane),
+        velocity: Vector2(-2400, -40),
+        targets: <KidComponent>[],
+        onHit: (_, _) {},
+        onGround: (lob) {
+          splats += 1;
+          splatAt = lob.position.clone();
+        },
+        flightRange: 900,
+        throwerRow: 3,
+        landingRow: 3,
+        landingY: lane,
+      );
 
-    for (var i = 0; i < 240 && splats == 0; i++) {
-      shot.update(1 / 60);
+      for (var i = 0; i < 240 && splats == 0; i++) {
+        shot.update(1 / 60);
+      }
+
+      expect(splats, 1);
+      expect(splatAt!.y, closeTo(ThrowPhysics.impactGroundY(3), 1));
+      expect(splatAt!.y, greaterThan(lane));
+    },
+  );
+
+  test('a snowball over a hit box paints behind the kid', () {
+    final poses = KidPoseSprites(
+      idle: sprite,
+      walk: sprite,
+      charge: sprite,
+      throwPose: sprite,
+      hit: sprite,
+      ko: sprite,
+      pickup: sprite,
+      turnBack: sprite,
+      turnQuarter: sprite,
+      turnFront: sprite,
+    );
+    final kid = KidComponent(
+      side: KidSide.enemy,
+      poses: poses,
+      position: ArenaGrid.cellCenter(KidSide.enemy, 2, 4),
+      size: Vector2.all(ArenaGrid.kidSize),
+    );
+    expect(kid.priority, ArenaGrid.depthOrder(kid.hitCenter.y));
+
+    LobProjectile shotAt(double depth) {
+      return LobProjectile(
+        sprite: sprite,
+        position: Vector2(180, depth),
+        velocity: Vector2(500, 0),
+        targets: [kid],
+        onHit: (_, _) {},
+        groundTrack: true,
+        travelSpeed: 500,
+        flightRange: 900,
+        landingY: depth,
+        throwerRow: 4,
+        landingRow: 4,
+      );
     }
 
-    expect(splats, 1);
-    expect(splatAt!.y, closeTo(ThrowPhysics.impactGroundY(3), 1));
-    expect(splatAt!.y, greaterThan(lane));
+    final over = shotAt(kid.hitCenter.y - 36);
+    over.update(1 / 60);
+    expect(over.priority, lessThan(kid.priority));
+    expect(over.priority, ArenaGrid.depthOrder(over.hitPosition.y));
+
+    final under = shotAt(kid.hitCenter.y + 36);
+    under.update(1 / 60);
+    expect(under.priority, greaterThan(kid.priority));
+    expect(under.priority, ArenaGrid.depthOrder(under.hitPosition.y));
   });
 }

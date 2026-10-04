@@ -53,6 +53,12 @@ class ArenaGrid {
   /// Feet-to-hit-center lift (`size.y * 0.45`).
   static const double bodyLift = kidSize * 0.45;
 
+  /// Paint order for a yard height. Smaller [y] is higher on the screen, so
+  /// it paints first and reads as farther away. A snowball whose ground
+  /// track is over a hit box therefore draws behind that kid, and one under
+  /// the box draws in front. The band stays above the background.
+  static int depthOrder(double y) => 200 + y.round();
+
   static const List<(int, int)> playerSlots = [(1, 4), (0, 2), (3, 6)];
   static const List<(int, int)> enemySlots = [(2, 3), (3, 1), (1, 6)];
 

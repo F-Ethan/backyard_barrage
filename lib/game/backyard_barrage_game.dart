@@ -959,7 +959,7 @@ class _ArenaInput extends PositionComponent with DragCallbacks {
           BackyardBarrageGame.worldHeight,
         ),
         position: Vector2.zero(),
-        priority: 40,
+        priority: 3000,
       );
 
   final BackyardBarrageGame game;

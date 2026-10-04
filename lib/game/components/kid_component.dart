@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 
+import '../arena_grid.dart';
 import '../combat_rules.dart';
 import '../throw_physics.dart';
 
@@ -59,8 +60,9 @@ class KidComponent extends SpriteComponent {
          position: position,
          size: size,
          anchor: Anchor.bottomCenter,
-         priority: side == KidSide.player ? 11 : 10,
-       );
+       ) {
+    priority = ArenaGrid.depthOrder(hitCenter.y);
+  }
 
   final KidSide side;
   Sprite idleSprite;
@@ -295,6 +297,7 @@ class KidComponent extends SpriteComponent {
   @override
   void update(double dt) {
     super.update(dt);
+    priority = ArenaGrid.depthOrder(hitCenter.y);
     var refresh = false;
     if (_stunTimer > 0) {
       _stunTimer -= dt;

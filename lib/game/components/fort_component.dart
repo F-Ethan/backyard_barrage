@@ -51,6 +51,7 @@ class FortComponent extends SpriteComponent {
     if (next > ArenaGrid.fortRowMax) next = ArenaGrid.fortRowMax;
     coverRow = next;
     position = ArenaGrid.fortAnchor(side, next);
+    _syncDepth();
   }
 
   Rect get hitRect => CombatRules.fortHitRect(
@@ -94,14 +95,24 @@ class FortComponent extends SpriteComponent {
   void _syncSprite() {
     if (hp <= 0) {
       sprite = collapsed ?? sprite;
-      priority = 5;
+      _syncDepth();
       return;
     }
-    priority = 12;
+    _syncDepth();
     if (hp < maxHp) {
       sprite = damaged ?? intact ?? sprite;
       return;
     }
     sprite = intact ?? sprite;
+  }
+
+  /// In front of kids on this cover row, behind kids closer to the camera.
+  /// A collapsed fort stays behind the kids.
+  void _syncDepth() {
+    if (hp <= 0) {
+      priority = 5;
+      return;
+    }
+    priority = ArenaGrid.depthOrder(ArenaGrid.laneY(coverRow)) + 1;
   }
 }

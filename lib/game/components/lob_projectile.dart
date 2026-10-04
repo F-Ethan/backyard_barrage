@@ -55,7 +55,7 @@ class LobProjectile extends SpriteComponent {
          position: position,
          size: Vector2.all(radius * 2.2),
          anchor: Anchor.center,
-         priority: 20,
+         priority: ArenaGrid.depthOrder(position.y),
        );
 
   Vector2 velocity;
@@ -169,6 +169,7 @@ class LobProjectile extends SpriteComponent {
     if (_falling) {
       _stepFall(dt);
       position.setFrom(_hit);
+      priority = ArenaGrid.depthOrder(_hit.y);
       if (_hit.y >= _groundY) _land();
       return;
     }
@@ -183,6 +184,9 @@ class LobProjectile extends SpriteComponent {
       _hit.y += velocity.y * dt;
     }
     _syncVisual();
+    // Ground-track height, not the lofted picture. Over the hit box paints
+    // behind the kid. Under it stays in front.
+    priority = ArenaGrid.depthOrder(_hit.y);
     if (_spent) return;
     if (groundTrack && _rangeDone) {
       _beginFall();

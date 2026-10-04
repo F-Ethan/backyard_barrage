@@ -2,6 +2,8 @@ import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flutter/animation.dart';
 
+import '../arena_grid.dart';
+
 /// Brief impact VFX that auto-removes.
 class ImpactBurst extends SpriteComponent {
   ImpactBurst({required Sprite sprite, required Vector2 position})
@@ -10,7 +12,7 @@ class ImpactBurst extends SpriteComponent {
         position: position,
         size: Vector2.all(96),
         anchor: Anchor.center,
-        priority: 25,
+        priority: ArenaGrid.depthOrder(position.y) + 1,
       );
 
   @override

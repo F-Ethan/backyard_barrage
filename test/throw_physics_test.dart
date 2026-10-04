@@ -516,45 +516,49 @@ void main() {
       expect(visualAt(originX), closeTo(originY, 0.01));
     });
 
-    test('charge swivel swings the cone and release timing picks the depth', () {
-      expect(ThrowPhysics.swivelElevation(0), closeTo(0, 0.001));
-      expect(
-        ThrowPhysics.swivelElevation(ThrowPhysics.swivelPeriod / 4),
-        closeTo(ThrowPhysics.maxAimRadians, 0.001),
-      );
-      expect(
-        ThrowPhysics.swivelElevation(ThrowPhysics.swivelPeriod / 2),
-        closeTo(0, 0.001),
-      );
-      expect(
-        ThrowPhysics.swivelElevation(ThrowPhysics.swivelPeriod * 0.75),
-        closeTo(-ThrowPhysics.maxAimRadians, 0.001),
-      );
-      final up = ThrowPhysics.planPlayerLob(
-        throwerRow: 4,
-        throwerColumn: 1,
-        aimDirection: ThrowPhysics.aimForElevation(
-          ThrowPhysics.maxAimRadians,
+    test(
+      'charge swivel swings the cone and release timing picks the depth',
+      () {
+        expect(ThrowPhysics.swivelPeriod, closeTo(3.6, 0.001));
+        expect(ThrowPhysics.swivelElevation(0), closeTo(0, 0.001));
+        expect(
+          ThrowPhysics.swivelElevation(ThrowPhysics.swivelPeriod / 4),
+          closeTo(ThrowPhysics.maxAimRadians, 0.001),
+        );
+        expect(
+          ThrowPhysics.swivelElevation(ThrowPhysics.swivelPeriod / 2),
+          closeTo(0, 0.001),
+        );
+        expect(
+          ThrowPhysics.swivelElevation(ThrowPhysics.swivelPeriod * 0.75),
+          closeTo(-ThrowPhysics.maxAimRadians, 0.001),
+        );
+        final up = ThrowPhysics.planPlayerLob(
+          throwerRow: 4,
+          throwerColumn: 1,
+          aimDirection: ThrowPhysics.aimForElevation(
+            ThrowPhysics.maxAimRadians,
+            facingRight: true,
+          ),
+          charge: 1,
           facingRight: true,
-        ),
-        charge: 1,
-        facingRight: true,
-        originY: ArenaGrid.laneY(4),
-      );
-      final down = ThrowPhysics.planPlayerLob(
-        throwerRow: 4,
-        throwerColumn: 1,
-        aimDirection: ThrowPhysics.aimForElevation(
-          -ThrowPhysics.maxAimRadians,
+          originY: ArenaGrid.laneY(4),
+        );
+        final down = ThrowPhysics.planPlayerLob(
+          throwerRow: 4,
+          throwerColumn: 1,
+          aimDirection: ThrowPhysics.aimForElevation(
+            -ThrowPhysics.maxAimRadians,
+            facingRight: true,
+          ),
+          charge: 1,
           facingRight: true,
-        ),
-        charge: 1,
-        facingRight: true,
-        originY: ArenaGrid.laneY(4),
-      );
-      expect(up.landingRow, lessThan(4));
-      expect(down.landingRow, greaterThan(4));
-    });
+          originY: ArenaGrid.laneY(4),
+        );
+        expect(up.landingRow, lessThan(4));
+        expect(down.landingRow, greaterThan(4));
+      },
+    );
 
     test('a small depth window lets a ball pass in front or behind', () {
       final kid = Vector2(400, ArenaGrid.laneY(4));

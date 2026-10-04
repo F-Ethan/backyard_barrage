@@ -49,20 +49,20 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | Rule | MVP value |
 | --- | --- |
 | Player starts with | 1 kid |
-| Hits to KO | 3. Enemy: brush-off (~1s), knockdown then up, then out. Ally: a hit stuns ~7.5s; a second hit during that stun KOs |
+| Hits to KO | 3. Enemy: brush-off (~1s), knockdown then up, then out. Ally: a hit stuns ~5.6s; a second hit during that stun KOs |
 | Throw | Hold the right third of the screen to charge. Release throws. There is no aim stick |
-| Charge | Tap ≈ 1/3 power, ~1s ≈ 1/2, ~3s full. Half-bell ease toward max. While held, aim swivels through ±20° |
+| Charge | Tap ≈ 1/3 power, ~1s ≈ 1/2, ~3s full. Half-bell ease toward max. While held, the aim sweeps ±20° over about 3.6s |
 | Throw depth | Release samples the swivel. The ball's ground track slides to that depth. Power sets how far it goes |
 | Hit | A small body hitbox. The ball can pass in front of or behind a kid. Overlap of the ground track is what counts |
-| Walk | Left two-thirds of the screen. A tap steps one row toward the touch. A hold keeps stepping. About 1.2s per column of distance |
+| Walk | Left two-thirds of the screen. A tap steps one cell toward the touch (forward, back, up, or down). A hold keeps stepping. About 1.2s per column |
 | Active thrower | One kid is selected and shows a soft glow. The others throw on Easy |
 | Enemy count | Starts ~2–3, scales by wave |
 | Win | All enemies KO’d |
 | Lose | All player kids KO’d |
 
 ### 3.3 Controls (touch, landscape)
-- Right third of the screen: hold to charge the selected kid, release to throw. A short hold is still about 1/3 power. While the hold lasts, the kid swivels through about ±20°. Letting go samples that angle, so timing sets the depth and the charge sets the distance.
-- Left two-thirds: the move box for the selected kid. A tap steps one row toward the touch (down when the touch is below the kid, up when it is above). A hold keeps stepping toward the finger. Their column does not change. A tap on a living kid selects them.
+- Right third of the screen: hold to charge the selected kid, release to throw. A short hold is still about 1/3 power. While the hold lasts, the aim sweeps through about ±20° over about 3.6 seconds. Letting go samples that angle, so timing sets the depth and the charge sets the distance. The kid sprite stays upright. The side-profile art cannot turn left and right.
+- Left two-thirds: the move box for the selected kid. A tap steps one cell toward the touch: down when it is below, up when it is above, forward when it is toward the rivals, back when it is toward their own edge. A hold keeps stepping. A tap on a living kid selects them.
 - Kids you are not controlling throw and step like Easy rivals.
 - Each side stays on its own half. The middle band is neutral. The yard grid still places kids. It does not lock the snowball's hit row.
 - A loss wipes the run: coins, crew, fort, and throw rank go back to a new game. Season and best wave stay. Retry starts at wave 1.

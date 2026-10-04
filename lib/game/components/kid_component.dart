@@ -261,11 +261,6 @@ class KidComponent extends SpriteComponent {
   /// Small body circle. A snowball can pass the sprite and still miss.
   double get hitRadius => size.x * ThrowPhysics.kidHitScale;
 
-  /// Rock the charge pose. Positive [radians] tips the head up the screen.
-  void setSwivel(double radians) {
-    angle = -radians;
-  }
-
   @override
   void update(double dt) {
     super.update(dt);

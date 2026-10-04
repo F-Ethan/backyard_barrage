@@ -38,7 +38,8 @@ class CombatRules {
   static const double enemyKnockdownSeconds = 1.8;
 
   /// Ally hit 1. Cannot move or throw. A hit during this window KOs.
-  static const double allyStunSeconds = 7.5;
+  /// Three quarters of the old 7.5s lock.
+  static const double allyStunSeconds = 7.5 * 3 / 4;
 
   static int enemyCountForWave(int wave) {
     if (wave <= 1) return 2;

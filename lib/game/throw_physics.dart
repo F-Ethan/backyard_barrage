@@ -99,6 +99,13 @@ class RowLob {
   }
 }
 
+/// Upright yaw while a charge sweeps along a row.
+///
+/// [back] is the far end of the row. [across] is the existing side-profile
+/// charge pose. [quarter] is halfway toward the camera. [front] is chest
+/// and face toward the camera. Art is not mirrored.
+enum ChargeYaw { back, across, quarter, front }
+
 /// Shared throw / hit helpers (pure, unit-testable).
 class ThrowPhysics {
   ThrowPhysics._();
@@ -275,6 +282,22 @@ class ThrowPhysics {
   static double swivelElevation(double heldSeconds) {
     if (swivelPeriod <= 0) return 0;
     return math.sin(2 * math.pi * heldSeconds / swivelPeriod) * maxAimRadians;
+  }
+
+  /// Which upright sprite the charge sweep should show.
+  ///
+  /// [elevation] is screen-up radians from [swivelElevation]. The far end of
+  /// the row is +[maxAimRadians] (back of the coat). Straight across the yard
+  /// is 0 (the existing charge pose). The near end, chest toward the camera,
+  /// is -[maxAimRadians]. Those four looks split the sweep into equal bands.
+  /// The same bands apply to both sides. Turn art is not mirrored.
+  static ChargeYaw chargeYaw(double elevation) {
+    if (maxAimRadians <= 0) return ChargeYaw.across;
+    final u = (elevation / maxAimRadians).clamp(-1.0, 1.0);
+    if (u >= 0.5) return ChargeYaw.back;
+    if (u >= 0) return ChargeYaw.across;
+    if (u >= -0.5) return ChargeYaw.quarter;
+    return ChargeYaw.front;
   }
 
   /// Forward aim at [elevation] radians. Positive elevation aims up the screen.

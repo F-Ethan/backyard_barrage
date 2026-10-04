@@ -938,7 +938,7 @@ class BackyardBarrageGame extends FlameGame {
         );
         _swivel = ThrowPhysics.swivelElevation(_chargeHeld);
         _aimDir = ThrowPhysics.aimForElevation(_swivel, facingRight: true);
-        kid.showChargePose();
+        kid.showChargeYaw(ThrowPhysics.chargeYaw(_swivel));
         _syncChargeHud();
         _publishCharge();
       }

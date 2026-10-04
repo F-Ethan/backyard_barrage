@@ -396,6 +396,48 @@ void main() {
     expect(kid.angle, closeTo(0, 0.001));
   });
 
+  testWidgets('the charge sweep swaps upright yaw poses', (tester) async {
+    final game = (await boot(tester, MetaState())).game;
+    final kid = game.players.first;
+    final enemy = game.enemies.first;
+
+    game.pressChargeZone();
+    expect(kid.chargeYaw, ChargeYaw.across);
+    expect(kid.sprite, kid.chargeSprite);
+    expect(kid.angle, closeTo(0, 0.001));
+    expect(kid.scale.x, greaterThan(0));
+
+    game.update(ThrowPhysics.swivelPeriod / 4);
+    expect(kid.chargeYaw, ChargeYaw.back);
+    expect(kid.sprite, kid.turnBackSprite);
+    expect(kid.angle, closeTo(0, 0.001));
+    expect(kid.scale.x, greaterThan(0));
+
+    game.update(ThrowPhysics.swivelPeriod / 4);
+    expect(kid.chargeYaw, ChargeYaw.across);
+    expect(kid.sprite, kid.chargeSprite);
+
+    game.update(ThrowPhysics.swivelPeriod * math.asin(0.25) / (2 * math.pi));
+    expect(kid.chargeYaw, ChargeYaw.quarter);
+    expect(kid.sprite, kid.turnQuarterSprite);
+    expect(kid.angle, closeTo(0, 0.001));
+
+    // Just past the front band. A longer jump lets a rival lob land first.
+    final held =
+        ThrowPhysics.swivelPeriod * (0.5 + math.asin(0.25) / (2 * math.pi));
+    game.update(ThrowPhysics.swivelPeriod * 0.60 - held);
+    expect(game.isCharging, isTrue);
+    expect(kid.chargeYaw, ChargeYaw.front);
+    expect(kid.sprite, kid.turnFrontSprite);
+    expect(kid.angle, closeTo(0, 0.001));
+    expect(kid.scale.x, greaterThan(0));
+
+    // Rivals keep their own art. The sweep does not mirror either side.
+    expect(enemy.scale.x, greaterThan(0));
+    expect(enemy.angle, closeTo(0, 0.001));
+    game.releaseChargeZone();
+  });
+
   testWidgets('rivals take three hits; an ally stun can end on the next hit', (
     tester,
   ) async {

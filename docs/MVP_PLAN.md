@@ -49,7 +49,7 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | Rule | MVP value |
 | --- | --- |
 | Player starts with | 1 kid |
-| Hits to KO | 3. Enemy: brush-off (~1s), knockdown then up, then out. Ally: a hit stuns ~5.6s; a second hit during that stun KOs |
+| Hits to KO | 3. Enemy: brush-off (~1s), knockdown then up, then out. Ally: a hit stuns ~2.8s; a second hit during that stun KOs |
 | Throw | Hold the right third of the screen to charge. Release throws. There is no aim stick |
 | Charge | Tap ≈ 1/3 power, ~1s ≈ 1/2, ~3s full. Half-bell ease toward max. While held, the aim sweeps ±20° over about 3.6s |
 | Throw depth | Release samples the swivel. The ball's ground track slides to that depth. Power sets how far it goes |
@@ -61,7 +61,7 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | Lose | All player kids KO’d |
 
 ### 3.3 Controls (touch, landscape)
-- Right third of the screen: hold to charge the selected kid, release to throw. A short hold is still about 1/3 power. While the hold lasts, the aim sweeps through about ±20° over about 3.6 seconds. Letting go samples that angle, so timing sets the depth and the charge sets the distance. The kid sprite stays upright. The side-profile art cannot turn left and right.
+- Right third of the screen: hold to charge the selected kid, release to throw. A short hold is still about 1/3 power. While the hold lasts, the aim sweeps through about ±20° over about 3.6 seconds. Letting go samples that angle, so timing sets the depth and the charge sets the distance. The kid stays upright and does not roll. The sweep swaps the upright sprite in four equal bands from the far end of the row to the near end: turn-back, the existing charge pose, turn-quarter, then turn-front. Those sprites are not mirrored. The aim arrow still shows the angle.
 - Left two-thirds: the move box for the selected kid. A tap steps one cell toward the touch: down when it is below, up when it is above, forward when it is toward the rivals, back when it is toward their own edge. A hold keeps stepping. A tap on a living kid selects them.
 - Kids you are not controlling throw and step like Easy rivals.
 - Each side stays on its own half. The middle band is neutral. The yard grid still places kids. It does not lock the snowball's hit row.

@@ -110,6 +110,17 @@ enum ChargeYaw { back, across, quarter, front }
 class ThrowPhysics {
   ThrowPhysics._();
 
+  /// True when the loft peak is already past [footprint] in the throw
+  /// direction, so the ball has cleared that fort.
+  static bool peaksPastFort({
+    required double apexX,
+    required Rect footprint,
+    required bool facingRight,
+  }) {
+    if (facingRight) return apexX > footprint.right;
+    return apexX < footprint.left;
+  }
+
   static const double gravity = 980;
 
   /// A tap still lobs, but it dies in the neutral band.
@@ -824,6 +835,9 @@ class ThrowPhysics {
   }
 
   /// How much faster a finger drag is than that column walk.
+  ///
+  /// Playtest lock. Do not retune this. Six times the old column walk is
+  /// the speed that felt right, on every difficulty.
   static const double dragSpeedScale = 6;
 
   /// Player drag. Six times the old cell walk, so a finger across the

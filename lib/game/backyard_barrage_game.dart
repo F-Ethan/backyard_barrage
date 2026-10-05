@@ -182,14 +182,14 @@ class BackyardBarrageGame extends FlameGame {
       side: KidSide.player,
       sprite: _fortIntact[meta.fortStage]!,
       position: ArenaGrid.fortAnchor(),
-      size: Vector2(270, 300),
+      size: ArenaGrid.fortDrawSize,
     );
     world.add(fort);
     enemyFort = FortComponent(
       side: KidSide.enemy,
       sprite: _fortIntact[1]!,
       position: ArenaGrid.fortAnchor(KidSide.enemy),
-      size: Vector2(270, 300),
+      size: ArenaGrid.fortDrawSize,
     );
     world.add(enemyFort);
 
@@ -302,6 +302,7 @@ class BackyardBarrageGame extends FlameGame {
           initialDelay: stagger,
           onFire: _onEnemyFire,
           isFighting: () => phase == MatchPhase.fight,
+          playerChargeSeconds: _playerChargeSeconds,
         ),
       );
     }
@@ -493,6 +494,9 @@ class BackyardBarrageGame extends FlameGame {
   DifficultyTuning _tuning() =>
       DifficultyTuning.of(feel.settings.difficulty, wave: wave);
 
+  double _playerChargeSeconds() =>
+      CombatRules.playerChargeSeconds(meta.throwRank);
+
   void _onEnemyFire(
     KidComponent enemy,
     KidComponent? target,
@@ -563,6 +567,7 @@ class BackyardBarrageGame extends FlameGame {
           approachColumn: 1,
           isManual: () => identical(_selected, kid),
           currentWave: () => wave,
+          playerChargeSeconds: _playerChargeSeconds,
         ),
       );
     }
@@ -794,8 +799,8 @@ class BackyardBarrageGame extends FlameGame {
     final finger = _moveTarget;
     if (finger == null) return;
     final goal = _dragPoint(kid, finger + _grabOffset);
-    final scale = _tuning().playerMoveScale;
-    final cap = ThrowPhysics.playerDragSpeed() * (scale <= 0 ? 1.0 : scale);
+    // Locked drag rate. Difficulty does not speed this up or slow it down.
+    final cap = ThrowPhysics.playerDragSpeed();
     final delta = goal - kid.position;
     final distance = delta.length;
     final step = cap * dt;

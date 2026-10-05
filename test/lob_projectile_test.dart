@@ -1,9 +1,11 @@
 import 'dart:ui' as ui;
 
 import 'package:backyard_barrage/game/arena_grid.dart';
+import 'package:backyard_barrage/game/components/fort_component.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
 import 'package:backyard_barrage/game/components/lob_projectile.dart';
 import 'package:backyard_barrage/game/throw_physics.dart';
+import 'package:backyard_barrage/meta/difficulty.dart';
 import 'package:flame/components.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -100,6 +102,113 @@ void main() {
       expect(splats, 1);
       expect(splatAt!.y, closeTo(ThrowPhysics.impactGroundY(3), 1));
       expect(splatAt!.y, greaterThan(lane));
+    },
+  );
+
+  test(
+    'Hard chips a full lob into your own fort; Easy and Normal clear it',
+    () {
+      final poses = KidPoseSprites(
+        idle: sprite,
+        walk: sprite,
+        charge: sprite,
+        throwPose: sprite,
+        hit: sprite,
+        ko: sprite,
+        pickup: sprite,
+        turnBack: sprite,
+        turnQuarter: sprite,
+        turnFront: sprite,
+      );
+      final kid = KidComponent(
+        side: KidSide.player,
+        poses: poses,
+        position: ArenaGrid.cellCenter(KidSide.player, 0, ArenaGrid.coverRow),
+        size: Vector2.all(ArenaGrid.kidSize),
+      );
+      final fort = FortComponent(
+        side: KidSide.player,
+        sprite: sprite,
+        position: ArenaGrid.fortAnchor(),
+        size: ArenaGrid.fortDrawSize,
+      );
+      fort.placeOnRow(ArenaGrid.coverRow);
+      final lob = ThrowPhysics.planPlayerLob(
+        throwerRow: ArenaGrid.coverRow,
+        throwerColumn: 0,
+        aimDirection: Vector2(1, 0),
+        charge: 1,
+        facingRight: true,
+        originY: kid.throwOrigin.y,
+      );
+      expect(
+        ThrowPhysics.peaksPastFort(
+          apexX: lob.apexWorldX(kid.throwOrigin.x),
+          footprint: fort.footprint,
+          facingRight: true,
+        ),
+        isTrue,
+      );
+
+      for (final difficulty in [
+        Difficulty.easy,
+        Difficulty.normal,
+        Difficulty.hard,
+      ]) {
+        final chip = DifficultyTuning.of(difficulty).friendlyFortDamage;
+        final before = fort.hp;
+        var fortHits = 0;
+        final shot = LobProjectile(
+          sprite: sprite,
+          position: kid.throwOrigin.clone(),
+          velocity: lob.velocity.clone(),
+          targets: <KidComponent>[],
+          owner: kid,
+          blockedByFort: true,
+          forts: [fort],
+          friendlyFortDamage: chip,
+          groundTrack: lob.groundTrack,
+          throwerRow: lob.throwerRow,
+          throwerColumn: lob.throwerColumn,
+          peakRow: lob.peakRow,
+          landingRow: lob.landingRow,
+          apexRise: lob.apexRise,
+          landingDrop: lob.landingDrop,
+          launchVy: lob.velocity.y,
+          travelSpeed: lob.travelSpeed,
+          flightRange: lob.range,
+          apexFraction: lob.apexFraction,
+          settleFraction: lob.settleFraction,
+          landingY: lob.landingY,
+          apexY: lob.apexY,
+          onHit: (_, _) {},
+          onFortHit: (hit) {
+            fortHits += 1;
+            if (hit.fortDamage) fort.takeHit();
+          },
+        );
+        for (
+          var i = 0;
+          i < 40 && shot.hitPosition.x < fort.footprint.right + 30;
+          i++
+        ) {
+          shot.update(1 / 60);
+        }
+        if (difficulty == Difficulty.hard) {
+          expect(chip, isTrue);
+          expect(fortHits, 1);
+          expect(shot.fortDamage, isTrue);
+          expect(shot.struckFort, fort);
+          expect(fort.hp, before - 1);
+        } else {
+          expect(chip, isFalse);
+          expect(fortHits, 0);
+          expect(shot.fortDamage, isFalse);
+          expect(shot.struckFort, isNull);
+          expect(shot.hitPosition.x, greaterThan(fort.footprint.right));
+          expect(fort.hp, before);
+        }
+      }
     },
   );
 

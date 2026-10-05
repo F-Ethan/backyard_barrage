@@ -31,6 +31,7 @@ class EnemyController extends Component {
     this.approachColumn = -1,
     this.isManual,
     this.currentWave,
+    this.playerChargeSeconds,
   }) : _cycle = initialDelay,
        _seenHp = host.hp;
 
@@ -55,6 +56,10 @@ class EnemyController extends Component {
   /// Live wave, for kids who stay across waves. Falls back to [wave].
   final int Function()? currentWave;
 
+  /// The player's full-charge time. Easy and Normal scale their windup
+  /// from this. Hard follows it a little, about 0.45s down to 0.3s.
+  final double Function()? playerChargeSeconds;
+
   _AiPhase _phase = _AiPhase.wait;
   double _cycle;
   double _elapsed = 0;
@@ -64,10 +69,9 @@ class EnemyController extends Component {
   Vector2? _moveTarget;
 
   double get _telegraph {
-    final window = _cycle * 0.28;
-    if (window < 0.3) return 0.3;
-    if (window > 0.55) return 0.55;
-    return window;
+    final player =
+        playerChargeSeconds?.call() ?? CombatRules.playerChargeSeconds(0);
+    return tuning().botChargeSeconds(player);
   }
 
   @override
@@ -184,6 +188,8 @@ class EnemyController extends Component {
   void _beginCycle({required bool shotFellShort}) {
     final profile = tuning();
     _cycle = EnemyAi.throwGap(rng, profile);
+    final hold = _telegraph;
+    if (hold > _cycle) _cycle = hold;
     _elapsed = 0;
     _phase = _AiPhase.wait;
     _moveTarget = null;

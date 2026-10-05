@@ -103,6 +103,9 @@ void main() {
       expect(box.contains(Offset(front.x, lane)), isFalse);
       final otherRow = ArenaGrid.laneY(ArenaGrid.coverRow + 2);
       expect(box.contains(Offset(a.x, otherRow)), isFalse);
+      final nextRow = ArenaGrid.laneY(ArenaGrid.coverRow + 1);
+      expect(box.contains(Offset(a.x, nextRow)), isFalse);
+      expect(box.width, lessThan(ArenaGrid.horizontalSpan * 0.5));
     }
   });
 

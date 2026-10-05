@@ -59,4 +59,12 @@ void main() {
     expect(fullscreen, greaterThan(0));
     expect(plist.substring(fullscreen, fullscreen + 48), contains('<true/>'));
   });
+
+  test('the iOS build allows the ads plugin private header include', () {
+    final podfile = File('ios/Podfile').readAsStringSync();
+    final project = File('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
+    const flag = 'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES';
+    expect(podfile, contains("$flag'] = 'YES'"));
+    expect(flag.allMatches(project), hasLength(6));
+  });
 }

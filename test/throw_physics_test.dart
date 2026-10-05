@@ -374,36 +374,57 @@ void main() {
       );
     });
 
-    test(
-      'a short lob from behind the fort can peak over it; full power cannot',
-      () {
-        final feet = ArenaGrid.cellCenter(KidSide.player, 0, 4);
-        final from = ArenaGrid.throwOrigin(
-          KidSide.player,
-          feet,
-          Vector2.all(152),
+    test('a lob from behind the fort peaks past it', () {
+      final feet = ArenaGrid.cellCenter(KidSide.player, 0, 4);
+      final from = ArenaGrid.throwOrigin(
+        KidSide.player,
+        feet,
+        Vector2.all(152),
+      );
+      final box = ArenaGrid.fortFootprint(KidSide.player);
+      final enemy = ArenaGrid.fortFootprint(KidSide.enemy);
+      double apexFor(double charge) {
+        final lob = ThrowPhysics.planPlayerLob(
+          throwerRow: 4,
+          throwerColumn: 0,
+          aimDirection: Vector2(1, 0),
+          charge: charge,
+          facingRight: true,
+          originY: from.y,
         );
-        final box = ArenaGrid.fortFootprint(KidSide.player);
-        double apexFor(double charge) {
-          final lob = ThrowPhysics.planPlayerLob(
-            throwerRow: 4,
-            throwerColumn: 0,
-            aimDirection: Vector2(1, 0),
-            charge: charge,
-            facingRight: true,
-            originY: from.y,
-          );
-          return lob.apexWorldX(from.x);
-        }
+        return lob.apexWorldX(from.x);
+      }
 
-        final tapApex = apexFor(ThrowPhysics.minThrowCharge);
-        final fullApex = apexFor(1);
-        expect(tapApex, inInclusiveRange(box.left, box.right));
-        expect(fullApex, greaterThan(box.right));
-        expect(ArenaGrid.columnIsBehindFort(KidSide.player, 0), isTrue);
-        expect(ArenaGrid.columnIsBehindFort(KidSide.player, 1), isFalse);
-      },
-    );
+      final tapApex = apexFor(ThrowPhysics.minThrowCharge);
+      final fullApex = apexFor(1);
+      expect(box.width, lessThan(ArenaGrid.horizontalSpan * 0.5));
+      expect(
+        ThrowPhysics.peaksPastFort(
+          apexX: tapApex,
+          footprint: box,
+          facingRight: true,
+        ),
+        isTrue,
+      );
+      expect(
+        ThrowPhysics.peaksPastFort(
+          apexX: fullApex,
+          footprint: box,
+          facingRight: true,
+        ),
+        isTrue,
+      );
+      expect(
+        ThrowPhysics.peaksPastFort(
+          apexX: fullApex,
+          footprint: enemy,
+          facingRight: true,
+        ),
+        isFalse,
+      );
+      expect(ArenaGrid.columnIsBehindFort(KidSide.player, 0), isTrue);
+      expect(ArenaGrid.columnIsBehindFort(KidSide.player, 1), isFalse);
+    });
 
     test('a full-power lob is flatter than a steep flick', () {
       final shot = ThrowPhysics.launchVelocity(

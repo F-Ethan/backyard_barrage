@@ -62,6 +62,7 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | Lose | All player kids KO’d |
 
 ### 3.3 Controls (touch, landscape)
+- At the start of each round, both crews walk in from off-screen to their spots. Input stays locked until they arrive.
 - Right third of the screen: hold to charge the selected kid, release to throw. A short hold is still about 1/3 power. While the hold lasts, the aim sweeps through about ±20° over about 3.6 seconds. Letting go samples that angle, so timing sets the depth and the charge sets the distance. The kid stays upright and does not roll. The sweep swaps the upright sprite in four equal bands from the far end of the row to the near end: turn-back, the existing charge pose, turn-quarter, then turn-front. Those sprites are not mirrored. The aim arrow still shows the angle.
 - Left two-thirds: drag and the selected kid follows the finger inside their half. They are not snapped to a cell. A tap on a living kid selects them and keeps their feet until the finger moves. A tap on open ground sends them to that spot. The yard's columns and rows still place forts, rivals, and throw lanes.
 - Kids you are not controlling throw and step like Easy rivals.
@@ -122,7 +123,7 @@ Player **chooses** season on main menu. No real-world lock in MVP.
 3. **Arena HUD** — kid HP pips, fort bar, charge bar, pause  
 4. **Wave clear** — coins earned, Continue  
 5. **Skill tree** — buy the next node in a branch, Continue to next wave  
-6. **Defeat summary** — waves cleared, coins carried over, Skills / Retry / Menu  
+6. **Defeat summary** — a short coin beat for the unspent amount, then waves cleared, coins carried over, Skills / Retry / Menu  
 7. **Settings** — SFX/music, haptics, credits  
 
 Accessibility: large hit targets; consider OpenDyslexic-friendly UI font option later.

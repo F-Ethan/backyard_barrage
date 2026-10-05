@@ -19,6 +19,7 @@ import '../seasons/season_kit.dart';
 import 'arena_grid.dart';
 import 'combat_rules.dart';
 import 'components/charge_indicator.dart';
+import 'components/coin_carry.dart';
 import 'components/enemy_controller.dart';
 import 'components/fort_component.dart';
 import 'components/impact_burst.dart';
@@ -27,9 +28,9 @@ import 'components/lob_projectile.dart';
 import 'components/overlay_banner.dart';
 import 'throw_physics.dart';
 
-enum MatchPhase { fight, clearing, defeat, shop, paused }
+enum MatchPhase { entering, fight, clearing, defeat, shop, paused }
 
-enum _Banner { none, waveKo, waveDone, defeatKo }
+enum _Banner { none, waveKo, waveDone, defeatKo, defeatCoins }
 
 /// Landscape backyard arena: charge on the swivel, lob, then shop between waves.
 class BackyardBarrageGame extends FlameGame {
@@ -108,6 +109,15 @@ class BackyardBarrageGame extends FlameGame {
   /// Shop opened from the defeat screen. Closing it returns there.
   bool shoppingFromDefeat = false;
 
+  /// Unspent coins at the moment the crew went down. The defeat beat shows
+  /// this, and the wallet keeps the same amount.
+  int carriedCoins = 0;
+
+  /// Walk-on pace. Not the locked drag rate.
+  static const double entranceSpeed = 280;
+
+  static const double _offstage = 180;
+
   /// Right-hand share of the screen. A hold there charges; release throws.
   static const double chargeScreenFraction = 2 / 3;
 
@@ -118,6 +128,9 @@ class BackyardBarrageGame extends FlameGame {
   static const double kidSpacing = 64;
 
   bool _chargeHolding = false;
+  final List<({KidComponent kid, Vector2 goal})> _entrance = [];
+  CoinCarry? _coinCarry;
+  Sprite? _coinSprite;
   bool _moveHolding = false;
   bool _charging = false;
   double _charge = 0;
@@ -172,6 +185,7 @@ class BackyardBarrageGame extends FlameGame {
     _fortCollapsed = await loadSprite('forts/fort_collapsed_draft.png');
 
     final glow = await loadSprite('vfx/charge_glow_draft.png');
+    _coinSprite = await loadSprite('ui/coin_draft.png');
 
     _bg = SpriteComponent(
       sprite: _kit.background,
@@ -212,7 +226,11 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   void pauseMatch() {
-    if (phase != MatchPhase.fight && phase != MatchPhase.clearing) return;
+    if (phase != MatchPhase.fight &&
+        phase != MatchPhase.clearing &&
+        phase != MatchPhase.entering) {
+      return;
+    }
     _resumePhase = phase;
     _endActiveThrow();
     phase = MatchPhase.paused;
@@ -261,10 +279,12 @@ class BackyardBarrageGame extends FlameGame {
     _pendingBanner = _Banner.none;
     _bannerTime = 0;
     _clearBanner();
+    _clearCoinCarry();
     _endActiveThrow();
     _clearShots();
     _clearEnemies();
-    phase = MatchPhase.fight;
+    phase = MatchPhase.entering;
+    _entrance.clear();
 
     while (players.length > meta.crewSize) {
       players.removeLast().removeFromParent();
@@ -276,10 +296,13 @@ class BackyardBarrageGame extends FlameGame {
     }
     for (var i = 0; i < players.length; i++) {
       final kid = players[i];
-      kid.position = ArenaGrid.slot(KidSide.player, i);
-      kid.syncDepth();
+      final goal = ArenaGrid.slot(KidSide.player, i);
       kid.revive();
       kid.shieldHits = meta.shieldCharges;
+      kid.position = Vector2(-_offstage - i * 36, goal.y);
+      kid.setWalking(true);
+      kid.syncDepth();
+      _entrance.add((kid: kid, goal: goal));
     }
     _setSelected(_firstLiving(players));
     _ensureAllyBrains();
@@ -287,8 +310,13 @@ class BackyardBarrageGame extends FlameGame {
     final count = CombatRules.enemyCountForWave(wave);
     for (var i = 0; i < count; i++) {
       final kid = _makeKid(KidSide.enemy, i);
+      final goal = ArenaGrid.slot(KidSide.enemy, i);
+      kid.position = Vector2(worldWidth + _offstage + i * 36, goal.y);
+      kid.setWalking(true);
+      kid.syncDepth();
       enemies.add(kid);
       world.add(kid);
+      _entrance.add((kid: kid, goal: goal));
       final profile = _tuning();
       final gap = profile.throwGap(_rng.nextDouble());
       final stagger = (gap * (0.75 + i * 0.1)).clamp(
@@ -462,6 +490,7 @@ class BackyardBarrageGame extends FlameGame {
     _endActiveThrow();
     _clearShots();
     feel.defeated();
+    carriedCoins = meta.coins;
     meta.resetRun();
     unawaited(persist());
     _publishHud();
@@ -493,8 +522,14 @@ class BackyardBarrageGame extends FlameGame {
         overlays.add('shop');
         pauseEngine();
       case _Banner.defeatKo:
+        _clearBanner();
+        _showCoinCarry();
+        _pendingBanner = _Banner.defeatCoins;
+        _bannerTime = 1.45;
+      case _Banner.defeatCoins:
         _pendingBanner = _Banner.none;
         _clearBanner();
+        _clearCoinCarry();
         overlays.add('defeat');
         pauseEngine();
       case _Banner.none:
@@ -522,6 +557,61 @@ class BackyardBarrageGame extends FlameGame {
   void _clearBanner() {
     _banner?.removeFromParent();
     _banner = null;
+  }
+
+  /// Label while the coin beat is on screen. Null before and after it.
+  String? get coinCarryLabel => _coinCarry?.label;
+
+  void _showCoinCarry() {
+    _clearCoinCarry();
+    final sprite = _coinSprite;
+    if (sprite == null) return;
+    _coinCarry = CoinCarry(
+      sprite: sprite,
+      amount: carriedCoins,
+      position: Vector2(worldWidth / 2, worldHeight / 2 - 10),
+    );
+    world.add(_coinCarry!);
+  }
+
+  void _clearCoinCarry() {
+    _coinCarry?.removeFromParent();
+    _coinCarry = null;
+  }
+
+  /// Walk both crews from off-screen to their spots. Input stays locked.
+  void _tickEntrance(double dt) {
+    if (phase != MatchPhase.entering) return;
+    var waiting = false;
+    final step = entranceSpeed * dt;
+    for (final mark in _entrance) {
+      final kid = mark.kid;
+      final delta = mark.goal - kid.position;
+      final distance = delta.length;
+      if (distance <= step || distance < 1) {
+        kid.position = mark.goal.clone();
+        kid.setWalking(false);
+      } else {
+        kid.position += delta / distance * step;
+        kid.setWalking(true);
+        waiting = true;
+      }
+      kid.syncDepth();
+    }
+    if (!waiting) {
+      _entrance.clear();
+      phase = MatchPhase.fight;
+    }
+  }
+
+  /// Skip the walk-on. Tests that start in a fight use this.
+  @visibleForTesting
+  void finishEntrance() {
+    var guard = 0;
+    while (phase == MatchPhase.entering && guard < 40) {
+      update(0.25);
+      guard += 1;
+    }
   }
 
   DifficultyTuning _tuning() =>
@@ -992,6 +1082,7 @@ class BackyardBarrageGame extends FlameGame {
   void update(double dt) {
     if (paused || phase == MatchPhase.paused) return;
     super.update(dt);
+    _tickEntrance(dt);
     _tickMove(dt);
     if (_charging) {
       final kid = _selected;

@@ -70,7 +70,7 @@ void main() {
       RecordingPulse pulses,
     })
   >
-  boot(WidgetTester tester, MetaState meta) async {
+  boot(WidgetTester tester, MetaState meta, {bool settle = true}) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final store = SaveStore(preferences: prefs);
@@ -108,6 +108,7 @@ void main() {
       await tester.pump();
     }
     expect(game.isLoaded, isTrue, reason: 'arena failed to finish loading');
+    if (settle) game.finishEntrance();
     return (game: game, store: store, playback: playback, pulses: pulses);
   }
 
@@ -170,6 +171,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('next-wave')));
     await tester.pump();
+    expect(game.phase, MatchPhase.entering);
+    game.finishEntrance();
     expect(game.wave, 2);
     expect(game.enemies, hasLength(3));
     expect(game.players.single.hp, CombatRules.hitsToKo);
@@ -204,12 +207,23 @@ void main() {
     expect(game.meta.season, Season.summer);
     expect(game.wave, 1);
 
+    expect(game.carriedCoins, 40);
+    expect(game.meta.coins, 40);
+    expect(game.coinCarryLabel, isNull);
+
     game.update(0.7);
+    expect(game.coinCarryLabel, 'Carried over 40');
+    expect(find.byKey(const Key('retry')), findsNothing);
+
+    game.update(1.5);
     await tester.pump();
+    expect(game.coinCarryLabel, isNull);
     expect(find.byKey(const Key('retry')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('retry')));
     await tester.pump();
+    expect(game.phase, MatchPhase.entering);
+    game.finishEntrance();
     expect(game.wave, 1);
     expect(game.players, hasLength(1));
     expect(game.players.single.hp, CombatRules.hitsToKo);
@@ -224,6 +238,7 @@ void main() {
     knockOut(game.players);
     game.resolveKnockouts();
     game.update(0.7);
+    game.update(1.5);
     await tester.pump();
 
     await tester.tap(find.byKey(const Key('open-skills')));
@@ -242,6 +257,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('retry')));
     await tester.pump();
+    expect(game.phase, MatchPhase.entering);
+    game.finishEntrance();
     expect(game.meta.throwRank, 1);
     expect(game.meta.coins, 24);
     expect(game.meta.crewSize, 1);
@@ -710,6 +727,7 @@ void main() {
     )).game;
     game.wave = 2;
     game.startWave();
+    game.finishEntrance();
     game.updateTree(0);
     _expectFullBackyard(game);
   });
@@ -724,8 +742,51 @@ void main() {
     )).game;
     game.wave = 2;
     game.startWave();
+    game.finishEntrance();
     game.updateTree(0);
     _expectFullBackyard(game);
+  });
+
+  testWidgets('both crews walk on before the fight takes input', (
+    tester,
+  ) async {
+    final game = (await boot(
+      tester,
+      MetaState(crewSize: 2),
+      settle: false,
+    )).game;
+    expect(game.phase, MatchPhase.entering);
+    expect(game.players.first.sprite, game.players.first.walkSprite);
+    expect(game.players.first.position.x, lessThan(0));
+    expect(
+      game.enemies.first.position.x,
+      greaterThan(BackyardBarrageGame.worldWidth),
+    );
+
+    final planted = game.players.first.position.clone();
+    game.pressChargeZone();
+    game.pressMoveZone(ArenaGrid.slot(KidSide.player, 0));
+    game.update(0);
+    expect(game.isCharging, isFalse);
+    expect(game.players.first.position.x, planted.x);
+    expect(game.players.first.position.y, planted.y);
+
+    game.finishEntrance();
+    expect(game.phase, MatchPhase.fight);
+    final lead = ArenaGrid.slot(KidSide.player, 0);
+    final mate = ArenaGrid.slot(KidSide.player, 1);
+    final rival = ArenaGrid.slot(KidSide.enemy, 0);
+    expect(game.players[0].position.x, closeTo(lead.x, 0.5));
+    expect(game.players[0].position.y, closeTo(lead.y, 0.5));
+    expect(game.players[1].position.x, closeTo(mate.x, 0.5));
+    expect(game.players[1].position.y, closeTo(mate.y, 0.5));
+    expect(game.enemies.first.position.x, closeTo(rival.x, 0.5));
+    expect(game.enemies.first.position.y, closeTo(rival.y, 0.5));
+    expect(game.players.first.sprite, game.players.first.pickupSprite);
+    expect(game.enemies.first.sprite, game.enemies.first.idleSprite);
+
+    game.pressChargeZone();
+    expect(game.isCharging, isTrue);
   });
 
   testWidgets('fight HUD stays screen-sized on a short phone', (tester) async {

@@ -41,6 +41,15 @@ post_install do |installer|
     target.build_configurations.each do |config|
       # Xcode 27 rejects pod targets below iOS 15. The Runner target matches.
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      # google_mobile_ads 9.1.0 is a framework module (DEFINES_MODULE) whose
+      # public headers import GoogleMobileAds_Beta.h. That file ships in
+      # PrivateHeaders and is not in the GoogleMobileAds module map, so
+      # flutter build ipa and Xcode Archive both fail. 9.1.0 is the newest
+      # plugin release and the one that added the import. No SDK pin fixes it.
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
     end
+  end
+  installer.pods_project.build_configurations.each do |config|
+    config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
   end
 end

@@ -32,12 +32,13 @@ class MatchHud extends StatelessWidget {
         final fort = game.fort;
         final fraction = fort.maxHp <= 0 ? 0.0 : fort.hp / fort.maxHp;
         final fighting = phase == MatchPhase.fight;
+        final chargeZone = fighting || phase == MatchPhase.entering;
         final modern = UiKitScope.of(context).modern;
         final charge = game.chargeListenable.value;
         return Stack(
           fit: StackFit.expand,
           children: [
-            if (fighting) _PlayZones(game: game),
+            if (chargeZone) _PlayZones(game: game),
             if (fighting && modern && charge > 0)
               Positioned.fill(
                 child: IgnorePointer(child: _ChargeGlow(charge: charge)),

@@ -128,6 +128,10 @@ class BackyardBarrageGame extends FlameGame {
   static const double kidSpacing = 64;
 
   bool _chargeHolding = false;
+
+  /// Finger is down on the charge zone during the walk-on. The charge
+  /// starts when the crews arrive, without a second press.
+  bool _chargeArmed = false;
   final List<({KidComponent kid, Vector2 goal})> _entrance = [];
   CoinCarry? _coinCarry;
   Sprite? _coinSprite;
@@ -599,8 +603,10 @@ class BackyardBarrageGame extends FlameGame {
       kid.syncDepth();
     }
     if (!waiting) {
+      final held = _chargeArmed;
       _entrance.clear();
       phase = MatchPhase.fight;
+      if (held) _beginHeldCharge();
     }
   }
 
@@ -711,7 +717,20 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   /// Hold on the right third of the screen. Release throws.
+  ///
+  /// During the walk-on the finger is remembered and the charge starts
+  /// when the crews reach their spots.
   void pressChargeZone() {
+    if (phase == MatchPhase.entering) {
+      _chargeArmed = true;
+      return;
+    }
+    if (phase != MatchPhase.fight || _chargeHolding) return;
+    _beginHeldCharge();
+  }
+
+  void _beginHeldCharge() {
+    _chargeArmed = false;
     if (phase != MatchPhase.fight || _chargeHolding) return;
     final kid = _readyThrower();
     if (kid == null) return;
@@ -724,6 +743,7 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   void releaseChargeZone() {
+    _chargeArmed = false;
     if (!_chargeHolding) return;
     _chargeHolding = false;
     if (_charging) _releaseThrow();
@@ -1011,6 +1031,7 @@ class BackyardBarrageGame extends FlameGame {
 
   void _endActiveThrow() {
     _chargeHolding = false;
+    _chargeArmed = false;
     _moveHolding = false;
     _charging = false;
     _charge = 0;

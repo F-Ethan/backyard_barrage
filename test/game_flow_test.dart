@@ -765,6 +765,7 @@ void main() {
 
     final planted = game.players.first.position.clone();
     game.pressChargeZone();
+    game.releaseChargeZone();
     game.pressMoveZone(ArenaGrid.slot(KidSide.player, 0));
     game.update(0);
     expect(game.isCharging, isFalse);
@@ -787,6 +788,27 @@ void main() {
 
     game.pressChargeZone();
     expect(game.isCharging, isTrue);
+  });
+
+  testWidgets('a charge held through the walk-on starts when they arrive', (
+    tester,
+  ) async {
+    final game = (await boot(
+      tester,
+      MetaState(),
+      settle: false,
+    )).game;
+    expect(game.phase, MatchPhase.entering);
+    await tester.pump();
+    expect(find.byKey(const Key('charge-zone')), findsOneWidget);
+
+    game.pressChargeZone();
+    expect(game.isCharging, isFalse);
+
+    game.finishEntrance();
+    expect(game.phase, MatchPhase.fight);
+    expect(game.isCharging, isTrue);
+    expect(game.players.first.sprite, game.players.first.chargeSprite);
   });
 
   testWidgets('fight HUD stays screen-sized on a short phone', (tester) async {

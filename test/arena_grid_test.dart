@@ -5,6 +5,42 @@ import 'package:backyard_barrage/game/components/kid_component.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('far rows draw at 75 percent and match a snowball on that row', () {
+    expect(
+      ArenaGrid.depthScale(ArenaGrid.rowBack, groundTrack: false),
+      closeTo(ArenaGrid.depthScaleFar, 0.001),
+    );
+    expect(
+      ArenaGrid.depthScale(ArenaGrid.rowFront, groundTrack: false),
+      closeTo(ArenaGrid.depthScaleNear, 0.001),
+    );
+    expect(ArenaGrid.depthScaleFar, closeTo(0.75, 0.001));
+    expect(
+      ArenaGrid.depthScale(ArenaGrid.laneY(0), groundTrack: true),
+      closeTo(ArenaGrid.depthScaleFar, 0.001),
+    );
+    expect(
+      ArenaGrid.depthScale(
+        ArenaGrid.laneY(ArenaGrid.rows - 1),
+        groundTrack: true,
+      ),
+      closeTo(ArenaGrid.depthScaleNear, 0.001),
+    );
+    for (var row = 0; row < ArenaGrid.rows; row++) {
+      expect(
+        ArenaGrid.depthScale(ArenaGrid.rowY(row), groundTrack: false),
+        closeTo(
+          ArenaGrid.depthScale(ArenaGrid.laneY(row), groundTrack: true),
+          0.001,
+        ),
+      );
+    }
+    expect(
+      ArenaGrid.depthScale(ArenaGrid.rowY(0), groundTrack: false),
+      lessThan(ArenaGrid.depthScale(ArenaGrid.rowY(4), groundTrack: false)),
+    );
+  });
+
   test('each side has more rows than columns and a neutral gap', () {
     expect(ArenaGrid.columnsPerSide, inInclusiveRange(3, 5));
     expect(ArenaGrid.rows, inInclusiveRange(7, 10));

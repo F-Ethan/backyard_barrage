@@ -123,6 +123,23 @@ void main() {
       size: Vector2.all(ArenaGrid.kidSize),
     );
     expect(kid.priority, ArenaGrid.depthOrder(kid.hitCenter.y));
+    expect(kid.anchor, Anchor.bottomCenter);
+    final hitRadius = kid.hitRadius;
+
+    kid.position = ArenaGrid.cellCenter(KidSide.enemy, 2, 0);
+    kid.syncDepth();
+    expect(kid.scale.x, closeTo(ArenaGrid.depthScaleFar, 0.001));
+    expect(kid.scale.y, kid.scale.x);
+    expect(kid.hitRadius, hitRadius);
+
+    kid.position = ArenaGrid.cellCenter(KidSide.enemy, 2, ArenaGrid.rows - 1);
+    kid.syncDepth();
+    expect(kid.scale.x, closeTo(ArenaGrid.depthScaleNear, 0.001));
+    expect(kid.scale.y, kid.scale.x);
+    expect(kid.hitRadius, hitRadius);
+
+    kid.position = ArenaGrid.cellCenter(KidSide.enemy, 2, 4);
+    kid.syncDepth();
 
     LobProjectile shotAt(double depth) {
       return LobProjectile(
@@ -144,6 +161,20 @@ void main() {
     over.update(1 / 60);
     expect(over.priority, lessThan(kid.priority));
     expect(over.priority, ArenaGrid.depthOrder(over.hitPosition.y));
+    expect(over.scale.x, over.scale.y);
+    expect(over.radius, 22);
+    expect(
+      over.scale.x,
+      closeTo(
+        ArenaGrid.depthScale(over.hitPosition.y, groundTrack: true),
+        0.001,
+      ),
+    );
+
+    final farShot = shotAt(ArenaGrid.laneY(0));
+    expect(farShot.scale.x, closeTo(ArenaGrid.depthScaleFar, 0.001));
+    final nearShot = shotAt(ArenaGrid.laneY(ArenaGrid.rows - 1));
+    expect(nearShot.scale.x, closeTo(ArenaGrid.depthScaleNear, 0.001));
 
     final under = shotAt(kid.hitCenter.y + 36);
     under.update(1 / 60);

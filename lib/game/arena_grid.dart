@@ -59,6 +59,26 @@ class ArenaGrid {
   /// the box draws in front. The band stays above the background.
   static int depthOrder(double y) => 200 + y.round();
 
+  /// Far-row size as a fraction of the near-row size. 75% is obvious from
+  /// the back line to the camera and still readable on the far row.
+  static const double depthScaleFar = 0.75;
+
+  /// Full size at the near edge of the yard (toward the camera).
+  static const double depthScaleNear = 1;
+
+  /// Drawn size for a yard height. Same factor on X and Y.
+  ///
+  /// Kids pass feet Y (`groundTrack: false`), which runs from [rowBack] to
+  /// [rowFront]. Snowballs pass ground-track Y (`groundTrack: true`), which
+  /// is the lane band one body-lift higher. Both spans are [verticalSpan],
+  /// so a ball on a row matches the kid standing on that row. Values outside
+  /// the band clamp. This does not change hit sizes.
+  static double depthScale(double y, {required bool groundTrack}) {
+    final origin = groundTrack ? laneY(0) : rowBack;
+    final t = ((y - origin) / verticalSpan).clamp(0.0, 1.0);
+    return depthScaleFar + (depthScaleNear - depthScaleFar) * t;
+  }
+
   static const List<(int, int)> playerSlots = [(1, 4), (0, 2), (3, 6)];
   static const List<(int, int)> enemySlots = [(2, 3), (3, 1), (1, 6)];
 

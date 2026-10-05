@@ -422,6 +422,11 @@ void main() {
         closeTo(ArenaGrid.columnStep / ThrowPhysics.stepSeconds, 0.01),
       );
       expect(ThrowPhysics.stepSeconds, closeTo(1.2, 0.001));
+      expect(
+        ThrowPhysics.playerDragSpeed(),
+        closeTo(pace * ThrowPhysics.dragSpeedScale, 0.01),
+      );
+      expect(ThrowPhysics.dragSpeedScale, 6);
       expect(pace, lessThan(ThrowPhysics.playerTravelSpeed));
       expect(pace, lessThan(80));
       expect(pace, greaterThan(40));

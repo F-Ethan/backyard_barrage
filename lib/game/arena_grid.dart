@@ -224,25 +224,33 @@ class ArenaGrid {
     return Vector2((left.x + right.x) / 2, left.y);
   }
 
-  /// Lane box for the fort: cover columns 1 and 2 on [row] (or [coverRow]).
+  /// Lane box for the fort: the middle of the two cover cells on [row].
   ///
-  /// A snowball center inside this rect is in the fort's footprint. The box
-  /// is the two shelter cells, not the whole sprite and not every row.
-  /// Horizontal edges do not move when the row changes, so a lob from the
-  /// back line still peaks over the same columns.
+  /// Wider than the gap between those cells, narrower than half the side,
+  /// and only about one row tall. The back column and the front column stay
+  /// open, and the rows above and below the fort stay open, so a lob can
+  /// pass. Horizontal edges do not move when the row changes.
   static Rect fortFootprint(KidSide side, [int? row]) {
     final coverRow = row ?? ArenaGrid.coverRow;
     final a = cellCenter(side, coverColumnA, coverRow);
     final b = cellCenter(side, coverColumnB, coverRow);
-    final left = math.min(a.x, b.x) - columnStep * 0.42;
-    final right = math.max(a.x, b.x) + columnStep * 0.42;
+    final centerX = (a.x + b.x) / 2;
+    final halfWidth = columnStep * 0.55;
     final mid = laneY(coverRow);
+    final halfHeight = rowStep * 0.46;
     return Rect.fromLTRB(
-      left,
-      mid - rowStep * 0.85,
-      right,
-      rowY(coverRow) - rowStep * 0.15,
+      centerX - halfWidth,
+      mid - halfHeight,
+      centerX + halfWidth,
+      mid + halfHeight,
     );
+  }
+
+  /// Drawn fort. Sits on the cover columns instead of covering the half.
+  static Vector2 get fortDrawSize {
+    final width = columnStep * 1.45;
+    final height = rowStep * 3.6;
+    return Vector2(width, height);
   }
 
   static Vector2 throwOrigin(KidSide side, Vector2 feet, Vector2 size) {

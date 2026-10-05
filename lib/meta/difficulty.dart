@@ -1,3 +1,5 @@
+import '../game/combat_rules.dart';
+
 /// How hard the backyard fight is. Stored with the other device settings.
 enum Difficulty { easy, normal, hard }
 
@@ -12,6 +14,7 @@ class DifficultyTuning {
     required this.playerMoveScale,
     required this.friendlyFortDamage,
     required this.enemyStepSpeed,
+    required this.chargeVersusPlayer,
   });
 
   /// Seconds from one enemy throw to the next.
@@ -25,7 +28,7 @@ class DifficultyTuning {
   /// hold still once a living player is already within one row.
   final bool matchPlayerRow;
 
-  /// Multiplier on the player's walk cap. 1 matches snowball pace.
+  /// Old walk bias. Player drag does not use it; that speed is locked.
   final double playerMoveScale;
 
   /// When true, a player's own lob can chip the player fort.
@@ -34,19 +37,48 @@ class DifficultyTuning {
   /// Pixels per second for an enemy's single-cell step.
   final double enemyStepSpeed;
 
+  /// Bot charge hold divided by the player's full charge.
+  ///
+  /// 1 matches the player. Above 1 is slower than the player (Easy).
+  /// Below 1 keeps Hard's short windup and does not follow the player's hold.
+  final double chargeVersusPlayer;
+
+  /// How long a bot holds the charge pose before releasing.
+  ///
+  /// Easy is longer than [playerCharge]. Normal matches it. Hard stays in
+  /// the old short band, about 0.3–0.55s, so Hard still charges faster.
+  double botChargeSeconds(double playerCharge) {
+    final player = playerCharge < 0.2
+        ? CombatRules.playerChargeSeconds(0)
+        : playerCharge;
+    if (chargeVersusPlayer < 1) {
+      final window = player * chargeVersusPlayer;
+      if (window < 0.3) return 0.3;
+      if (window > 0.55) return 0.55;
+      return window;
+    }
+    return player * chargeVersusPlayer;
+  }
+
   static DifficultyTuning of(Difficulty difficulty, {int wave = 1}) {
     final steps = wave < 1 ? 0 : wave - 1;
     switch (difficulty) {
       case Difficulty.easy:
-        final max = (4.6 - steps * 0.06).clamp(3.6, 4.6).toDouble();
+        // Longer than a full player charge, so the player finishes first.
+        const versus = 1.5;
+        final hold = CombatRules.playerChargeSeconds(0) * versus;
+        final max = (hold + 1.1 - steps * 0.05)
+            .clamp(hold, hold + 1.1)
+            .toDouble();
         return DifficultyTuning(
-          throwGapMin: 3,
+          throwGapMin: hold,
           throwGapMax: max,
           throwsPerStep: 2,
           matchPlayerRow: false,
           playerMoveScale: 1.12,
           friendlyFortDamage: false,
           enemyStepSpeed: 120,
+          chargeVersusPlayer: versus,
         );
       case Difficulty.hard:
         final max = (1.5 - steps * 0.025).clamp(1.08, 1.5).toDouble();
@@ -58,17 +90,24 @@ class DifficultyTuning {
           playerMoveScale: 0.88,
           friendlyFortDamage: true,
           enemyStepSpeed: 170,
+          chargeVersusPlayer: 0.15,
         );
       case Difficulty.normal:
-        final max = (3.0 - steps * 0.05).clamp(2.0, 3.0).toDouble();
+        // The cycle is at least one full player charge, so Normal bots
+        // finish a charge when the player does.
+        final hold = CombatRules.playerChargeSeconds(0);
+        final max = (hold + 0.6 - steps * 0.04)
+            .clamp(hold, hold + 0.6)
+            .toDouble();
         return DifficultyTuning(
-          throwGapMin: 1.5,
+          throwGapMin: hold,
           throwGapMax: max,
           throwsPerStep: 1,
           matchPlayerRow: false,
           playerMoveScale: 1,
           friendlyFortDamage: false,
           enemyStepSpeed: 150,
+          chargeVersusPlayer: 1,
         );
     }
   }

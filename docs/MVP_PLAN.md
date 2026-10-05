@@ -55,7 +55,7 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | Throw depth | Release samples the swivel. The ball's ground track slides to that depth. Power sets how far it goes |
 | Hit | A small body hitbox. The ball can pass in front of or behind a kid. Overlap of the ground track is what counts. The snowball image draws behind a kid when that track is over the hit box, and in front when it is under. Drawn size does not change the hit |
 | Depth | Kids and snowballs draw smaller toward the far edge (75% of the near-edge size) and full size toward the camera. Scale is anchored at a kid's feet. Rivals still take about 1.2s per column |
-| Walk | Left two-thirds of the screen. Drag and the selected kid follows the finger inside their half, about six times the old cell walk. A tap on a kid selects them |
+| Walk | Left two-thirds of the screen. Drag and the selected kid follows the finger inside their half, at the locked rate of six times the old cell walk. Difficulty does not change that speed. A tap on a kid selects them |
 | Active thrower | One kid is selected and shows a soft glow. The others throw on Easy |
 | Enemy count | Starts ~2–3, scales by wave |
 | Win | All enemies KO’d |
@@ -71,7 +71,8 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 
 ### 3.4 AI (simple)
 - Rivals target a living player kid, throw on the difficulty timer, and step with the Easy / Normal / Hard lane rules
-- Throw about every 1.5–3s on Normal (slower on Easy, about 1–1.5s on Hard)
+- Charge: Easy bots take longer than the player's full charge. Normal bots match it. Hard bots keep a short windup (about 0.3–0.55s), so Hard still charges faster than the player
+- Throw about every 3s on Normal (slower on Easy, about 1–1.5s on Hard)
 - After a throw, step one row toward a living opponent if nobody is within one row. Easy does that every other throw. Normal does it every throw. Hard steps onto the closest opponent's exact row every throw
 - A lob that falls short steps one column closer. A hit steps one column back, or off that row if they are already at the back line
 - They will not step onto a teammate
@@ -88,7 +89,7 @@ Spend soft currency earned from wins:
 | Fort | Cover + fort HP / stages | 3 stages |
 | (Optional) Balloon/snow size | Larger hit radius | 3 ranks |
 
-Fort cover shelters 1–2 kids on the cover columns and absorbs lobs that are not at the top of their arc. The fort's row is random inside the mid band (not flush with the top or bottom of the yard, and not on the back line) so a kid can still shelter and a short lob can still peak over it. Enough hits collapse it. A collapsed fort does not block shots from either side. HP refills, and the row is rolled again, at the start of the next wave.
+Fort cover shelters 1–2 kids on the cover columns. The blocking box is under half of that side and about one row tall, so the rows above and below and the columns beside the fort stay open. A lob that peaks past your own fort clears it. The other side's fort still stops a ball that flies through its box. The fort's row is random inside the mid band (not flush with the top or bottom of the yard, and not on the back line). Enough hits collapse it. A collapsed fort does not block shots from either side. HP refills, and the row is rolled again, at the start of the next wave.
 
 ### 3.6 Seasons
 Same rules; swap:

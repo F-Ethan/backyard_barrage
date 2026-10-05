@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:backyard_barrage/game/combat_rules.dart';
 import 'package:backyard_barrage/game/enemy_ai.dart';
 import 'package:backyard_barrage/game/throw_physics.dart';
 import 'package:backyard_barrage/meta/difficulty.dart';
@@ -168,19 +169,31 @@ void main() {
       }
 
       expect(ally(shotFellShort: true, retreat: false), (column: 2, row: 4));
-      expect(
-        ally(shotFellShort: false, retreat: true, column: 2),
-        (column: 1, row: 4),
-      );
+      expect(ally(shotFellShort: false, retreat: true, column: 2), (
+        column: 1,
+        row: 4,
+      ));
     });
 
     test('throw gaps stay inside each difficulty band', () {
       final normal = DifficultyTuning.of(Difficulty.normal);
       final easy = DifficultyTuning.of(Difficulty.easy);
       final hard = DifficultyTuning.of(Difficulty.hard);
-      expect(normal.throwGapMin, 1.5);
-      expect(normal.throwGapMax, 3);
+      final playerCharge = CombatRules.playerChargeSeconds(0);
+      expect(normal.throwGapMin, playerCharge);
+      expect(normal.throwGapMax, greaterThanOrEqualTo(playerCharge));
+      expect(
+        normal.botChargeSeconds(playerCharge),
+        closeTo(playerCharge, 0.001),
+      );
+      expect(easy.botChargeSeconds(playerCharge), greaterThan(playerCharge));
+      expect(
+        easy.throwGapMin,
+        greaterThanOrEqualTo(easy.botChargeSeconds(playerCharge)),
+      );
       expect(easy.throwGapMin, greaterThanOrEqualTo(normal.throwGapMax));
+      expect(hard.botChargeSeconds(playerCharge), lessThan(playerCharge * 0.5));
+      expect(hard.botChargeSeconds(playerCharge), inInclusiveRange(0.3, 0.55));
       expect(hard.throwGapMax, lessThanOrEqualTo(1.5));
       expect(hard.throwGapMin, greaterThanOrEqualTo(1));
       expect(normal.friendlyFortDamage, isFalse);
@@ -198,8 +211,8 @@ void main() {
         expect(gap, inInclusiveRange(normal.throwGapMin, normal.throwGapMax));
       }
       final later = DifficultyTuning.of(Difficulty.normal, wave: 8);
-      expect(later.throwGapMin, greaterThanOrEqualTo(1.5));
-      expect(later.throwGapMax, lessThanOrEqualTo(3));
+      expect(later.throwGapMin, playerCharge);
+      expect(later.throwGapMax, greaterThanOrEqualTo(playerCharge));
       expect(later.throwGapMax, lessThan(normal.throwGapMax));
     });
 

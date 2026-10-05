@@ -5,25 +5,50 @@ import 'package:backyard_barrage/ads/ad_policy.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('an end ad needs a finished fight longer than two minutes', () {
+  test('an end ad needs two minutes or three cleared waves', () {
     expect(
-      AdPolicy.allows(fightSeconds: 120, alreadyShown: false, inFight: false),
+      AdPolicy.allows(
+        fightSeconds: 120,
+        wavesCleared: 2,
+        alreadyShown: false,
+        inFight: false,
+      ),
       isFalse,
     );
     expect(
       AdPolicy.allows(
         fightSeconds: 120.01,
+        wavesCleared: 0,
         alreadyShown: false,
         inFight: false,
       ),
       isTrue,
     );
     expect(
-      AdPolicy.allows(fightSeconds: 400, alreadyShown: false, inFight: true),
+      AdPolicy.allows(
+        fightSeconds: 10,
+        wavesCleared: 3,
+        alreadyShown: false,
+        inFight: false,
+      ),
+      isTrue,
+    );
+    expect(
+      AdPolicy.allows(
+        fightSeconds: 400,
+        wavesCleared: 3,
+        alreadyShown: false,
+        inFight: true,
+      ),
       isFalse,
     );
     expect(
-      AdPolicy.allows(fightSeconds: 400, alreadyShown: true, inFight: false),
+      AdPolicy.allows(
+        fightSeconds: 400,
+        wavesCleared: 3,
+        alreadyShown: true,
+        inFight: false,
+      ),
       isFalse,
     );
   });

@@ -196,6 +196,12 @@ void main() {
       expect(hard.botChargeSeconds(playerCharge), inInclusiveRange(0.3, 0.55));
       expect(hard.throwGapMax, lessThanOrEqualTo(1.5));
       expect(hard.throwGapMin, greaterThanOrEqualTo(1));
+      expect(easy.playerChargeTimeScale, 0.5);
+      expect(easy.allyStunScale, 0.5);
+      expect(normal.playerChargeTimeScale, closeTo(2 / 3, 0.0001));
+      expect(normal.allyStunScale, 0.75);
+      expect(hard.playerChargeTimeScale, 1);
+      expect(hard.allyStunScale, 1);
       expect(normal.friendlyFortDamage, isFalse);
       expect(easy.friendlyFortDamage, isFalse);
       expect(hard.friendlyFortDamage, isTrue);

@@ -49,15 +49,15 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | Rule | MVP value |
 | --- | --- |
 | Player starts with | 1 kid |
-| Hits to KO | 3. Enemy: brush-off (~1s), knockdown then up, then out. Ally: a hit stuns ~2.8s; a second hit during that stun KOs |
+| Hits to KO | 3. Enemy: brush-off (~1s), knockdown then up, then out. Ally: a hit stuns ~2.8s on Hard; Easy is half of that and Normal is three quarters. A second hit during that stun KOs |
 | Throw | Hold the right third of the screen to charge. Release throws. There is no aim stick |
-| Charge | Tap ≈ 1/3 power, ~1s ≈ 1/2, ~3s full. Half-bell ease toward max. While held, the aim sweeps ±20° over about 3.6s |
+| Charge | Hard: tap ≈ 1/3 power, ~1s ≈ 1/2, ~3s full. Easy fills that hold in half the time (2×). Normal fills it in two thirds (1.5×). Half-bell ease toward max. While held, the aim sweeps ±20° over about 3.6s |
 | Throw depth | Release samples the swivel. The ball's ground track slides to that depth. Power sets how far it goes |
 | Hit | A small body hitbox. The ball can pass in front of or behind a kid. Overlap of the ground track is what counts. The snowball image draws behind a kid when that track is over the hit box, and in front when it is under. Drawn size does not change the hit |
 | Depth | Kids and snowballs draw smaller toward the far edge (75% of the near-edge size) and full size toward the camera. Scale is anchored at a kid's feet. Rivals still take about 1.2s per column |
 | Walk | Left two-thirds of the screen. Drag and the selected kid follows the finger inside their half, at the locked rate of six times the old cell walk. Difficulty does not change that speed. A tap on a kid selects them |
 | Active thrower | One kid is selected and shows a soft glow. The others throw on Easy |
-| Enemy count | Starts ~2–3, scales by wave |
+| Enemy count | Wave 1 is 1 rival. Later waves are 3 |
 | Win | All enemies KO’d |
 | Lose | All player kids KO’d |
 
@@ -81,7 +81,7 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 - Per-wave: slightly shorter gaps and tighter landing scatter  
 
 ### 3.5 Skill tree (between waves, and from the defeat screen)
-Spend soft currency earned from wins. The tree replaces the three-card shop. Each branch is a short chain: a node unlocks after its parent, and costs rise along the chain. Balance numbers live in `PROGRESS.md`.
+Each rival KO pays 8 coins. Clearing the wave pays a bonus on top (`12 + wave * 8`). Spend that soft currency in the tree, which replaces the three-card shop. Each branch is a short chain: a node unlocks after its parent, and costs rise along the chain. Balance numbers live in `PROGRESS.md`.
 
 | Branch | Effect |
 | --- | --- |

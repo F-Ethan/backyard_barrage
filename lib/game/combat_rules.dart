@@ -42,7 +42,7 @@ class CombatRules {
   static const double allyStunSeconds = 7.5 * 3 / 8;
 
   static int enemyCountForWave(int wave) {
-    if (wave <= 1) return 2;
+    if (wave <= 1) return 1;
     return 3;
   }
 

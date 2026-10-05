@@ -511,7 +511,6 @@ class BackyardBarrageGame extends FlameGame {
     carriedCoins = meta.coins;
     meta.resetRun();
     unawaited(persist());
-    _offerEndAd();
     _publishHud();
     _showBanner(
       'Crew down',
@@ -549,6 +548,8 @@ class BackyardBarrageGame extends FlameGame {
         _pendingBanner = _Banner.none;
         _clearBanner();
         _clearCoinCarry();
+        // After the coin beat, so the interstitial does not cover it.
+        _offerEndAd();
         overlays.add('defeat');
         pauseEngine();
       case _Banner.none:
@@ -644,7 +645,9 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   /// One interstitial after the run, and never during the fight.
-  /// A purchased Remove Ads entitlement skips it without spending the once-flag.
+  /// A knockout offers it when the coin beat ends. Leaving from the
+  /// pause menu can offer it sooner. A purchased Remove Ads entitlement
+  /// skips it without spending the once-flag.
   void _offerEndAd() {
     if (adsRemoved?.call() ?? false) return;
     if (!AdPolicy.allows(

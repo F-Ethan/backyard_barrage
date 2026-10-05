@@ -182,11 +182,8 @@ void main() {
       final playerCharge = CombatRules.playerChargeSeconds(0);
       expect(normal.throwGapMin, playerCharge);
       expect(normal.throwGapMax, greaterThanOrEqualTo(playerCharge));
-      expect(
-        normal.botChargeSeconds(playerCharge),
-        closeTo(playerCharge, 0.001),
-      );
-      expect(easy.botChargeSeconds(playerCharge), greaterThan(playerCharge));
+      expect(normal.botChargeSeconds(playerCharge), closeTo(3, 0.001));
+      expect(easy.botChargeSeconds(playerCharge), closeTo(4.5, 0.001));
       expect(
         easy.throwGapMin,
         greaterThanOrEqualTo(easy.botChargeSeconds(playerCharge)),

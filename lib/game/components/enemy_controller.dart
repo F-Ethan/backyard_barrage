@@ -57,8 +57,9 @@ class EnemyController extends Component {
   /// Live wave, for kids who stay across waves. Falls back to [wave].
   final int Function()? currentWave;
 
-  /// The player's full-charge time. Easy and Normal scale their windup
-  /// from this. Hard follows it a little, about 0.45s down to 0.3s.
+  /// Unscaled throw-rank charge. Easy and Normal speed up the player's bar
+  /// only, so this stays the old hold: about 4.5s on Easy and 3s on Normal
+  /// at rank 0. Hard follows it a little, about 0.45s down to 0.3s.
   final double Function()? playerChargeSeconds;
 
   /// Multiplier on aim scatter. Teammate aim nodes pass a value under 1.
@@ -77,6 +78,10 @@ class EnemyController extends Component {
         playerChargeSeconds?.call() ?? CombatRules.playerChargeSeconds(0);
     return tuning().botChargeSeconds(player);
   }
+
+  /// Charge pose before a bot releases. Tests check Easy and Normal stay
+  /// on the unscaled hold.
+  double get windupSeconds => _telegraph;
 
   @override
   void update(double dt) {

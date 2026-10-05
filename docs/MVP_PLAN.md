@@ -72,7 +72,7 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 
 ### 3.4 AI (simple)
 - Rivals target a living player kid, throw on the difficulty timer, and step with the Easy / Normal / Hard lane rules
-- Charge: Easy bots take longer than the player's full charge. Normal bots match it. Hard bots keep a short windup (about 0.3–0.55s), so Hard still charges faster than the player
+- Charge: Easy bots hold about 4.5s at rank 0. Normal bots hold the unscaled rank-0 charge, about 3s. Hard bots keep a short windup (about 0.3–0.55s), so Hard still charges faster than the player
 - Throw about every 3s on Normal (slower on Easy, about 1–1.5s on Hard)
 - After a throw, step one row toward a living opponent if nobody is within one row. Easy does that every other throw. Normal does it every throw. Hard steps onto the closest opponent's exact row every throw
 - A lob that falls short steps one column closer. A hit steps one column back, or off that row if they are already at the back line
@@ -101,7 +101,7 @@ Fort cover shelters 1–2 kids on the cover columns. The blocking box is under h
 ### 3.6 Seasons
 Same rules; swap:
 - Projectile art + VFX + SFX  
-- Arena tint / props (snow vs grass + sprinkler/pool hint)  
+- Arena tint / props (snow vs grass)  
 - Kid outerwear (coat vs tee)  
 
 Player **chooses** season on main menu. No real-world lock in MVP.
@@ -183,7 +183,7 @@ lib/
 ### 7.2 Art — world
 - 1 backyard arena BG (wide landscape)  
 - Winter overlay props (snow banks)  
-- Summer overlay props (grass, optional pool edge / hose)  
+- Summer overlay props (grass)  
 - Fort stages 1–3 (player side)  
 
 ### 7.3 Art — VFX / projectiles

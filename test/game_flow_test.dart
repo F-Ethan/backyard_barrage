@@ -9,6 +9,7 @@ import 'package:backyard_barrage/feel/game_haptics.dart';
 import 'package:backyard_barrage/game/arena_grid.dart';
 import 'package:backyard_barrage/game/backyard_barrage_game.dart';
 import 'package:backyard_barrage/game/combat_rules.dart';
+import 'package:backyard_barrage/game/components/enemy_controller.dart';
 import 'package:backyard_barrage/game/components/fort_component.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
 import 'package:backyard_barrage/game/components/lob_projectile.dart';
@@ -299,6 +300,22 @@ void main() {
       kid.stunRemaining,
       closeTo(CombatRules.allyStunSeconds * 0.5, 0.001),
     );
+  });
+
+  testWidgets('easy and normal rivals keep the unscaled windup', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    final rival = game.enemies.single;
+    final brain = rival.children.whereType<EnemyController>().single;
+
+    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.easy));
+    expect(brain.windupSeconds, closeTo(4.5, 0.001));
+
+    game.feel.apply(
+      game.feel.settings.copyWith(difficulty: Difficulty.normal),
+    );
+    expect(brain.windupSeconds, closeTo(3, 0.001));
   });
 
   testWidgets('normal fills a charge in two thirds of the hold', (

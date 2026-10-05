@@ -362,7 +362,7 @@ class BackyardBarrageGame extends FlameGame {
           initialDelay: stagger,
           onFire: _onEnemyFire,
           isFighting: () => phase == MatchPhase.fight,
-          playerChargeSeconds: _playerChargeSeconds,
+          playerChargeSeconds: _baseChargeSeconds,
         ),
       );
     }
@@ -699,9 +699,12 @@ class BackyardBarrageGame extends FlameGame {
     killCoinsThisWave += paid;
   }
 
+  /// Throw-rank hold before Easy or Normal shortens the player's bar.
+  /// Bots scale from this, so their windup stays put when the bar speeds up.
+  double _baseChargeSeconds() => CombatRules.playerChargeSeconds(meta.throwRank);
+
   double _playerChargeSeconds() =>
-      CombatRules.playerChargeSeconds(meta.throwRank) *
-      _tuning().playerChargeTimeScale;
+      _baseChargeSeconds() * _tuning().playerChargeTimeScale;
 
   void _onEnemyFire(
     KidComponent enemy,
@@ -773,7 +776,7 @@ class BackyardBarrageGame extends FlameGame {
           approachColumn: 1,
           isManual: () => identical(_selected, kid),
           currentWave: () => wave,
-          playerChargeSeconds: _playerChargeSeconds,
+          playerChargeSeconds: _baseChargeSeconds,
           aimJitterScale: () => meta.allyAimScale,
         ),
       );

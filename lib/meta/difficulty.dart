@@ -57,8 +57,9 @@ class DifficultyTuning {
 
   /// How long a bot holds the charge pose before releasing.
   ///
-  /// Easy is longer than [playerCharge]. Normal matches it. Hard stays in
-  /// the old short band, about 0.3–0.55s, so Hard still charges faster.
+  /// [playerCharge] is the unscaled throw-rank hold, not the sped-up bar.
+  /// Easy is 1.5× that hold (about 4.5s at rank 0). Normal matches it
+  /// (about 3s). Hard stays in the old short band, about 0.3–0.55s.
   double botChargeSeconds(double playerCharge) {
     final player = playerCharge < 0.2
         ? CombatRules.playerChargeSeconds(0)

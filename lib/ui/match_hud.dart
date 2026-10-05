@@ -112,7 +112,7 @@ class MatchHud extends StatelessWidget {
                         fit: BoxFit.scaleDown,
                         child: _HudChip(
                           child: Text(
-                            'Tap the left side to step  ·  hold the right side to throw',
+                            'Drag on the left to move  ·  hold the right side to throw',
                             key: Key('hud-hint'),
                             style: BarrageType.muted,
                           ),
@@ -259,7 +259,8 @@ class _PlayZones extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final chargeWidth =
-            constraints.maxWidth * (1 - BackyardBarrageGame.chargeScreenFraction);
+            constraints.maxWidth *
+            (1 - BackyardBarrageGame.chargeScreenFraction);
         return Stack(
           children: [
             Positioned(

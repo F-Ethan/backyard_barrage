@@ -815,13 +815,20 @@ class ThrowPhysics {
     return Vector2(speed * math.cos(theta), -speed * math.sin(theta));
   }
 
-  /// Hard cap on kid walking, in pixels per second.
+  /// Hard cap on rival stepping, in pixels per second.
   ///
   /// One column takes [stepSeconds]. Throw rank does not speed this up;
   /// difficulty applies its own scale on top in the match.
   static double kidMoveSpeed() {
     return ArenaGrid.columnStep / stepSeconds;
   }
+
+  /// How much faster a finger drag is than that column walk.
+  static const double dragSpeedScale = 6;
+
+  /// Player drag. Six times the old cell walk, so a finger across the
+  /// home half is easy to follow and a short move does not take a second.
+  static double playerDragSpeed() => kidMoveSpeed() * dragSpeedScale;
 
   static double apexRise(Vector2 velocity) {
     if (velocity.y >= 0) return 0;

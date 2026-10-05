@@ -108,8 +108,11 @@ class BackyardBarrageGame extends FlameGame {
   /// Right-hand share of the screen. A hold there charges; release throws.
   static const double chargeScreenFraction = 2 / 3;
 
-  /// A touch this close to a kid's body selects them instead of stepping.
+  /// A touch this close to a kid's body selects them.
   static const double selectRadius = 72;
+
+  /// Living kids stay at least this far apart while one is dragged.
+  static const double kidSpacing = 64;
 
   bool _chargeHolding = false;
   bool _moveHolding = false;
@@ -119,7 +122,10 @@ class BackyardBarrageGame extends FlameGame {
   double _swivel = 0;
   Vector2 _aimDir = Vector2(1, 0);
   Vector2? _moveTarget;
-  ArenaCell? _moveGoal;
+
+  /// Feet minus the finger when the press landed on a kid, so a tap on the
+  /// body does not slide them up onto the finger. Open ground uses zero.
+  Vector2 _grabOffset = Vector2.zero();
   _Banner _pendingBanner = _Banner.none;
   double _bannerTime = 0;
   OverlayBanner? _banner;
@@ -575,7 +581,8 @@ class BackyardBarrageGame extends FlameGame {
     if (kid == null) return;
     _chargeHolding = true;
     _moveHolding = false;
-    _moveGoal = null;
+    _moveTarget = null;
+    _grabOffset = Vector2.zero();
     _setSelected(kid);
     _beginCharge();
   }
@@ -586,30 +593,33 @@ class BackyardBarrageGame extends FlameGame {
     if (_charging) _releaseThrow();
   }
 
-  /// Left side of the screen. A tap steps one cell toward the touch.
-  /// A hold keeps stepping until the finger lifts or the kid arrives.
+  /// Left side of the screen. A touch selects a kid under the finger.
+  /// While the finger stays down, the selected kid follows it.
   void pressMoveZone(Vector2 world) {
     if (phase != MatchPhase.fight || _charging) return;
     final tapped = _nearestLiving(players, world, maxDistance: selectRadius);
-    if (tapped != null) {
-      _setSelected(tapped);
-      _moveHolding = false;
-      _moveGoal = null;
-      return;
-    }
+    if (tapped != null) _setSelected(tapped);
+    final kid = _selected;
+    if (kid == null || kid.isKo || kid.isStunned) return;
     _moveHolding = true;
-    _moveGoal = ArenaGrid.nearestCell(KidSide.player, world);
-    _queueGridStep();
+    _moveTarget = world;
+    // A finger on the body keeps the feet planted until the drag moves.
+    _grabOffset = tapped != null && identical(tapped, kid)
+        ? kid.position - world
+        : Vector2.zero();
   }
 
   void dragMoveZone(Vector2 world) {
     if (!_moveHolding || _charging || phase != MatchPhase.fight) return;
-    _moveGoal = ArenaGrid.nearestCell(KidSide.player, world);
-    _queueGridStep();
+    _moveTarget = world;
   }
 
   void releaseMoveZone() {
     _moveHolding = false;
+    _moveTarget = null;
+    _grabOffset = Vector2.zero();
+    final kid = _selected;
+    if (kid != null && !kid.isKo) kid.setWalking(false);
   }
 
   void _beginCharge() {
@@ -625,6 +635,7 @@ class BackyardBarrageGame extends FlameGame {
     _charge = ThrowPhysics.minThrowCharge;
     _swivel = 0;
     _moveTarget = null;
+    _grabOffset = Vector2.zero();
     _moveHolding = false;
     kid.setWalking(false);
     _aimDir = ThrowPhysics.aimForElevation(0, facingRight: true);
@@ -766,100 +777,88 @@ class BackyardBarrageGame extends FlameGame {
   void _tickMove(double dt) {
     final kid = _selected;
     if (kid == null || kid.isKo || phase != MatchPhase.fight) return;
-    if (kid.isStunned || _charging) {
-      if (_moveTarget != null) {
+    if (kid.isStunned || _charging || !_moveHolding) {
+      if (_moveTarget != null || _moveHolding) {
         _moveTarget = null;
+        _grabOffset = Vector2.zero();
         _moveHolding = false;
         kid.setWalking(false);
       }
       return;
     }
-    final arrived = _advanceStep(kid, dt);
-    if (arrived && _moveTarget == null && _moveHolding) {
-      _queueGridStep();
-    }
+    _dragKid(kid, dt);
   }
 
-  /// Moves toward the current cell. Returns true when that consumed the
-  /// frame, including the frame the kid arrives, so one update cannot
-  /// chain into a second cell.
-  bool _advanceStep(KidComponent kid, double dt) {
-    final target = _moveTarget;
-    if (target == null) return false;
+  /// Follows the finger inside the home half. Not snapped to a cell.
+  void _dragKid(KidComponent kid, double dt) {
+    final finger = _moveTarget;
+    if (finger == null) return;
+    final goal = _dragPoint(kid, finger + _grabOffset);
     final scale = _tuning().playerMoveScale;
-    final cap = ThrowPhysics.kidMoveSpeed() * (scale <= 0 ? 1.0 : scale);
-    final delta = target - kid.position;
+    final cap = ThrowPhysics.playerDragSpeed() * (scale <= 0 ? 1.0 : scale);
+    final delta = goal - kid.position;
     final distance = delta.length;
     final step = cap * dt;
     if (distance <= step || distance < 0.8) {
-      kid.position = target.clone();
-      kid.setWalking(false);
-      _moveTarget = null;
+      kid.position = goal.clone();
+      kid.setWalking(distance > 0.8);
     } else {
       kid.position += delta / distance * step;
       kid.setWalking(true);
     }
     kid.syncDepth();
-    return true;
   }
 
-  /// One cell toward the finger: forward, back, up, or down. Never two
-  /// cells, and never both axes in the same step. A tap cannot chain.
-  void _queueGridStep() {
-    if (_moveTarget != null) return;
-    final kid = _selected;
-    final goal = _moveGoal;
-    if (kid == null || goal == null || kid.isKo || kid.isStunned || _charging) {
-      return;
+  /// Feet stay in the player's half and off a teammate.
+  Vector2 _dragPoint(KidComponent kid, Vector2 world) {
+    final field = ArenaGrid.field(KidSide.player);
+    var point = ArenaGrid.clampToRect(field, world);
+    for (var pass = 0; pass < players.length; pass++) {
+      for (final other in players) {
+        if (identical(other, kid) || other.isKo) continue;
+        point = _apartFrom(field, point, other.position);
+      }
     }
-    final cell = ArenaGrid.nearestCell(KidSide.player, kid.position);
-    final dColumn = goal.column - cell.column;
-    final dRow = goal.row - cell.row;
-    if (dColumn == 0 && dRow == 0) return;
-    final goalPoint = ArenaGrid.cellCenter(
-      KidSide.player,
-      goal.column,
-      goal.row,
-    );
-    final columnFirst =
-        (goalPoint.x - kid.position.x).abs() >=
-        (goalPoint.y - kid.position.y).abs();
-    final options = columnFirst
-        ? <(int, int)>[(dColumn.sign, 0), (0, dRow.sign)]
-        : <(int, int)>[(0, dRow.sign), (dColumn.sign, 0)];
-    for (final (stepColumn, stepRow) in options) {
-      if (stepColumn == 0 && stepRow == 0) continue;
-      final nextColumn = cell.column + stepColumn;
-      final nextRow = cell.row + stepRow;
-      if (nextColumn < 0 || nextColumn >= ArenaGrid.columnsPerSide) continue;
-      if (nextRow < 0 || nextRow >= ArenaGrid.rows) continue;
-      if (_playerCellTaken(nextColumn, nextRow, kid)) continue;
-      final dest = ArenaGrid.cellCenter(KidSide.player, nextColumn, nextRow);
-      if (dest.distanceTo(kid.position) < 1) continue;
-      _moveTarget = dest;
-      kid.setWalking(true);
-      return;
-    }
+    return point;
   }
 
-  bool _playerCellTaken(int column, int row, KidComponent self) {
-    for (final kid in players) {
-      if (identical(kid, self) || kid.isKo) continue;
-      final cell = ArenaGrid.nearestCell(KidSide.player, kid.position);
-      if (cell.column == column && cell.row == row) return true;
+  /// Pushes [point] out to [kidSpacing] from [other], staying inside [field].
+  ///
+  /// A teammate on the edge would otherwise clamp the push back on top of them.
+  Vector2 _apartFrom(Rect field, Vector2 point, Vector2 other) {
+    final away = point - other;
+    final dist = away.length;
+    if (dist >= kidSpacing) return point;
+    final options = <Vector2>[
+      if (dist >= 0.001) other + away / dist * kidSpacing,
+      other + Vector2(kidSpacing, 0),
+      other + Vector2(-kidSpacing, 0),
+      other + Vector2(0, kidSpacing),
+      other + Vector2(0, -kidSpacing),
+    ];
+    Vector2? best;
+    var bestMiss = double.infinity;
+    for (final option in options) {
+      final clamped = ArenaGrid.clampToRect(field, option);
+      if (clamped.distanceTo(other) < kidSpacing - 0.5) continue;
+      final miss = clamped.distanceTo(point);
+      if (miss < bestMiss) {
+        bestMiss = miss;
+        best = clamped;
+      }
     }
-    return false;
+    return best ?? point;
   }
 
   void _endActiveThrow() {
     _chargeHolding = false;
     _moveHolding = false;
-    _moveGoal = null;
     _charging = false;
     _charge = 0;
     _chargeHeld = 0;
     _swivel = 0;
     _moveTarget = null;
+    _grabOffset = Vector2.zero();
     chargeHud.visibleCharge = false;
     _publishCharge();
     final kid = _selected;

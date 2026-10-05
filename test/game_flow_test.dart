@@ -274,7 +274,7 @@ void main() {
     expect(find.byKey(const Key('move-zone')), findsOneWidget);
     expect(find.byKey(const Key('power-bar')), findsNothing);
     expect(
-      find.text('Tap the left side to step  ·  hold the right side to throw'),
+      find.text('Drag on the left to move  ·  hold the right side to throw'),
       findsOneWidget,
     );
 
@@ -297,71 +297,56 @@ void main() {
     expect(game.charge, 0);
   });
 
-  testWidgets('a tap steps one row and a hold keeps walking that way', (
-    tester,
-  ) async {
+  testWidgets('a drag on the left follows the finger', (tester) async {
     final game = (await boot(tester, MetaState(crewSize: 2))).game;
     final kid = game.players.first;
+    final mate = game.players[1];
+    final planted = kid.position.clone();
+    game.pressMoveZone(kid.hitCenter);
+    game.update(0.3);
+    expect(kid.position.x, closeTo(planted.x, 0.5));
+    expect(kid.position.y, closeTo(planted.y, 0.5));
+    game.releaseMoveZone();
+
+    final before = kid.position.distanceTo(mate.position);
+    game.pressMoveZone(kid.position.clone());
+    game.dragMoveZone(mate.position.clone());
+    game.update(0.8);
+    final gap = kid.position.distanceTo(mate.position);
+    expect(gap, greaterThanOrEqualTo(BackyardBarrageGame.kidSpacing - 1));
+    expect(gap, lessThan(before - 20));
+    game.releaseMoveZone();
+
     final start = kid.position.clone();
-    final cell = ArenaGrid.nearestCell(KidSide.player, start);
-    final below = ArenaGrid.cellCenter(
-      KidSide.player,
-      cell.column,
-      cell.row + 3,
-    );
+    // Open ground inside the home half, farther than the old one-frame step.
+    final below = Vector2(start.x, start.y + 80);
 
     game.pressMoveZone(below);
-    game.releaseMoveZone();
     game.update(0.05);
-    final cap = ThrowPhysics.kidMoveSpeed() * 0.05 + 1.5;
-    expect((kid.position.y - start.y).abs(), greaterThan(0));
-    expect(start.distanceTo(kid.position), lessThanOrEqualTo(cap));
-    expect(kid.position.x, closeTo(start.x, 0.5));
+    final oldCap = ThrowPhysics.kidMoveSpeed() * 0.05 + 1.5;
+    expect(kid.position.y, greaterThan(start.y));
+    expect(kid.position.x, closeTo(start.x, 1));
+    expect(start.distanceTo(kid.position), greaterThan(oldCap * 2));
 
-    game.update(2);
-    final oneRow = ArenaGrid.cellCenter(
-      KidSide.player,
-      cell.column,
-      cell.row + 1,
-    );
-    expect(kid.position.x, closeTo(oneRow.x, 0.5));
-    expect(kid.position.y, closeTo(oneRow.y, 0.5));
+    game.update(0.6);
+    expect(kid.position.x, closeTo(below.x, 1));
+    expect(kid.position.y, closeTo(below.y, 1));
 
-    final heldFrom = kid.position.clone();
-    game.pressMoveZone(below);
-    game.update(0.05);
-    game.update(2);
-    game.update(2);
-    expect(kid.position.y, greaterThan(heldFrom.y + ArenaGrid.rowStep));
-    expect(kid.position.y, closeTo(below.y, 0.5));
-    game.releaseMoveZone();
+    final corner = ArenaGrid.cellCenter(KidSide.player, 3, 7);
+    game.dragMoveZone(corner);
+    game.update(1.2);
+    final home = ArenaGrid.clampToRect(ArenaGrid.field(KidSide.player), corner);
+    expect(kid.position.x, closeTo(home.x, 1.5));
+    expect(kid.position.y, closeTo(home.y, 1.5));
 
-    final back = kid.position.clone();
-    final backCell = ArenaGrid.nearestCell(KidSide.player, back);
-    final ahead = ArenaGrid.cellCenter(
-      KidSide.player,
-      backCell.column + 2,
-      backCell.row,
-    );
-    game.pressMoveZone(ahead);
     game.releaseMoveZone();
-    game.update(0.05);
-    game.update(2);
-    final oneColumn = ArenaGrid.cellCenter(
-      KidSide.player,
-      backCell.column + 1,
-      backCell.row,
-    );
-    expect(kid.position.x, closeTo(oneColumn.x, 0.5));
-    expect(kid.position.y, closeTo(oneColumn.y, 0.5));
-    game.pressMoveZone(ahead);
-    game.update(2);
-    game.update(2);
-    expect(kid.position.x, closeTo(ahead.x, 0.5));
-    expect(kid.position.y, closeTo(ahead.y, 0.5));
-    game.releaseMoveZone();
+    final stopped = kid.position.clone();
+    game.update(0.4);
+    expect(kid.position.x, closeTo(stopped.x, 0.5));
+    expect(kid.position.y, closeTo(stopped.y, 0.5));
 
     final frozen = kid.position.clone();
+    game.pressMoveZone(start);
     game.pressChargeZone();
     game.update(0.3);
     expect(game.isCharging, isTrue);

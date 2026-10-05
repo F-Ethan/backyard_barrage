@@ -27,6 +27,11 @@ class AdConfig {
   /// A run must last longer than this, in fight time, before an end ad.
   static const double minFightSeconds = 120;
 
+  /// Non-consumable Remove Ads product. Create this same id in App Store
+  /// Connect (and sign the Paid Apps agreement) before a store build.
+  static const String removeAdsProductId =
+      'dev.gamelogic.backyardbarrage.removeads';
+
   static String get interstitialId {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       return androidInterstitialId;

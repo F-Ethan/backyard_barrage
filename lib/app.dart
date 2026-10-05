@@ -4,6 +4,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
 import 'ads/end_ad.dart';
+import 'ads/remove_ads.dart';
 import 'feel/feel_bus.dart';
 import 'game/backyard_barrage_game.dart';
 import 'meta/meta_state.dart';
@@ -25,12 +26,14 @@ class BackyardBarrageApp extends StatefulWidget {
     this.settingsStore,
     this.feel,
     this.endAd = const NoEndAd(),
+    this.removeAds,
   });
 
   final SaveStore? saveStore;
   final SettingsStore? settingsStore;
   final FeelBus? feel;
   final EndAd endAd;
+  final RemoveAdsController? removeAds;
 
   @override
   State<BackyardBarrageApp> createState() => _BackyardBarrageAppState();
@@ -41,12 +44,26 @@ class _BackyardBarrageAppState extends State<BackyardBarrageApp> {
   late final SettingsStore _settingsStore =
       widget.settingsStore ?? SettingsStore();
   late final FeelBus _feel = widget.feel ?? FeelBus();
+  late final RemoveAdsController _removeAds =
+      widget.removeAds ?? RemoveAdsController();
   MetaState? _running;
 
   @override
   void initState() {
     super.initState();
-    unawaited(widget.endAd.prepare());
+    unawaited(_bootAds());
+  }
+
+  Future<void> _bootAds() async {
+    await _removeAds.prepare();
+    if (!mounted) return;
+    await widget.endAd.prepare();
+  }
+
+  @override
+  void dispose() {
+    if (widget.removeAds == null) _removeAds.dispose();
+    super.dispose();
   }
 
   @override
@@ -82,6 +99,7 @@ class _BackyardBarrageAppState extends State<BackyardBarrageApp> {
                 feel: _feel,
                 onPlay: (meta) => setState(() => _running = meta),
                 onAdPrivacy: widget.endAd.showPrivacyOptions,
+                removeAds: _removeAds,
               )
             : GameScreen(
                 meta: running,
@@ -90,6 +108,8 @@ class _BackyardBarrageAppState extends State<BackyardBarrageApp> {
                 feel: _feel,
                 endAd: widget.endAd,
                 onAdPrivacy: widget.endAd.showPrivacyOptions,
+                removeAds: _removeAds,
+                adsRemoved: () => _removeAds.owned,
                 onExit: () {
                   unawaited(_feel.enterMenu());
                   setState(() => _running = null);
@@ -110,6 +130,8 @@ class GameScreen extends StatefulWidget {
     required this.onExit,
     this.endAd = const NoEndAd(),
     this.onAdPrivacy,
+    this.removeAds,
+    this.adsRemoved,
     this.game,
   });
 
@@ -120,6 +142,8 @@ class GameScreen extends StatefulWidget {
   final VoidCallback onExit;
   final EndAd endAd;
   final Future<void> Function()? onAdPrivacy;
+  final RemoveAdsController? removeAds;
+  final bool Function()? adsRemoved;
   final BackyardBarrageGame? game;
 
   @override
@@ -141,6 +165,7 @@ class _GameScreenState extends State<GameScreen> {
           feel: widget.feel,
           onExitToMenu: widget.onExit,
           endAd: widget.endAd,
+          adsRemoved: widget.adsRemoved,
         );
   }
 
@@ -158,6 +183,7 @@ class _GameScreenState extends State<GameScreen> {
             onChanged: game.commitSettings,
             onClose: game.closeSettings,
             onAdPrivacy: widget.onAdPrivacy,
+            removeAds: widget.removeAds,
           ),
           'shop': (context, game) => ShopOverlay(game: game),
           'defeat': (context, game) => DefeatOverlay(game: game),

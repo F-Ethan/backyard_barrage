@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../ads/remove_ads.dart';
 import '../feel/feel_bus.dart';
 import '../meta/game_settings.dart';
 import '../meta/meta_state.dart';
@@ -20,6 +21,7 @@ class MainMenu extends StatefulWidget {
     required this.feel,
     required this.onPlay,
     this.onAdPrivacy,
+    this.removeAds,
   });
 
   final SaveStore saveStore;
@@ -27,6 +29,7 @@ class MainMenu extends StatefulWidget {
   final FeelBus feel;
   final ValueChanged<MetaState> onPlay;
   final Future<void> Function()? onAdPrivacy;
+  final RemoveAdsController? removeAds;
 
   @override
   State<MainMenu> createState() => _MainMenuState();
@@ -183,6 +186,7 @@ class _MainMenuState extends State<MainMenu> {
                 onChanged: _commitSettings,
                 onClose: () => setState(() => _settingsOpen = false),
                 onAdPrivacy: widget.onAdPrivacy,
+                removeAds: widget.removeAds,
               ),
           ],
         ),

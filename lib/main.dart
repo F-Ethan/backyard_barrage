@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ads/end_ad_locator.dart';
+import 'ads/remove_ads.dart';
+import 'ads/remove_ads_locator.dart';
 import 'app.dart';
 
 Future<void> main() async {
@@ -11,5 +13,8 @@ Future<void> main() async {
     DeviceOrientation.landscapeRight,
   ]);
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-  runApp(BackyardBarrageApp(endAd: createEndAd()));
+  final removeAds = RemoveAdsController(catalog: createRemoveAdsCatalog());
+  runApp(
+    BackyardBarrageApp(endAd: createEndAd(removeAds), removeAds: removeAds),
+  );
 }

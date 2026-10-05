@@ -44,6 +44,8 @@
 	<string>ca-app-pub-3940256099942544~1458002511</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Backyard Barrage uses this to show ads. The game still works if you say no.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict><key>SKAdNetworkIdentifier</key><string>cstr6suwn9.skadnetwork</string></dict>

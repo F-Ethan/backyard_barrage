@@ -37,5 +37,14 @@ void main() {
     expect(manifest, contains(AdConfig.androidAppId));
     expect(AdConfig.iosInterstitialId, contains('4411468910'));
     expect(AdConfig.androidInterstitialId, contains('1033173712'));
+    expect(
+      AdConfig.removeAdsProductId,
+      'dev.gamelogic.backyardbarrage.removeads',
+    );
+    final encryption = plist.indexOf(
+      '<key>ITSAppUsesNonExemptEncryption</key>',
+    );
+    expect(encryption, greaterThan(0));
+    expect(plist.substring(encryption, encryption + 60), contains('<false/>'));
   });
 }

@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../ads/remove_ads.dart';
 import '../feel/feel_bus.dart';
 import '../meta/difficulty.dart';
 import '../meta/game_settings.dart';
@@ -17,6 +20,7 @@ class SettingsOverlay extends StatefulWidget {
     required this.onClose,
     this.feel,
     this.onAdPrivacy,
+    this.removeAds,
   });
 
   final GameSettings settings;
@@ -24,6 +28,7 @@ class SettingsOverlay extends StatefulWidget {
   final VoidCallback onClose;
   final FeelBus? feel;
   final Future<void> Function()? onAdPrivacy;
+  final RemoveAdsController? removeAds;
 
   @override
   State<SettingsOverlay> createState() => _SettingsOverlayState();
@@ -133,6 +138,11 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                             textAlign: TextAlign.center,
                             style: BarrageType.muted,
                           ),
+                          if (widget.removeAds != null)
+                            _RemoveAdsSection(
+                              removeAds: widget.removeAds!,
+                              feel: widget.feel,
+                            ),
                           if (widget.onAdPrivacy != null) ...[
                             const SizedBox(height: 12),
                             DraftImageButton(
@@ -155,6 +165,68 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _RemoveAdsSection extends StatelessWidget {
+  const _RemoveAdsSection({required this.removeAds, this.feel});
+
+  final RemoveAdsController removeAds;
+  final FeelBus? feel;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: removeAds,
+      builder: (context, _) {
+        final owned = removeAds.owned;
+        final price = removeAds.priceLabel;
+        final canBuy = !owned && price != null;
+        final label = owned
+            ? 'Ads removed'
+            : price != null
+            ? 'Remove Ads · $price'
+            : 'Remove Ads';
+        final note =
+            removeAds.note ??
+            (!owned && price == null ? RemoveAdsCopy.unavailable : null);
+        return Column(
+          children: [
+            const SizedBox(height: 12),
+            DraftImageButton(
+              key: const Key('remove-ads'),
+              label: label,
+              enabled: canBuy,
+              width: 260,
+              height: 52,
+              fontSize: 15,
+              feel: feel,
+              onPressed: canBuy ? () => unawaited(removeAds.buy()) : null,
+            ),
+            if (note != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                note,
+                key: const Key('remove-ads-note'),
+                textAlign: TextAlign.center,
+                style: BarrageType.muted,
+              ),
+            ],
+            const SizedBox(height: 8),
+            DraftImageButton(
+              key: const Key('restore-purchases'),
+              label: 'Restore Purchases',
+              secondary: true,
+              width: 260,
+              height: 52,
+              fontSize: 15,
+              feel: feel,
+              onPressed: () => unawaited(removeAds.restore()),
+            ),
+          ],
+        );
+      },
     );
   }
 }

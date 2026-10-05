@@ -6,9 +6,13 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'ad_config.dart';
 import 'end_ad.dart';
+import 'remove_ads.dart';
 
 /// UMP consent, the iOS tracking prompt, then one interstitial per ending.
 class MobileEndAd extends EndAd {
+  MobileEndAd(this.removeAds);
+
+  final RemoveAdsController removeAds;
   InterstitialAd? _ready;
   var _loading = false;
   var _prepared = false;
@@ -18,6 +22,8 @@ class MobileEndAd extends EndAd {
   Future<void> prepare() async {
     if (_prepared) return;
     _prepared = true;
+    await removeAds.prepare();
+    if (removeAds.owned) return;
     final params = ConsentRequestParameters();
     ConsentInformation.instance.requestConsentInfoUpdate(
       params,
@@ -35,18 +41,19 @@ class MobileEndAd extends EndAd {
   }
 
   Future<void> _requestTracking() async {
+    if (removeAds.owned) return;
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
     try {
       final status = await AppTrackingTransparency.trackingAuthorizationStatus;
-      if (status == TrackingStatus.notDetermined) {
-        await AppTrackingTransparency.requestTrackingAuthorization();
-      }
+      if (removeAds.owned || status != TrackingStatus.notDetermined) return;
+      await AppTrackingTransparency.requestTrackingAuthorization();
     } catch (_) {
       // The prompt is iOS-only. A missing plugin must not block the game.
     }
   }
 
   Future<void> _startAdsIfAllowed() async {
+    if (removeAds.owned) return;
     try {
       if (!await ConsentInformation.instance.canRequestAds()) return;
       await MobileAds.instance.initialize();
@@ -55,7 +62,7 @@ class MobileEndAd extends EndAd {
   }
 
   void _load() {
-    if (_loading || _ready != null) return;
+    if (removeAds.owned || _loading || _ready != null) return;
     _loading = true;
     unawaited(
       InterstitialAd.load(
@@ -77,6 +84,11 @@ class MobileEndAd extends EndAd {
 
   @override
   Future<void> onRunEnded({required double fightSeconds}) async {
+    if (removeAds.owned) {
+      _ready?.dispose();
+      _ready = null;
+      return;
+    }
     if (_showing) return;
     final ad = _ready;
     _ready = null;

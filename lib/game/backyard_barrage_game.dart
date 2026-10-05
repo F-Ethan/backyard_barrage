@@ -44,6 +44,7 @@ class BackyardBarrageGame extends FlameGame {
     math.Random? random,
     this.onExitToMenu,
     this.endAd = const NoEndAd(),
+    this.adsRemoved,
   }) : _save = saveStore ?? SaveStore(),
        _settings = settingsStore ?? SettingsStore(),
        feel = feel ?? FeelBus(),
@@ -66,6 +67,9 @@ class BackyardBarrageGame extends FlameGame {
   final MetaState meta;
   final VoidCallback? onExitToMenu;
   final EndAd endAd;
+
+  /// True once Remove Ads is owned. Read at the moment a run ends.
+  final bool Function()? adsRemoved;
   final FeelBus feel;
   final SaveStore _save;
   final SettingsStore _settings;
@@ -640,7 +644,9 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   /// One interstitial after the run, and never during the fight.
+  /// A purchased Remove Ads entitlement skips it without spending the once-flag.
   void _offerEndAd() {
+    if (adsRemoved?.call() ?? false) return;
     if (!AdPolicy.allows(
       fightSeconds: fightSeconds,
       alreadyShown: _endAdOffered,

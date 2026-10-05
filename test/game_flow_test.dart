@@ -76,6 +76,7 @@ void main() {
     MetaState meta, {
     bool settle = true,
     EndAd endAd = const NoEndAd(),
+    bool Function()? adsRemoved,
   }) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
@@ -94,6 +95,7 @@ void main() {
       feel: feel,
       random: math.Random(1),
       endAd: endAd,
+      adsRemoved: adsRemoved,
     );
     await primeSprites(game);
     await tester.pumpWidget(
@@ -198,6 +200,24 @@ void main() {
     game.pauseMatch();
     game.exitToMenu();
     expect(ads.calls, 1);
+  });
+
+  testWidgets('remove ads skips the end interstitial', (tester) async {
+    final ads = _RecordingEndAd();
+    final game = (await boot(
+      tester,
+      MetaState(),
+      endAd: ads,
+      adsRemoved: () => true,
+    )).game;
+    game.fightSeconds = 200;
+    knockOut(game.players);
+    game.resolveKnockouts();
+    expect(game.phase, MatchPhase.defeat);
+    expect(ads.calls, 0);
+
+    game.exitToMenu();
+    expect(ads.calls, 0);
   });
 
   testWidgets('clearing a wave opens the shop and the next wave grows', (

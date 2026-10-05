@@ -47,4 +47,16 @@ void main() {
     expect(encryption, greaterThan(0));
     expect(plist.substring(encryption, encryption + 60), contains('<false/>'));
   });
+
+  test('iPad stays landscape and opts out of multitasking', () {
+    final plist = File('ios/Runner/Info.plist').readAsStringSync();
+    expect(plist, isNot(contains('Portrait')));
+    expect(plist, contains('<key>UISupportedInterfaceOrientations</key>'));
+    expect(plist, contains('<key>UISupportedInterfaceOrientations~ipad</key>'));
+    expect(plist, contains('UIInterfaceOrientationLandscapeLeft'));
+    expect(plist, contains('UIInterfaceOrientationLandscapeRight'));
+    final fullscreen = plist.indexOf('<key>UIRequiresFullScreen</key>');
+    expect(fullscreen, greaterThan(0));
+    expect(plist.substring(fullscreen, fullscreen + 48), contains('<true/>'));
+  });
 }

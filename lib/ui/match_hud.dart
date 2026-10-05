@@ -24,7 +24,10 @@ class MatchHud extends StatelessWidget {
       ]),
       builder: (context, _) {
         final phase = game.phase;
-        final show = phase == MatchPhase.fight || phase == MatchPhase.clearing;
+        final show =
+            phase == MatchPhase.entering ||
+            phase == MatchPhase.fight ||
+            phase == MatchPhase.clearing;
         if (!show) return const SizedBox.shrink();
         final fort = game.fort;
         final fraction = fort.maxHp <= 0 ? 0.0 : fort.hp / fort.maxHp;

@@ -268,6 +268,7 @@ class BackyardBarrageGame extends FlameGame {
     for (var i = 0; i < players.length; i++) {
       final kid = players[i];
       kid.position = ArenaGrid.slot(KidSide.player, i);
+      kid.syncDepth();
       kid.revive();
     }
     _setSelected(_firstLiving(players));
@@ -798,6 +799,7 @@ class BackyardBarrageGame extends FlameGame {
       kid.position += delta / distance * step;
       kid.setWalking(true);
     }
+    kid.syncDepth();
     return true;
   }
 

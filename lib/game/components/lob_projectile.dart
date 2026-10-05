@@ -56,7 +56,9 @@ class LobProjectile extends SpriteComponent {
          size: Vector2.all(radius * 2.2),
          anchor: Anchor.center,
          priority: ArenaGrid.depthOrder(position.y),
-       );
+       ) {
+    _applyDepth();
+  }
 
   Vector2 velocity;
   final List<KidComponent> targets;
@@ -169,7 +171,7 @@ class LobProjectile extends SpriteComponent {
     if (_falling) {
       _stepFall(dt);
       position.setFrom(_hit);
-      priority = ArenaGrid.depthOrder(_hit.y);
+      _applyDepth();
       if (_hit.y >= _groundY) _land();
       return;
     }
@@ -185,8 +187,8 @@ class LobProjectile extends SpriteComponent {
     }
     _syncVisual();
     // Ground-track height, not the lofted picture. Over the hit box paints
-    // behind the kid. Under it stays in front.
-    priority = ArenaGrid.depthOrder(_hit.y);
+    // behind the kid. Under it stays in front. Scale uses that same height.
+    _applyDepth();
     if (_spent) return;
     if (groundTrack && _rangeDone) {
       _beginFall();
@@ -252,6 +254,12 @@ class LobProjectile extends SpriteComponent {
       return;
     }
     if (_shouldStartFall()) _beginFall();
+  }
+
+  void _applyDepth() {
+    priority = ArenaGrid.depthOrder(_hit.y);
+    final factor = ArenaGrid.depthScale(_hit.y, groundTrack: true);
+    scale.setValues(factor, factor);
   }
 
   void _syncVisual() {

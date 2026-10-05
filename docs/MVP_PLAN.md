@@ -53,7 +53,8 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | Throw | Hold the right third of the screen to charge. Release throws. There is no aim stick |
 | Charge | Tap ≈ 1/3 power, ~1s ≈ 1/2, ~3s full. Half-bell ease toward max. While held, the aim sweeps ±20° over about 3.6s |
 | Throw depth | Release samples the swivel. The ball's ground track slides to that depth. Power sets how far it goes |
-| Hit | A small body hitbox. The ball can pass in front of or behind a kid. Overlap of the ground track is what counts. The snowball image draws behind a kid when that track is over the hit box, and in front when it is under |
+| Hit | A small body hitbox. The ball can pass in front of or behind a kid. Overlap of the ground track is what counts. The snowball image draws behind a kid when that track is over the hit box, and in front when it is under. Drawn size does not change the hit |
+| Depth | Kids and snowballs draw smaller toward the far edge (75% of the near-edge size) and full size toward the camera. Scale is anchored at a kid's feet. A column step still takes about 1.2s |
 | Walk | Left two-thirds of the screen. A tap steps one cell toward the touch (forward, back, up, or down). A hold keeps stepping. About 1.2s per column |
 | Active thrower | One kid is selected and shows a soft glow. The others throw on Easy |
 | Enemy count | Starts ~2–3, scales by wave |

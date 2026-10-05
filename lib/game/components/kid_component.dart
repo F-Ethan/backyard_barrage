@@ -61,7 +61,7 @@ class KidComponent extends SpriteComponent {
          size: size,
          anchor: Anchor.bottomCenter,
        ) {
-    priority = ArenaGrid.depthOrder(hitCenter.y);
+    syncDepth();
   }
 
   final KidSide side;
@@ -292,12 +292,21 @@ class KidComponent extends SpriteComponent {
   Vector2 get hitCenter => position + Vector2(0, -size.y * 0.45);
 
   /// Small body circle. A snowball can pass the sprite and still miss.
+  /// Uses [size], not the drawn depth scale, so a far kid is not a smaller target.
   double get hitRadius => size.x * ThrowPhysics.kidHitScale;
+
+  /// Feet stay put: the sprite is anchored at the bottom center, and the
+  /// same factor scales X and Y. Hit circles ignore this.
+  void syncDepth() {
+    priority = ArenaGrid.depthOrder(hitCenter.y);
+    final factor = ArenaGrid.depthScale(position.y, groundTrack: false);
+    scale.setValues(factor, factor);
+  }
 
   @override
   void update(double dt) {
     super.update(dt);
-    priority = ArenaGrid.depthOrder(hitCenter.y);
+    syncDepth();
     var refresh = false;
     if (_stunTimer > 0) {
       _stunTimer -= dt;

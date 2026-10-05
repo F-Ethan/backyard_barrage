@@ -66,7 +66,7 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 - Left two-thirds: drag and the selected kid follows the finger inside their half. They are not snapped to a cell. A tap on a living kid selects them and keeps their feet until the finger moves. A tap on open ground sends them to that spot. The yard's columns and rows still place forts, rivals, and throw lanes.
 - Kids you are not controlling throw and step like Easy rivals.
 - Each side stays on its own half. The middle band is neutral. The yard grid still places rivals and forts. It does not lock the player's feet or the snowball's hit row.
-- A loss wipes the run: coins, crew, fort, and throw rank go back to a new game. Season and best wave stay. Retry starts at wave 1.
+- A loss resets the run: wave progress and every skill node (crew, fort, throw, and the rest of the tree) go back to a new game. Unspent coins carry into the next run's wallet. Season and best wave stay. Retry starts at wave 1.
 - Lock orientation: landscape left/right only  
 
 ### 3.4 AI (simple)
@@ -79,15 +79,21 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 - Player kids who are not selected use that same Easy brain, mirrored so "closer" is toward the rivals
 - Per-wave: slightly shorter gaps and tighter landing scatter  
 
-### 3.5 Upgrades (between waves)
-Spend soft currency earned from wins:
+### 3.5 Skill tree (between waves, and from the defeat screen)
+Spend soft currency earned from wins. The tree replaces the three-card shop. Each branch is a short chain: a node unlocks after its parent, and costs rise along the chain. Balance numbers live in `PROGRESS.md`.
 
-| Upgrade | Effect | Cap (MVP) |
-| --- | --- | --- |
-| Extra kid | +1 max crew (unlock slots 2, 3) | 3 kids |
-| Throw speed | Faster charge / projectile | 3–5 ranks |
-| Fort | Cover + fort HP / stages | 3 stages |
-| (Optional) Balloon/snow size | Larger hit radius | 3 ranks |
+| Branch | Effect |
+| --- | --- |
+| Team | Crew 1→2→3 |
+| Fort | Stages 2 and 3, then extra HP |
+| Throw | Faster charge / harder lob, 5 ranks |
+| Poise | Shorter stun on your kids |
+| Pressure | Longer stun on enemies |
+| Aim / Reaction / Charge | Teammate bot aim, throw gap, and windup |
+| Shield | Block 1 hit with no stun, then more charges |
+| Lanes | Your snowballs pass your own fort. Until this node, the base fort rule stays |
+| Blast | Larger hit radius |
+| Damage | Your throws land extra hits, then teammate bots do too |
 
 Fort cover shelters 1–2 kids on the cover columns. The blocking box is under half of that side and about one row tall, so the rows above and below and the columns beside the fort stay open. On Easy and Normal a lob that peaks past your own fort clears it. Hard skips that clear, so a full lob from behind your own fort can still chip it. The other side's fort still stops a ball that flies through its box. The fort's row is random inside the mid band (not flush with the top or bottom of the yard, and not on the back line). Enough hits collapse it. A collapsed fort does not block shots from either side. HP refills, and the row is rolled again, at the start of the next wave.
 
@@ -115,8 +121,8 @@ Player **chooses** season on main menu. No real-world lock in MVP.
 2. **Main menu** — Play, Season toggle (Winter/Summer), Upgrades preview, Settings  
 3. **Arena HUD** — kid HP pips, fort bar, charge bar, pause  
 4. **Wave clear** — coins earned, Continue  
-5. **Upgrade shop** — buy ranks, Continue to next wave  
-6. **Defeat / Victory run summary** — waves cleared, coins, Retry / Menu  
+5. **Skill tree** — buy the next node in a branch, Continue to next wave  
+6. **Defeat summary** — waves cleared, coins carried over, Skills / Retry / Menu  
 7. **Settings** — SFX/music, haptics, credits  
 
 Accessibility: large hit targets; consider OpenDyslexic-friendly UI font option later.

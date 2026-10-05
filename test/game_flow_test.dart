@@ -196,7 +196,7 @@ void main() {
     }
     game.resolveKnockouts();
     expect(game.phase, MatchPhase.defeat);
-    expect(game.meta.coins, 0);
+    expect(game.meta.coins, 40);
     expect(game.meta.crewSize, 1);
     expect(game.meta.fortStage, 1);
     expect(game.meta.throwRank, 0);
@@ -215,6 +215,88 @@ void main() {
     expect(game.players.single.hp, CombatRules.hitsToKo);
     expect(game.phase, MatchPhase.fight);
     expect(game.enemies, hasLength(2));
+  });
+
+  testWidgets('coins spent on the defeat skill tree start the next run', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState(coins: 40, crewSize: 2))).game;
+    knockOut(game.players);
+    game.resolveKnockouts();
+    game.update(0.7);
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('open-skills')));
+    await tester.pump();
+    expect(find.byKey(const Key('buy-throw')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('buy-throw')));
+    await tester.pump();
+    expect(game.meta.throwRank, 1);
+    expect(game.meta.coins, 24);
+    expect(game.wave, 1);
+
+    await tester.tap(find.byKey(const Key('next-wave')));
+    await tester.pump();
+    expect(find.byKey(const Key('retry')), findsOneWidget);
+    expect(game.phase, MatchPhase.defeat);
+
+    await tester.tap(find.byKey(const Key('retry')));
+    await tester.pump();
+    expect(game.meta.throwRank, 1);
+    expect(game.meta.coins, 24);
+    expect(game.meta.crewSize, 1);
+    expect(game.players, hasLength(1));
+    expect(game.wave, 1);
+    expect(game.phase, MatchPhase.fight);
+  });
+
+  testWidgets('a shield blocks one hit and a harder throw lands three', (
+    tester,
+  ) async {
+    final game = (await boot(
+      tester,
+      MetaState(skills: {'shield-1', 'damage-1', 'damage-2'}),
+    )).game;
+    final kid = game.players.single;
+    expect(kid.shieldHits, 1);
+    kid.takeHit();
+    expect(kid.hp, CombatRules.hitsToKo);
+    expect(kid.shieldHits, 0);
+    expect(kid.isStunned, isFalse);
+
+    final enemy = game.enemies.first;
+    final before = enemy.hp;
+    game.applySnowballHit(
+      shot: LobProjectile(
+        sprite: kid.sprite!,
+        position: enemy.position.clone(),
+        velocity: Vector2(10, 0),
+        targets: [enemy],
+        owner: kid,
+        manualThrow: true,
+        onHit: (_, _) {},
+      ),
+      target: enemy,
+    );
+    expect(before, CombatRules.hitsToKo);
+    expect(enemy.isKo, isTrue);
+  });
+
+  testWidgets('the skill tree fits a short phone', (tester) async {
+    await _useSurface(tester, const Size(844, 390));
+    final game = (await boot(tester, MetaState())).game;
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('buy-throw')), findsOneWidget);
+    expect(find.text('Next wave'), findsOneWidget);
+    await tester.tap(find.text('Team'));
+    await tester.pump();
+    expect(find.byKey(const Key('skill-team-2')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('pause freezes the clear timer until resume', (tester) async {

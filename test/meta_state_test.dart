@@ -1,5 +1,6 @@
 import 'package:backyard_barrage/meta/meta_state.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
+import 'package:backyard_barrage/meta/skill_tree.dart';
 import 'package:backyard_barrage/seasons/season.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -48,7 +49,7 @@ void main() {
       expect(meta.coins, greaterThanOrEqualTo(0));
     });
 
-    test('a defeat wipe clears the run and keeps season and best wave', () {
+    test('a defeat wipe keeps unspent coins and clears skills', () {
       final meta = MetaState(
         coins: 80,
         crewSize: 3,
@@ -57,13 +58,59 @@ void main() {
         season: Season.summer,
         bestWave: 6,
       );
+      meta.buy('shield-1');
       meta.resetRun();
-      expect(meta.coins, 0);
+      expect(meta.coins, 80 - 36);
+      expect(meta.skills, isEmpty);
       expect(meta.crewSize, 1);
       expect(meta.fortStage, 1);
       expect(meta.throwRank, 0);
+      expect(meta.shieldCharges, 0);
       expect(meta.season, Season.summer);
       expect(meta.bestWave, 6);
+      expect(meta.buyThrowSpeed(), isTrue);
+      expect(meta.throwRank, 1);
+    });
+
+    test('a node stays locked until its parent is owned', () {
+      final meta = MetaState(coins: 500);
+      expect(meta.buy('team-3'), isFalse);
+      expect(meta.buy('damage-2'), isFalse);
+      expect(meta.buy('lanes'), isTrue);
+      expect(meta.passesOwnFort, isTrue);
+      expect(meta.buy('team-2'), isTrue);
+      expect(meta.buy('team-3'), isTrue);
+      expect(meta.crewSize, 3);
+      expect(meta.stunScaleFor(ally: true), 1);
+      expect(meta.buy('poise-1'), isTrue);
+      expect(meta.stunScaleFor(ally: true), 0.82);
+      expect(meta.stunScaleFor(ally: false), 1);
+      expect(meta.hitsFor(manualThrow: true), 1);
+      expect(meta.hitsFor(manualThrow: false), 1);
+      expect(meta.buy('damage-1'), isTrue);
+      expect(meta.hitsFor(manualThrow: true), 2);
+      expect(meta.hitsFor(manualThrow: false), 1);
+      expect(meta.buy('damage-2'), isTrue);
+      expect(meta.hitsFor(manualThrow: true), 3);
+      expect(meta.buy('damage-3'), isTrue);
+      expect(meta.hitsFor(manualThrow: false), 2);
+      expect(meta.blastScale, 1);
+      expect(meta.shieldCharges, 0);
+    });
+
+    test('the full tree is a long save, not one short run', () {
+      final total = SkillTree.nodes.fold<int>(
+        0,
+        (sum, node) => sum + node.cost,
+      );
+      expect(total, 2620);
+      var waves = 0;
+      for (var wave = 1; wave <= 20; wave++) {
+        waves += MetaState.coinsForWave(wave);
+      }
+      expect(waves, 1920);
+      expect(waves, lessThan(total));
+      expect(MetaState.coinsForWave(1), greaterThanOrEqualTo(16));
     });
 
     test('wave rewards grow and best wave only moves forward', () {
@@ -105,7 +152,31 @@ void main() {
       expect(again.throwRank, 4);
       expect(again.season, Season.summer);
       expect(again.bestWave, 6);
+      expect(again.owns('team-2'), isTrue);
+      expect(again.owns('throw-4'), isTrue);
+      expect(again.owns('fort-3'), isTrue);
     });
+
+    test(
+      'an older save without a skill list restores crew, fort, and throw',
+      () {
+        final restored = MetaState.fromJson({
+          'coins': 15,
+          'crewSize': 2,
+          'fortStage': 3,
+          'throwRank': 2,
+          'season': 'summer',
+          'bestWave': 4,
+        });
+        expect(restored.coins, 15);
+        expect(restored.crewSize, 2);
+        expect(restored.fortStage, 3);
+        expect(restored.throwRank, 2);
+        expect(restored.owns('team-2'), isTrue);
+        expect(restored.owns('team-3'), isFalse);
+        expect(restored.owns('fort-hp-1'), isFalse);
+      },
+    );
   });
 
   test('save store round trip', () async {

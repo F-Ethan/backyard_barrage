@@ -199,8 +199,6 @@ void main() {
       expect(normal.friendlyFortDamage, isFalse);
       expect(easy.friendlyFortDamage, isFalse);
       expect(hard.friendlyFortDamage, isTrue);
-      expect(easy.playerMoveScale, greaterThan(normal.playerMoveScale));
-      expect(hard.playerMoveScale, lessThan(normal.playerMoveScale));
       final playerPace = ThrowPhysics.kidMoveSpeed();
       expect(hard.enemyStepSpeed, greaterThan(playerPace));
       expect(hard.enemyStepSpeed, lessThan(playerPace * 4));

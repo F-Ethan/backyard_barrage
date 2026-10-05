@@ -401,9 +401,11 @@ class LobProjectile extends SpriteComponent {
         sameSide && ArenaGrid.columnIsBehindFort(ownerSide, throwerColumn);
     if (sameSide && !behind) return false;
 
-    // A shot that peaks past your own fort has already lofted over it.
-    // The other side's fort still stops a ball that flies through it.
-    if (groundTrack && sameSide && flightRange > 1) {
+    // Easy and Normal: a shot that peaks past your own fort has already
+    // lofted over it. Hard skips this so a full lob from behind can still
+    // chip that fort. The other side's fort still stops a ball that flies
+    // through it.
+    if (groundTrack && sameSide && flightRange > 1 && !friendlyFortDamage) {
       final apexX = originX + facing * flightRange * apexFraction;
       if (ThrowPhysics.peaksPastFort(
         apexX: apexX,

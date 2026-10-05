@@ -89,7 +89,7 @@ Spend soft currency earned from wins:
 | Fort | Cover + fort HP / stages | 3 stages |
 | (Optional) Balloon/snow size | Larger hit radius | 3 ranks |
 
-Fort cover shelters 1–2 kids on the cover columns. The blocking box is under half of that side and about one row tall, so the rows above and below and the columns beside the fort stay open. A lob that peaks past your own fort clears it. The other side's fort still stops a ball that flies through its box. The fort's row is random inside the mid band (not flush with the top or bottom of the yard, and not on the back line). Enough hits collapse it. A collapsed fort does not block shots from either side. HP refills, and the row is rolled again, at the start of the next wave.
+Fort cover shelters 1–2 kids on the cover columns. The blocking box is under half of that side and about one row tall, so the rows above and below and the columns beside the fort stay open. On Easy and Normal a lob that peaks past your own fort clears it. Hard skips that clear, so a full lob from behind your own fort can still chip it. The other side's fort still stops a ball that flies through its box. The fort's row is random inside the mid band (not flush with the top or bottom of the yard, and not on the back line). Enough hits collapse it. A collapsed fort does not block shots from either side. HP refills, and the row is rolled again, at the start of the next wave.
 
 ### 3.6 Seasons
 Same rules; swap:

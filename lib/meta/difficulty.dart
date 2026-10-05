@@ -11,7 +11,6 @@ class DifficultyTuning {
     required this.throwGapMax,
     required this.throwsPerStep,
     required this.matchPlayerRow,
-    required this.playerMoveScale,
     required this.friendlyFortDamage,
     required this.enemyStepSpeed,
     required this.chargeVersusPlayer,
@@ -28,9 +27,6 @@ class DifficultyTuning {
   /// hold still once a living player is already within one row.
   final bool matchPlayerRow;
 
-  /// Old walk bias. Player drag does not use it; that speed is locked.
-  final double playerMoveScale;
-
   /// When true, a player's own lob can chip the player fort.
   final bool friendlyFortDamage;
 
@@ -40,7 +36,8 @@ class DifficultyTuning {
   /// Bot charge hold divided by the player's full charge.
   ///
   /// 1 matches the player. Above 1 is slower than the player (Easy).
-  /// Below 1 keeps Hard's short windup and does not follow the player's hold.
+  /// Hard is below 1 and still follows the player's hold a little: about
+  /// 0.45s at rank 0, down to the 0.3s floor as throw rank rises.
   final double chargeVersusPlayer;
 
   /// How long a bot holds the charge pose before releasing.
@@ -75,7 +72,6 @@ class DifficultyTuning {
           throwGapMax: max,
           throwsPerStep: 2,
           matchPlayerRow: false,
-          playerMoveScale: 1.12,
           friendlyFortDamage: false,
           enemyStepSpeed: 120,
           chargeVersusPlayer: versus,
@@ -87,7 +83,6 @@ class DifficultyTuning {
           throwGapMax: max,
           throwsPerStep: 1,
           matchPlayerRow: true,
-          playerMoveScale: 0.88,
           friendlyFortDamage: true,
           enemyStepSpeed: 170,
           chargeVersusPlayer: 0.15,
@@ -104,7 +99,6 @@ class DifficultyTuning {
           throwGapMax: max,
           throwsPerStep: 1,
           matchPlayerRow: false,
-          playerMoveScale: 1,
           friendlyFortDamage: false,
           enemyStepSpeed: 150,
           chargeVersusPlayer: 1,

@@ -57,7 +57,7 @@ class EnemyController extends Component {
   final int Function()? currentWave;
 
   /// The player's full-charge time. Easy and Normal scale their windup
-  /// from this. Hard ignores it and keeps the short windup.
+  /// from this. Hard follows it a little, about 0.45s down to 0.3s.
   final double Function()? playerChargeSeconds;
 
   _AiPhase _phase = _AiPhase.wait;

@@ -212,6 +212,81 @@ void main() {
     },
   );
 
+  test('the open-fort node lets a full lob pass your own fort', () {
+    final poses = KidPoseSprites(
+      idle: sprite,
+      walk: sprite,
+      charge: sprite,
+      throwPose: sprite,
+      hit: sprite,
+      ko: sprite,
+      pickup: sprite,
+      turnBack: sprite,
+      turnQuarter: sprite,
+      turnFront: sprite,
+    );
+    final kid = KidComponent(
+      side: KidSide.player,
+      poses: poses,
+      position: ArenaGrid.cellCenter(KidSide.player, 0, ArenaGrid.coverRow),
+      size: Vector2.all(ArenaGrid.kidSize),
+    );
+    final fort = FortComponent(
+      side: KidSide.player,
+      sprite: sprite,
+      position: ArenaGrid.fortAnchor(),
+      size: ArenaGrid.fortDrawSize,
+    );
+    fort.placeOnRow(ArenaGrid.coverRow);
+    final lob = ThrowPhysics.planPlayerLob(
+      throwerRow: ArenaGrid.coverRow,
+      throwerColumn: 0,
+      aimDirection: Vector2(1, 0),
+      charge: 1,
+      facingRight: true,
+      originY: kid.throwOrigin.y,
+    );
+    final before = fort.hp;
+    var fortHits = 0;
+    final shot = LobProjectile(
+      sprite: sprite,
+      position: kid.throwOrigin.clone(),
+      velocity: lob.velocity.clone(),
+      targets: <KidComponent>[],
+      owner: kid,
+      blockedByFort: true,
+      forts: [fort],
+      friendlyFortDamage: true,
+      passOwnFort: true,
+      groundTrack: lob.groundTrack,
+      throwerRow: lob.throwerRow,
+      throwerColumn: lob.throwerColumn,
+      peakRow: lob.peakRow,
+      landingRow: lob.landingRow,
+      apexRise: lob.apexRise,
+      landingDrop: lob.landingDrop,
+      launchVy: lob.velocity.y,
+      travelSpeed: lob.travelSpeed,
+      flightRange: lob.range,
+      apexFraction: lob.apexFraction,
+      settleFraction: lob.settleFraction,
+      landingY: lob.landingY,
+      apexY: lob.apexY,
+      onHit: (_, _) {},
+      onFortHit: (_) => fortHits += 1,
+    );
+    for (
+      var i = 0;
+      i < 40 && shot.hitPosition.x < fort.footprint.right + 30;
+      i++
+    ) {
+      shot.update(1 / 60);
+    }
+    expect(fortHits, 0);
+    expect(fort.hp, before);
+    expect(shot.hitPosition.x, greaterThan(fort.footprint.right));
+  });
+
   test('a snowball over a hit box paints behind the kid', () {
     final poses = KidPoseSprites(
       idle: sprite,

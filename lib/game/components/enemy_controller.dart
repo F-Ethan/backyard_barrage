@@ -32,6 +32,7 @@ class EnemyController extends Component {
     this.isManual,
     this.currentWave,
     this.playerChargeSeconds,
+    this.aimJitterScale,
   }) : _cycle = initialDelay,
        _seenHp = host.hp;
 
@@ -59,6 +60,9 @@ class EnemyController extends Component {
   /// The player's full-charge time. Easy and Normal scale their windup
   /// from this. Hard follows it a little, about 0.45s down to 0.3s.
   final double Function()? playerChargeSeconds;
+
+  /// Multiplier on aim scatter. Teammate aim nodes pass a value under 1.
+  final double Function()? aimJitterScale;
 
   _AiPhase _phase = _AiPhase.wait;
   double _cycle;
@@ -167,10 +171,10 @@ class EnemyController extends Component {
     final living = [for (final kid in players) !kid.isKo];
     final index = EnemyAi.pickLaneTarget(living, rows, cell.row, rng);
     final target = index == null ? null : players[index];
-    final scatter = EnemyAi.rangeScatter(
-      rng,
-      CombatRules.enemyAimJitterRadians(currentWave?.call() ?? wave),
-    );
+    final jitter =
+        CombatRules.enemyAimJitterRadians(currentWave?.call() ?? wave) *
+        (aimJitterScale?.call() ?? 1);
+    final scatter = EnemyAi.rangeScatter(rng, jitter);
     var fellShort = false;
     if (target != null) {
       final distance = (host.throwOrigin.x - target.hitCenter.x).abs();

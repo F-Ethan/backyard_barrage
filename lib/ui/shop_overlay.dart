@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../feel/feel_bus.dart';
 import '../game/backyard_barrage_game.dart';
-import '../meta/meta_state.dart';
+import '../meta/skill_tree.dart';
 import '../seasons/season.dart';
 import 'barrage_colors.dart';
 import 'coin_amount.dart';
 import 'draft_button.dart';
 import 'kit_panel.dart';
 import 'season_chip.dart';
-import 'shop_card_frame.dart';
 
+/// Between-wave skill tree. One branch at a time, each a short chain.
 class ShopOverlay extends StatefulWidget {
   const ShopOverlay({super.key, required this.game});
 
@@ -21,8 +21,10 @@ class ShopOverlay extends StatefulWidget {
 }
 
 class _ShopOverlayState extends State<ShopOverlay> {
-  Future<void> _buy(bool Function() action) async {
-    if (!action()) return;
+  SkillBranch _branch = SkillBranch.throwSpeed;
+
+  Future<void> _buy(String id) async {
+    if (!widget.game.meta.buy(id)) return;
     widget.game.feel.purchased();
     setState(() {});
     await widget.game.persist();
@@ -38,35 +40,38 @@ class _ShopOverlayState extends State<ShopOverlay> {
   Widget build(BuildContext context) {
     final game = widget.game;
     final meta = game.meta;
+    final fromDefeat = game.shoppingFromDefeat;
+    final chain = SkillTree.chain(_branch);
     return Material(
       color: BarrageColors.scrim,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: KitPanel(
-            padding: const EdgeInsets.fromLTRB(22, 18, 22, 14),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
             child: Column(
               children: [
                 Row(
                   children: [
                     Expanded(
                       child: Text(
-                        'Wave ${game.wave} clear',
+                        fromDefeat ? 'Skills' : 'Wave ${game.wave} clear',
                         style: BarrageType.heading.copyWith(fontSize: 22),
                       ),
                     ),
-                    Text(
-                      '+${game.lastReward}',
-                      style: BarrageType.body.copyWith(
-                        color: BarrageColors.player,
-                        fontWeight: FontWeight.w800,
+                    if (!fromDefeat)
+                      Text(
+                        '+${game.lastReward}',
+                        style: BarrageType.body.copyWith(
+                          color: BarrageColors.player,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
                     const SizedBox(width: 12),
                     CoinAmount(amount: meta.coins),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -88,63 +93,53 @@ class _ShopOverlayState extends State<ShopOverlay> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: _UpgradeCard(
-                          title: 'Extra kid',
-                          rank: 'Crew ${meta.crewSize}/${MetaState.maxCrew}',
-                          detail: 'Another kid joins next wave.',
-                          buttonKey: const Key('buy-kid'),
-                          label: meta.nextKidCost == null
-                              ? 'Max'
-                              : 'Buy ${meta.nextKidCost}',
-                          enabled: meta.canBuyKid,
-                          feel: game.feel,
-                          onPressed: () => _buy(meta.buyExtraKid),
+                      SizedBox(
+                        width: 132,
+                        child: ListView(
+                          children: [
+                            for (final branch in SkillBranch.values)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: _BranchChip(
+                                  label: branch.label,
+                                  selected: branch == _branch,
+                                  onTap: () => setState(() => _branch = branch),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: _UpgradeCard(
-                          title: 'Fort',
-                          rank:
-                              'Stage ${meta.fortStage}/${MetaState.maxFortStage}',
-                          detail:
-                              'Blocks shots until its HP is gone. Refills each wave.',
-                          buttonKey: const Key('buy-fort'),
-                          label: meta.nextFortCost == null
-                              ? 'Max'
-                              : 'Buy ${meta.nextFortCost}',
-                          enabled: meta.canBuyFort,
-                          feel: game.feel,
-                          onPressed: () => _buy(meta.buyFort),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _UpgradeCard(
-                          title: 'Throw speed',
-                          rank:
-                              'Rank ${meta.throwRank}/${MetaState.maxThrowRank}',
-                          detail: 'Faster charge and a harder lob.',
-                          buttonKey: const Key('buy-throw'),
-                          label: meta.nextThrowCost == null
-                              ? 'Max'
-                              : 'Buy ${meta.nextThrowCost}',
-                          enabled: meta.canBuyThrow,
-                          feel: game.feel,
-                          onPressed: () => _buy(meta.buyThrowSpeed),
+                        child: ListView(
+                          children: [
+                            for (var i = 0; i < chain.length; i++)
+                              _NodeRow(
+                                node: chain[i],
+                                owned: meta.owns(chain[i].id),
+                                unlocked:
+                                    meta.canBuy(chain[i].id) ||
+                                    meta.owns(chain[i].id) ||
+                                    (chain[i].parentId != null &&
+                                        meta.owns(chain[i].parentId!)) ||
+                                    chain[i].parentId == null,
+                                affordable: meta.canBuy(chain[i].id),
+                                feel: game.feel,
+                                onBuy: () => _buy(chain[i].id),
+                              ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 DraftImageButton(
                   key: const Key('next-wave'),
-                  label: 'Next wave',
+                  label: fromDefeat ? 'Back' : 'Next wave',
                   onPressed: game.continueFromShop,
                   width: 230,
-                  height: 64,
+                  height: 56,
                   feel: game.feel,
                 ),
               ],
@@ -156,58 +151,120 @@ class _ShopOverlayState extends State<ShopOverlay> {
   }
 }
 
-class _UpgradeCard extends StatelessWidget {
-  const _UpgradeCard({
-    required this.title,
-    required this.rank,
-    required this.detail,
-    required this.buttonKey,
+class _BranchChip extends StatelessWidget {
+  const _BranchChip({
     required this.label,
-    required this.enabled,
-    required this.onPressed,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? BarrageColors.player : BarrageColors.cream,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: BarrageType.body.copyWith(
+              fontSize: 14,
+              color: selected ? BarrageColors.onPrimary : BarrageColors.ink,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NodeRow extends StatelessWidget {
+  const _NodeRow({
+    required this.node,
+    required this.owned,
+    required this.unlocked,
+    required this.affordable,
+    required this.onBuy,
     required this.feel,
   });
 
-  final String title;
-  final String rank;
-  final String detail;
-  final Key buttonKey;
-  final String label;
-  final bool enabled;
-  final VoidCallback onPressed;
+  final SkillNode node;
+  final bool owned;
+  final bool unlocked;
+  final bool affordable;
+  final VoidCallback onBuy;
   final FeelBus feel;
 
   @override
   Widget build(BuildContext context) {
-    return ShopCardFrame(
-      footer: DraftImageButton(
-        key: buttonKey,
-        label: label,
-        enabled: enabled,
-        onPressed: onPressed,
-        expand: true,
-        fontSize: 14,
-        feel: feel,
-      ),
-      child: Column(
-        children: [
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: BarrageType.heading.copyWith(fontSize: 16),
+    final locked = !owned && !unlocked;
+    final nextThrow = node.id.startsWith('throw-') && affordable;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: owned
+              ? const Color(0xFFE7F2FF)
+              : locked
+              ? const Color(0xFFF3F0EA)
+              : BarrageColors.cream,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: owned ? BarrageColors.player : const Color(0xFFE4D8C8),
           ),
-          Text(rank, textAlign: TextAlign.center, style: BarrageType.muted),
-          const SizedBox(height: 4),
-          Expanded(
-            child: Text(
-              detail,
-              textAlign: TextAlign.center,
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
-              style: BarrageType.muted.copyWith(fontSize: 12),
-            ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      node.title,
+                      style: BarrageType.heading.copyWith(fontSize: 15),
+                    ),
+                    Text(
+                      locked ? 'Unlock the node above first.' : node.detail,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: BarrageType.muted.copyWith(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (owned)
+                Text(
+                  'Owned',
+                  style: BarrageType.body.copyWith(
+                    color: BarrageColors.player,
+                    fontSize: 13,
+                  ),
+                )
+              else
+                DraftImageButton(
+                  key: Key(nextThrow ? 'buy-throw' : 'skill-${node.id}'),
+                  label: locked ? 'Locked' : 'Buy ${node.cost}',
+                  enabled: affordable,
+                  onPressed: onBuy,
+                  width: 108,
+                  height: 40,
+                  fontSize: 13,
+                  feel: feel,
+                ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

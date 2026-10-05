@@ -14,6 +14,7 @@ class DifficultyTuning {
     required this.friendlyFortDamage,
     required this.enemyStepSpeed,
     required this.chargeVersusPlayer,
+    this.chargeScale = 1,
   });
 
   /// Seconds from one enemy throw to the next.
@@ -40,6 +41,10 @@ class DifficultyTuning {
   /// 0.45s at rank 0, down to the 0.3s floor as throw rank rises.
   final double chargeVersusPlayer;
 
+  /// Extra multiplier on the windup. Teammate charge nodes use this so they
+  /// shorten the Easy hold without falling into Hard's short window.
+  final double chargeScale;
+
   /// How long a bot holds the charge pose before releasing.
   ///
   /// Easy is longer than [playerCharge]. Normal matches it. Hard stays in
@@ -48,13 +53,36 @@ class DifficultyTuning {
     final player = playerCharge < 0.2
         ? CombatRules.playerChargeSeconds(0)
         : playerCharge;
+    final double seconds;
     if (chargeVersusPlayer < 1) {
       final window = player * chargeVersusPlayer;
-      if (window < 0.3) return 0.3;
-      if (window > 0.55) return 0.55;
-      return window;
+      if (window < 0.3) {
+        seconds = 0.3;
+      } else if (window > 0.55) {
+        seconds = 0.55;
+      } else {
+        seconds = window;
+      }
+    } else {
+      seconds = player * chargeVersusPlayer;
     }
-    return player * chargeVersusPlayer;
+    final scaled = seconds * chargeScale;
+    if (scaled < 0.2) return 0.2;
+    return scaled;
+  }
+
+  /// Copy with shorter gaps and a shorter windup. Used for teammate bots.
+  DifficultyTuning scaled({double gapScale = 1, double chargeScale = 1}) {
+    return DifficultyTuning(
+      throwGapMin: throwGapMin * gapScale,
+      throwGapMax: throwGapMax * gapScale,
+      throwsPerStep: throwsPerStep,
+      matchPlayerRow: matchPlayerRow,
+      friendlyFortDamage: friendlyFortDamage,
+      enemyStepSpeed: enemyStepSpeed,
+      chargeVersusPlayer: chargeVersusPlayer,
+      chargeScale: this.chargeScale * chargeScale,
+    );
   }
 
   static DifficultyTuning of(Difficulty difficulty, {int wave = 1}) {

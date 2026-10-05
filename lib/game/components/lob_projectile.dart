@@ -35,6 +35,8 @@ class LobProjectile extends SpriteComponent {
     this.apexRise = 0,
     this.landingDrop = 0,
     this.friendlyFortDamage = false,
+    this.passOwnFort = false,
+    this.manualThrow = false,
     this.scripted = false,
     this.groundTrack = false,
     this.travelSpeed = 0,
@@ -85,6 +87,13 @@ class LobProjectile extends SpriteComponent {
   /// +1 toward the enemy half, -1 toward the player half.
   final double facing;
   final bool friendlyFortDamage;
+
+  /// Bought lane node. Your own shots pass your fort. The base rule stays
+  /// when this is false.
+  final bool passOwnFort;
+
+  /// The kid the player was controlling when this shot left their hand.
+  final bool manualThrow;
   final bool scripted;
 
   /// Straight depth line for hits. The sprite lofts above [hitPosition].
@@ -392,6 +401,11 @@ class LobProjectile extends SpriteComponent {
   /// and keep flying.
   bool _meetFort(FortComponent cover) {
     if (cover.isCollapsed) return false;
+    if (passOwnFort &&
+        cover.side == KidSide.player &&
+        owner?.side == KidSide.player) {
+      return false;
+    }
     if (_clearedForts.contains(cover)) return false;
     if (!_centerInFootprint(cover)) return false;
 

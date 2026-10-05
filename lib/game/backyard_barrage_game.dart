@@ -105,6 +105,9 @@ class BackyardBarrageGame extends FlameGame {
   int wave = 1;
   int lastReward = 0;
 
+  /// Shop opened from the defeat screen. Closing it returns there.
+  bool shoppingFromDefeat = false;
+
   /// Right-hand share of the screen. A hold there charges; release throws.
   static const double chargeScreenFraction = 2 / 3;
 
@@ -276,6 +279,7 @@ class BackyardBarrageGame extends FlameGame {
       kid.position = ArenaGrid.slot(KidSide.player, i);
       kid.syncDepth();
       kid.revive();
+      kid.shieldHits = meta.shieldCharges;
     }
     _setSelected(_firstLiving(players));
     _ensureAllyBrains();
@@ -313,6 +317,10 @@ class BackyardBarrageGame extends FlameGame {
       damagedSprite: _fortDamaged[meta.fortStage]!,
       collapsedSprite: _fortCollapsed!,
     );
+    if (meta.fortBonusHp > 0) {
+      fort.maxHp += meta.fortBonusHp;
+      fort.hp = fort.maxHp;
+    }
     enemyFort.applyStage(
       nextStage: 1,
       intactSprite: _fortIntact[1]!,
@@ -370,11 +378,36 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   void continueFromShop() {
+    if (shoppingFromDefeat) {
+      closeSkillTree();
+      return;
+    }
     if (phase != MatchPhase.shop) return;
     if (overlays.isActive('shop')) overlays.remove('shop');
     if (paused) resumeEngine();
     wave += 1;
     startWave();
+  }
+
+  /// Skill tree between waves, or from the defeat screen before retry.
+  void openSkillTree() {
+    if (phase != MatchPhase.defeat && phase != MatchPhase.shop) return;
+    shoppingFromDefeat = phase == MatchPhase.defeat;
+    if (overlays.isActive('defeat')) overlays.remove('defeat');
+    if (!overlays.isActive('shop')) overlays.add('shop');
+  }
+
+  /// Back to the defeat summary. Between waves this starts the next wave.
+  void closeSkillTree() {
+    if (!shoppingFromDefeat) {
+      continueFromShop();
+      return;
+    }
+    shoppingFromDefeat = false;
+    if (overlays.isActive('shop')) overlays.remove('shop');
+    if (phase == MatchPhase.defeat && !overlays.isActive('defeat')) {
+      overlays.add('defeat');
+    }
   }
 
   void retryFromDefeat() {
@@ -494,6 +527,13 @@ class BackyardBarrageGame extends FlameGame {
   DifficultyTuning _tuning() =>
       DifficultyTuning.of(feel.settings.difficulty, wave: wave);
 
+  DifficultyTuning _allyTuning() {
+    return DifficultyTuning.of(
+      Difficulty.easy,
+      wave: wave,
+    ).scaled(gapScale: meta.allyGapScale, chargeScale: meta.allyChargeScale);
+  }
+
   double _playerChargeSeconds() =>
       CombatRules.playerChargeSeconds(meta.throwRank);
 
@@ -559,7 +599,7 @@ class BackyardBarrageGame extends FlameGame {
           rivals: players,
           wave: wave,
           rng: _rng,
-          tuning: () => DifficultyTuning.of(Difficulty.easy, wave: wave),
+          tuning: _allyTuning,
           initialDelay: profile.throwGap((0.35 + i * 0.2).clamp(0.0, 1.0)),
           onFire: _onAllyFire,
           isFighting: () => phase == MatchPhase.fight,
@@ -568,6 +608,7 @@ class BackyardBarrageGame extends FlameGame {
           isManual: () => identical(_selected, kid),
           currentWave: () => wave,
           playerChargeSeconds: _playerChargeSeconds,
+          aimJitterScale: () => meta.allyAimScale,
         ),
       );
     }
@@ -677,14 +718,16 @@ class BackyardBarrageGame extends FlameGame {
     );
     kid.showThrowPose();
     feel.playerReleased();
-    _spawnShot(owner: kid, lob: lob, targets: enemies);
+    _spawnShot(owner: kid, lob: lob, targets: enemies, manualThrow: true);
   }
 
   void _spawnShot({
     required KidComponent owner,
     required RowLob lob,
     required List<KidComponent> targets,
+    bool manualThrow = false,
   }) {
+    final fromPlayer = owner.side == KidSide.player;
     world.add(
       LobProjectile(
         sprite: _kit.projectile,
@@ -695,6 +738,11 @@ class BackyardBarrageGame extends FlameGame {
         blockedByFort: true,
         forts: [fort, enemyFort],
         friendlyFortDamage: _tuning().friendlyFortDamage,
+        passOwnFort: fromPlayer && meta.passesOwnFort,
+        manualThrow: manualThrow,
+        radius: fromPlayer
+            ? MetaState.baseBlastRadius * meta.blastScale
+            : MetaState.baseBlastRadius,
         groundTrack: lob.groundTrack,
         throwerRow: lob.throwerRow,
         throwerColumn: lob.throwerColumn,
@@ -721,7 +769,7 @@ class BackyardBarrageGame extends FlameGame {
     _burst(shot.position);
     if (phase != MatchPhase.fight || target.isKo) return;
     final selectedHit = identical(target, _selected);
-    target.takeHit();
+    applySnowballHit(shot: shot, target: target);
     feel.kidHit(knockedOut: target.isKo, season: meta.season);
     if (selectedHit) {
       _endActiveThrow();
@@ -730,6 +778,22 @@ class BackyardBarrageGame extends FlameGame {
       }
     }
     resolveKnockouts();
+  }
+
+  /// One snowball. Damage nodes repeat the hit. Shields eat a hit each time.
+  @visibleForTesting
+  void applySnowballHit({
+    required LobProjectile shot,
+    required KidComponent target,
+  }) {
+    if (phase != MatchPhase.fight || target.isKo) return;
+    final owner = shot.owner;
+    final fromPlayer = owner != null && owner.side == KidSide.player;
+    final hits = fromPlayer ? meta.hitsFor(manualThrow: shot.manualThrow) : 1;
+    final scale = meta.stunScaleFor(ally: target.side == KidSide.player);
+    for (var i = 0; i < hits && !target.isKo; i++) {
+      target.takeHit(stunScale: scale);
+    }
   }
 
   void _onFortHit(LobProjectile shot) {

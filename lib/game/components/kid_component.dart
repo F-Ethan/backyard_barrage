@@ -77,6 +77,10 @@ class KidComponent extends SpriteComponent {
   Sprite turnFrontSprite;
   final int maxHp;
   int hp;
+
+  /// Hits absorbed before HP or stun. Refilled at the start of each wave.
+  int shieldHits = 0;
+
   bool _selected = false;
 
   /// Grey, dim, and marked so a downed kid does not read as still in the fight.
@@ -191,8 +195,13 @@ class KidComponent extends SpriteComponent {
     _refreshSprite();
   }
 
-  void takeHit() {
+  void takeHit({double stunScale = 1}) {
     if (isKo) return;
+    if (side == KidSide.player && shieldHits > 0) {
+      shieldHits -= 1;
+      _flash();
+      return;
+    }
     final result = CombatRules.resolveHit(
       ally: side == KidSide.player,
       hp: hp,
@@ -204,12 +213,7 @@ class KidComponent extends SpriteComponent {
     _chargingPose = false;
     _walking = false;
     _throwPoseTimer = 0;
-    add(
-      SequenceEffect([
-        OpacityEffect.to(0.35, EffectController(duration: 0.08)),
-        OpacityEffect.to(1.0, EffectController(duration: 0.12)),
-      ]),
-    );
+    _flash();
     if (result.knockedOut) {
       _stunTimer = 0;
       _downTimer = 0;
@@ -219,11 +223,21 @@ class KidComponent extends SpriteComponent {
       return;
     }
     _fragile = result.fragile;
-    _stunTimer = result.lockSeconds;
-    _downDuration = result.lockSeconds <= 0 ? 1 : result.lockSeconds;
-    _downTimer = result.knockdown ? result.lockSeconds : 0;
-    _hitPoseTimer = result.knockdown ? 0 : result.lockSeconds;
+    final lock = result.lockSeconds * stunScale;
+    _stunTimer = lock;
+    _downDuration = lock <= 0 ? 1 : lock;
+    _downTimer = result.knockdown ? lock : 0;
+    _hitPoseTimer = result.knockdown ? 0 : lock;
     _refreshSprite();
+  }
+
+  void _flash() {
+    add(
+      SequenceEffect([
+        OpacityEffect.to(0.35, EffectController(duration: 0.08)),
+        OpacityEffect.to(1.0, EffectController(duration: 0.12)),
+      ]),
+    );
   }
 
   void revive() {
@@ -235,6 +249,7 @@ class KidComponent extends SpriteComponent {
     _stunTimer = 0;
     _downTimer = 0;
     _fragile = false;
+    shieldHits = 0;
     _selected = false;
     paint.colorFilter = null;
     for (final effect in children.whereType<Effect>().toList()) {

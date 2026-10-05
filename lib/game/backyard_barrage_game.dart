@@ -121,6 +121,11 @@ class BackyardBarrageGame extends FlameGame {
   /// this, and the wallet keeps the same amount.
   int carriedCoins = 0;
 
+  /// Knockout coins earned during the current wave, before the clear bonus.
+  int killCoinsThisWave = 0;
+
+  final Set<KidComponent> _paidKills = {};
+
   /// Walk-on pace. Not the locked drag rate.
   static const double entranceSpeed = 280;
 
@@ -304,6 +309,8 @@ class BackyardBarrageGame extends FlameGame {
     _endActiveThrow();
     _clearShots();
     _clearEnemies();
+    _paidKills.clear();
+    killCoinsThisWave = 0;
     phase = MatchPhase.entering;
     _entrance.clear();
 
@@ -355,7 +362,7 @@ class BackyardBarrageGame extends FlameGame {
           initialDelay: stagger,
           onFire: _onEnemyFire,
           isFighting: () => phase == MatchPhase.fight,
-          playerChargeSeconds: _playerChargeSeconds,
+          playerChargeSeconds: _baseChargeSeconds,
         ),
       );
     }
@@ -476,6 +483,7 @@ class BackyardBarrageGame extends FlameGame {
 
   void resolveKnockouts() {
     if (phase != MatchPhase.fight) return;
+    _payKnockouts();
     final livingPlayers = players.where((kid) => !kid.isKo).length;
     final livingEnemies = enemies.where((kid) => !kid.isKo).length;
     switch (CombatRules.roundOutcome(
@@ -531,7 +539,9 @@ class BackyardBarrageGame extends FlameGame {
       case _Banner.waveKo:
         _showBanner(
           'Wave $wave clear!',
-          subtitle: '+$lastReward coins',
+          subtitle: killCoinsThisWave > 0
+              ? 'KO +$killCoinsThisWave · bonus +$lastReward'
+              : '+$lastReward coins',
           fontSize: 42,
           color: const Color(0xFF1A2332),
         );
@@ -541,6 +551,7 @@ class BackyardBarrageGame extends FlameGame {
         _pendingBanner = _Banner.none;
         _clearBanner();
         phase = MatchPhase.shop;
+        _offerEndAd();
         overlays.add('shop');
         pauseEngine();
       case _Banner.defeatKo:
@@ -650,14 +661,16 @@ class BackyardBarrageGame extends FlameGame {
     ).scaled(gapScale: meta.allyGapScale, chargeScale: meta.allyChargeScale);
   }
 
-  /// One interstitial after the run, and never during the fight.
-  /// A knockout offers it when the coin beat ends. Leaving from the
-  /// pause menu can offer it sooner. A purchased Remove Ads entitlement
+  /// One interstitial per run, and never during the fight.
+  /// It can show after two minutes of fight time or three cleared waves,
+  /// whichever comes first: at the shop, after the defeat coin beat, or
+  /// when leaving from the pause menu. A purchased Remove Ads entitlement
   /// skips it without spending the once-flag.
   void _offerEndAd() {
     if (adsRemoved?.call() ?? false) return;
     if (!AdPolicy.allows(
       fightSeconds: fightSeconds,
+      wavesCleared: _wavesCleared(),
       alreadyShown: _endAdOffered,
       inFight: phase == MatchPhase.fight,
     )) {
@@ -667,8 +680,31 @@ class BackyardBarrageGame extends FlameGame {
     unawaited(endAd.onRunEnded(fightSeconds: fightSeconds));
   }
 
+  /// Waves finished this run. The wave on screen still counts once it
+  /// has cleared and the shop is up.
+  int _wavesCleared() {
+    if (phase == MatchPhase.clearing || phase == MatchPhase.shop) return wave;
+    if (wave < 1) return 0;
+    return wave - 1;
+  }
+
+  void _payKnockouts() {
+    var paid = 0;
+    for (final kid in enemies) {
+      if (!kid.isKo || !_paidKills.add(kid)) continue;
+      paid += MetaState.coinsPerKnockout;
+    }
+    if (paid == 0) return;
+    meta.coins += paid;
+    killCoinsThisWave += paid;
+  }
+
+  /// Throw-rank hold before Easy or Normal shortens the player's bar.
+  /// Bots scale from this, so their windup stays put when the bar speeds up.
+  double _baseChargeSeconds() => CombatRules.playerChargeSeconds(meta.throwRank);
+
   double _playerChargeSeconds() =>
-      CombatRules.playerChargeSeconds(meta.throwRank);
+      _baseChargeSeconds() * _tuning().playerChargeTimeScale;
 
   void _onEnemyFire(
     KidComponent enemy,
@@ -740,7 +776,7 @@ class BackyardBarrageGame extends FlameGame {
           approachColumn: 1,
           isManual: () => identical(_selected, kid),
           currentWave: () => wave,
-          playerChargeSeconds: _playerChargeSeconds,
+          playerChargeSeconds: _baseChargeSeconds,
           aimJitterScale: () => meta.allyAimScale,
         ),
       );
@@ -841,7 +877,7 @@ class BackyardBarrageGame extends FlameGame {
     final kid = _selected;
     final charge = ThrowPhysics.chargeForHold(
       _chargeHeld,
-      CombatRules.playerChargeSeconds(meta.throwRank),
+      _playerChargeSeconds(),
     );
     _charging = false;
     _chargeHeld = 0;
@@ -937,7 +973,9 @@ class BackyardBarrageGame extends FlameGame {
     final owner = shot.owner;
     final fromPlayer = owner != null && owner.side == KidSide.player;
     final hits = fromPlayer ? meta.hitsFor(manualThrow: shot.manualThrow) : 1;
-    final scale = meta.stunScaleFor(ally: target.side == KidSide.player);
+    final ally = target.side == KidSide.player;
+    var scale = meta.stunScaleFor(ally: ally);
+    if (ally) scale *= _tuning().allyStunScale;
     for (var i = 0; i < hits && !target.isKo; i++) {
       target.takeHit(stunScale: scale);
     }
@@ -1154,7 +1192,7 @@ class BackyardBarrageGame extends FlameGame {
         _chargeHeld += dt;
         _charge = ThrowPhysics.chargeForHold(
           _chargeHeld,
-          CombatRules.playerChargeSeconds(meta.throwRank),
+          _playerChargeSeconds(),
         );
         _swivel = ThrowPhysics.swivelElevation(_chargeHeld);
         _aimDir = ThrowPhysics.aimForElevation(_swivel, facingRight: true);

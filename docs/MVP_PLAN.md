@@ -49,15 +49,15 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | Rule | MVP value |
 | --- | --- |
 | Player starts with | 1 kid |
-| Hits to KO | 3. Enemy: brush-off (~1s), knockdown then up, then out. Ally: a hit stuns ~2.8s; a second hit during that stun KOs |
+| Hits to KO | 3. Enemy: brush-off (~1s), knockdown then up, then out. Ally: a hit stuns ~2.8s on Hard; Easy is half of that and Normal is three quarters. A second hit during that stun KOs |
 | Throw | Hold the right third of the screen to charge. Release throws. There is no aim stick |
-| Charge | Tap ≈ 1/3 power, ~1s ≈ 1/2, ~3s full. Half-bell ease toward max. While held, the aim sweeps ±20° over about 3.6s |
+| Charge | Hard: tap ≈ 1/3 power, ~1s ≈ 1/2, ~3s full. Easy fills that hold in half the time (2×). Normal fills it in two thirds (1.5×). Half-bell ease toward max. While held, the aim sweeps ±20° over about 3.6s |
 | Throw depth | Release samples the swivel. The ball's ground track slides to that depth. Power sets how far it goes |
 | Hit | A small body hitbox. The ball can pass in front of or behind a kid. Overlap of the ground track is what counts. The snowball image draws behind a kid when that track is over the hit box, and in front when it is under. Drawn size does not change the hit |
 | Depth | Kids and snowballs draw smaller toward the far edge (75% of the near-edge size) and full size toward the camera. Scale is anchored at a kid's feet. Rivals still take about 1.2s per column |
 | Walk | Left two-thirds of the screen. Drag and the selected kid follows the finger inside their half, at the locked rate of six times the old cell walk. Difficulty does not change that speed. A tap on a kid selects them |
 | Active thrower | One kid is selected and shows a soft glow. The others throw on Easy |
-| Enemy count | Starts ~2–3, scales by wave |
+| Enemy count | Wave 1 is 1 rival. Later waves are 3 |
 | Win | All enemies KO’d |
 | Lose | All player kids KO’d |
 
@@ -72,7 +72,7 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 
 ### 3.4 AI (simple)
 - Rivals target a living player kid, throw on the difficulty timer, and step with the Easy / Normal / Hard lane rules
-- Charge: Easy bots take longer than the player's full charge. Normal bots match it. Hard bots keep a short windup (about 0.3–0.55s), so Hard still charges faster than the player
+- Charge: Easy bots hold about 4.5s at rank 0. Normal bots hold the unscaled rank-0 charge, about 3s. Hard bots keep a short windup (about 0.3–0.55s), so Hard still charges faster than the player
 - Throw about every 3s on Normal (slower on Easy, about 1–1.5s on Hard)
 - After a throw, step one row toward a living opponent if nobody is within one row. Easy does that every other throw. Normal does it every throw. Hard steps onto the closest opponent's exact row every throw
 - A lob that falls short steps one column closer. A hit steps one column back, or off that row if they are already at the back line
@@ -81,7 +81,7 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 - Per-wave: slightly shorter gaps and tighter landing scatter  
 
 ### 3.5 Skill tree (between waves, and from the defeat screen)
-Spend soft currency earned from wins. The tree replaces the three-card shop. Each branch is a short chain: a node unlocks after its parent, and costs rise along the chain. Balance numbers live in `PROGRESS.md`.
+Each rival KO pays 8 coins. Clearing the wave pays a bonus on top (`12 + wave * 8`). Spend that soft currency in the tree, which replaces the three-card shop. Each branch is a short chain: a node unlocks after its parent, and costs rise along the chain. Balance numbers live in `PROGRESS.md`.
 
 | Branch | Effect |
 | --- | --- |
@@ -101,7 +101,7 @@ Fort cover shelters 1–2 kids on the cover columns. The blocking box is under h
 ### 3.6 Seasons
 Same rules; swap:
 - Projectile art + VFX + SFX  
-- Arena tint / props (snow vs grass + sprinkler/pool hint)  
+- Arena tint / props (snow vs grass)  
 - Kid outerwear (coat vs tee)  
 
 Player **chooses** season on main menu. No real-world lock in MVP.
@@ -183,7 +183,7 @@ lib/
 ### 7.2 Art — world
 - 1 backyard arena BG (wide landscape)  
 - Winter overlay props (snow banks)  
-- Summer overlay props (grass, optional pool edge / hose)  
+- Summer overlay props (grass)  
 - Fort stages 1–3 (player side)  
 
 ### 7.3 Art — VFX / projectiles

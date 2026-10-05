@@ -124,7 +124,7 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                           ),
                           const SizedBox(height: 6),
                           const Text(
-                            'Sound, music, and haptics for this device. Modern UI is the new kit; turn it off for the classic wood look. Difficulty changes how often rivals throw and whether your own lobs can chip your fort.',
+                            'Sound, music, and haptics for this device. Modern UI is the new kit; turn it off for the classic wood look. Easy charges twice as fast and cuts your stun in half. Normal charges 1.5× and shortens that stun to three quarters. Hard keeps the full charge and stun, throws more often, and can chip your own fort.',
                             textAlign: TextAlign.center,
                             style: BarrageType.muted,
                           ),

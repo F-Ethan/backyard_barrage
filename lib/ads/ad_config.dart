@@ -27,6 +27,9 @@ class AdConfig {
   /// A run must last longer than this, in fight time, before an end ad.
   static const double minFightSeconds = 120;
 
+  /// Or this many cleared waves, whichever comes first.
+  static const int minWavesBeforeAd = 3;
+
   /// Non-consumable Remove Ads product. Create this same id in App Store
   /// Connect (and sign the Paid Apps agreement) before a store build.
   static const String removeAdsProductId =

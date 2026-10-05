@@ -117,10 +117,7 @@ def make_world(rel, winter=True, w=1280, h=720):
         # Darker grass patches
         for gx in (100, 400, 750, 1000):
             d.ellipse([gx, 500, gx + 200, 580], fill=(90, 170, 75, 180))
-        # Subtle hose / pool hint right corner
-        d.ellipse([1080, 560, 1260, 700], fill=(126, 200, 255, 160), outline=INK, width=3)
-        d.arc([1000, 520, 1120, 580], 0, 180, fill=(80, 140, 200, 255), width=6)
-        d.ellipse([1095, 555, 1115, 575], fill=(80, 140, 200, 255), outline=INK, width=2)
+        # No pool or hose. Those outlined circles read as leftover joysticks.
 
     # Empty mid-ground play area (no characters) — soft path
     if winter:

@@ -57,7 +57,7 @@ Playful, cozy backyard, kid-safe. Big readable silhouettes for phone **landscape
 ## World
 - Wide landscape backyard: house edge optional left, fence mid, bushes
 - Winter overlay: snow banks, snow on fence
-- Summer overlay: grass, optional hose/pool corner hint (subtle)
+- Summer overlay: grass. No pool or hose; those circles read as control pads.
 
 ## Forts
 - Stages 1→3: taller / more sandbags or crates; same wood palette

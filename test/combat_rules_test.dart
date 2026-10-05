@@ -5,8 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('CombatRules', () {
-    test('enemy count starts at 2 and caps at 3', () {
-      expect(CombatRules.enemyCountForWave(1), 2);
+    test('enemy count starts at 1 and caps at 3', () {
+      expect(CombatRules.enemyCountForWave(1), 1);
       expect(CombatRules.enemyCountForWave(2), 3);
       expect(CombatRules.enemyCountForWave(8), 3);
     });

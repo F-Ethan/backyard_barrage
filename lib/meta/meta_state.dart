@@ -181,7 +181,10 @@ class MetaState {
     _skills.clear();
   }
 
-  /// Soft currency for clearing [wave] (1-based).
+  /// Soft currency for knocking out one rival.
+  static const int coinsPerKnockout = 8;
+
+  /// Bonus for clearing [wave] (1-based), on top of each knockout.
   static int coinsForWave(int wave) => 12 + wave * 8;
 
   Map<String, Object> toJson() => {

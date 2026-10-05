@@ -182,11 +182,8 @@ void main() {
       final playerCharge = CombatRules.playerChargeSeconds(0);
       expect(normal.throwGapMin, playerCharge);
       expect(normal.throwGapMax, greaterThanOrEqualTo(playerCharge));
-      expect(
-        normal.botChargeSeconds(playerCharge),
-        closeTo(playerCharge, 0.001),
-      );
-      expect(easy.botChargeSeconds(playerCharge), greaterThan(playerCharge));
+      expect(normal.botChargeSeconds(playerCharge), closeTo(3, 0.001));
+      expect(easy.botChargeSeconds(playerCharge), closeTo(4.5, 0.001));
       expect(
         easy.throwGapMin,
         greaterThanOrEqualTo(easy.botChargeSeconds(playerCharge)),
@@ -196,6 +193,12 @@ void main() {
       expect(hard.botChargeSeconds(playerCharge), inInclusiveRange(0.3, 0.55));
       expect(hard.throwGapMax, lessThanOrEqualTo(1.5));
       expect(hard.throwGapMin, greaterThanOrEqualTo(1));
+      expect(easy.playerChargeTimeScale, 0.5);
+      expect(easy.allyStunScale, 0.5);
+      expect(normal.playerChargeTimeScale, closeTo(2 / 3, 0.0001));
+      expect(normal.allyStunScale, 0.75);
+      expect(hard.playerChargeTimeScale, 1);
+      expect(hard.allyStunScale, 1);
       expect(normal.friendlyFortDamage, isFalse);
       expect(easy.friendlyFortDamage, isFalse);
       expect(hard.friendlyFortDamage, isTrue);

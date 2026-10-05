@@ -9,10 +9,12 @@ import 'package:backyard_barrage/feel/game_haptics.dart';
 import 'package:backyard_barrage/game/arena_grid.dart';
 import 'package:backyard_barrage/game/backyard_barrage_game.dart';
 import 'package:backyard_barrage/game/combat_rules.dart';
+import 'package:backyard_barrage/game/components/enemy_controller.dart';
 import 'package:backyard_barrage/game/components/fort_component.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
 import 'package:backyard_barrage/game/components/lob_projectile.dart';
 import 'package:backyard_barrage/game/throw_physics.dart';
+import 'package:backyard_barrage/meta/difficulty.dart';
 import 'package:backyard_barrage/meta/meta_state.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
 import 'package:backyard_barrage/meta/settings_store.dart';
@@ -128,7 +130,7 @@ void main() {
     );
     final game = booted.game;
     expect(game.players, hasLength(2));
-    expect(game.enemies, hasLength(2));
+    expect(game.enemies, hasLength(1));
     expect(game.fort.stage, 2);
     expect(game.fort.hp, CombatRules.fortMaxHp(2));
     expect(game.players.first.hp, CombatRules.hitsToKo);
@@ -241,15 +243,106 @@ void main() {
     expect(ads.calls, 0);
   });
 
+  testWidgets('three cleared waves offer an ad before two minutes', (
+    tester,
+  ) async {
+    final ads = _RecordingEndAd();
+    final game = (await boot(tester, MetaState(), endAd: ads)).game;
+
+    for (var cleared = 0; cleared < 2; cleared++) {
+      knockOut(game.enemies);
+      game.resolveKnockouts();
+      game.update(0.7);
+      game.update(0.6);
+      expect(ads.calls, 0);
+      game.continueFromShop();
+      game.finishEntrance();
+    }
+
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    expect(game.phase, MatchPhase.shop);
+    expect(ads.calls, 1);
+
+    game.continueFromShop();
+    game.finishEntrance();
+    game.fightSeconds = 200;
+    game.pauseMatch();
+    game.exitToMenu();
+    expect(ads.calls, 1);
+  });
+
+  testWidgets('easy charges twice as fast and halves your stun', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.feel.apply(
+      game.feel.settings.copyWith(difficulty: Difficulty.easy),
+    );
+    final kid = game.players.single;
+    game.pressChargeZone();
+    game.update(CombatRules.playerChargeSeconds(0) / 2);
+    expect(game.chargeListenable.value, 1);
+
+    final rival = game.enemies.single;
+    final shot = LobProjectile(
+      sprite: kid.sprite!,
+      position: kid.position.clone(),
+      velocity: Vector2(-1, 0),
+      targets: [kid],
+      owner: rival,
+      onHit: (_, _) {},
+    );
+    game.applySnowballHit(shot: shot, target: kid);
+    expect(
+      kid.stunRemaining,
+      closeTo(CombatRules.allyStunSeconds * 0.5, 0.001),
+    );
+  });
+
+  testWidgets('easy and normal rivals keep the unscaled windup', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    final rival = game.enemies.single;
+    final brain = rival.children.whereType<EnemyController>().single;
+
+    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.easy));
+    expect(brain.windupSeconds, closeTo(4.5, 0.001));
+
+    game.feel.apply(
+      game.feel.settings.copyWith(difficulty: Difficulty.normal),
+    );
+    expect(brain.windupSeconds, closeTo(3, 0.001));
+  });
+
+  testWidgets('normal fills a charge in two thirds of the hold', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.feel.apply(
+      game.feel.settings.copyWith(difficulty: Difficulty.normal),
+    );
+    game.pressChargeZone();
+    game.update(CombatRules.playerChargeSeconds(0) * 2 / 3);
+    expect(game.chargeListenable.value, 1);
+  });
+
   testWidgets('clearing a wave opens the shop and the next wave grows', (
     tester,
   ) async {
     final game = (await boot(tester, MetaState())).game;
 
+    expect(game.enemies, hasLength(1));
     knockOut(game.enemies);
     game.resolveKnockouts();
     expect(game.phase, MatchPhase.clearing);
-    expect(game.meta.coins, MetaState.coinsForWave(1));
+    expect(
+      game.meta.coins,
+      MetaState.coinsForWave(1) + MetaState.coinsPerKnockout,
+    );
 
     game.update(0.7);
     game.update(0.6);
@@ -320,7 +413,7 @@ void main() {
     expect(game.players, hasLength(1));
     expect(game.players.single.hp, CombatRules.hitsToKo);
     expect(game.phase, MatchPhase.fight);
-    expect(game.enemies, hasLength(2));
+    expect(game.enemies, hasLength(1));
   });
 
   testWidgets('coins spent on the defeat skill tree start the next run', (
@@ -460,6 +553,8 @@ void main() {
     tester,
   ) async {
     final game = (await boot(tester, MetaState())).game;
+    // The bell anchors below are the unscaled 3s hold. Hard keeps that hold.
+    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));
     await tester.pump();
     expect(find.byKey(const Key('charge-zone')), findsOneWidget);
     expect(find.byKey(const Key('move-zone')), findsOneWidget);

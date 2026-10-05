@@ -4,14 +4,17 @@ import 'ad_config.dart';
 class AdPolicy {
   const AdPolicy._();
 
-  /// True only after the fight itself ran longer than two minutes, once
-  /// per ending, and never while the fight is still going.
+  /// True after two minutes of fight time or three cleared waves,
+  /// whichever comes first. Once per run, and never while the fight
+  /// is still going.
   static bool allows({
     required double fightSeconds,
+    required int wavesCleared,
     required bool alreadyShown,
     required bool inFight,
   }) {
     if (inFight || alreadyShown) return false;
-    return fightSeconds > AdConfig.minFightSeconds;
+    return fightSeconds > AdConfig.minFightSeconds ||
+        wavesCleared >= AdConfig.minWavesBeforeAd;
   }
 }

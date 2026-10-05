@@ -14,6 +14,8 @@ class DifficultyTuning {
     required this.friendlyFortDamage,
     required this.enemyStepSpeed,
     required this.chargeVersusPlayer,
+    required this.playerChargeTimeScale,
+    required this.allyStunScale,
     this.chargeScale = 1,
   });
 
@@ -45,10 +47,19 @@ class DifficultyTuning {
   /// shorten the Easy hold without falling into Hard's short window.
   final double chargeScale;
 
+  /// Player charge time as a fraction of the throw-rank hold.
+  /// Easy is 1/2 (2× speed). Normal is 2/3 (1.5× speed). Hard stays 1.
+  final double playerChargeTimeScale;
+
+  /// Ally stun as a fraction of the base lock.
+  /// Easy is half. Normal is three quarters. Hard stays the full lock.
+  final double allyStunScale;
+
   /// How long a bot holds the charge pose before releasing.
   ///
-  /// Easy is longer than [playerCharge]. Normal matches it. Hard stays in
-  /// the old short band, about 0.3–0.55s, so Hard still charges faster.
+  /// [playerCharge] is the unscaled throw-rank hold, not the sped-up bar.
+  /// Easy is 1.5× that hold (about 4.5s at rank 0). Normal matches it
+  /// (about 3s). Hard stays in the old short band, about 0.3–0.55s.
   double botChargeSeconds(double playerCharge) {
     final player = playerCharge < 0.2
         ? CombatRules.playerChargeSeconds(0)
@@ -81,6 +92,8 @@ class DifficultyTuning {
       friendlyFortDamage: friendlyFortDamage,
       enemyStepSpeed: enemyStepSpeed,
       chargeVersusPlayer: chargeVersusPlayer,
+      playerChargeTimeScale: playerChargeTimeScale,
+      allyStunScale: allyStunScale,
       chargeScale: this.chargeScale * chargeScale,
     );
   }
@@ -103,6 +116,8 @@ class DifficultyTuning {
           friendlyFortDamage: false,
           enemyStepSpeed: 120,
           chargeVersusPlayer: versus,
+          playerChargeTimeScale: 0.5,
+          allyStunScale: 0.5,
         );
       case Difficulty.hard:
         final max = (1.5 - steps * 0.025).clamp(1.08, 1.5).toDouble();
@@ -114,6 +129,8 @@ class DifficultyTuning {
           friendlyFortDamage: true,
           enemyStepSpeed: 170,
           chargeVersusPlayer: 0.15,
+          playerChargeTimeScale: 1,
+          allyStunScale: 1,
         );
       case Difficulty.normal:
         // The cycle is at least one full player charge, so Normal bots
@@ -130,6 +147,8 @@ class DifficultyTuning {
           friendlyFortDamage: false,
           enemyStepSpeed: 150,
           chargeVersusPlayer: 1,
+          playerChargeTimeScale: 2 / 3,
+          allyStunScale: 0.75,
         );
     }
   }

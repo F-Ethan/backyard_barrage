@@ -171,10 +171,13 @@ void main() {
     knockOut(game.players);
     game.resolveKnockouts();
     expect(game.phase, MatchPhase.defeat);
+    expect(game.coinCarryLabel, isNull);
+    expect(ads.calls, 0);
     game.update(0.7);
     expect(game.coinCarryLabel, isNotNull);
     expect(ads.calls, 0);
     game.update(1.5);
+    expect(game.coinCarryLabel, isNull);
     expect(ads.calls, 0);
 
     game.retryFromDefeat();
@@ -182,6 +185,7 @@ void main() {
     game.fightSeconds = 120.1;
     knockOut(game.players);
     game.resolveKnockouts();
+    expect(game.coinCarryLabel, isNull);
     expect(ads.calls, 0);
     game.update(0.7);
     expect(game.coinCarryLabel, isNotNull);
@@ -224,10 +228,13 @@ void main() {
     knockOut(game.players);
     game.resolveKnockouts();
     expect(game.phase, MatchPhase.defeat);
+    expect(game.coinCarryLabel, isNull);
+    expect(ads.calls, 0);
     game.update(0.7);
     expect(game.coinCarryLabel, isNotNull);
     expect(ads.calls, 0);
     game.update(1.5);
+    expect(game.coinCarryLabel, isNull);
     expect(ads.calls, 0);
 
     game.exitToMenu();

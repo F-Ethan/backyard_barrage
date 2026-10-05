@@ -12,6 +12,9 @@ dependencies:
   flame: ^1.35.1
   flame_audio: ^2.11.14
   shared_preferences: ^2.5.5
+  google_mobile_ads: ^9.1.0
+  app_tracking_transparency: ^2.0.7
+  in_app_purchase: ^3.3.1
 
 dev_dependencies:
   flutter_test:

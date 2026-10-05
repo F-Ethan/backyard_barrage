@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:backyard_barrage/ads/end_ad.dart';
 import 'package:backyard_barrage/app.dart';
 import 'package:backyard_barrage/audio/game_audio.dart';
 import 'package:backyard_barrage/feel/feel_bus.dart';
@@ -70,7 +71,12 @@ void main() {
       RecordingPulse pulses,
     })
   >
-  boot(WidgetTester tester, MetaState meta, {bool settle = true}) async {
+  boot(
+    WidgetTester tester,
+    MetaState meta, {
+    bool settle = true,
+    EndAd endAd = const NoEndAd(),
+  }) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final store = SaveStore(preferences: prefs);
@@ -87,6 +93,7 @@ void main() {
       settingsStore: settings,
       feel: feel,
       random: math.Random(1),
+      endAd: endAd,
     );
     await primeSprites(game);
     await tester.pumpWidget(
@@ -147,6 +154,50 @@ void main() {
     expect(game.fort.shelters(kid), isTrue);
     expect(game.players[1].sprite, isNot(game.players[1].pickupSprite));
     expect(game.fort.shelters(game.players[1]), isFalse);
+  });
+
+  testWidgets('an end ad waits for a long fight and shows once', (
+    tester,
+  ) async {
+    final ads = _RecordingEndAd();
+    final game = (await boot(tester, MetaState(), endAd: ads)).game;
+    final before = game.fightSeconds;
+    game.update(1.25);
+    expect(game.fightSeconds, closeTo(before + 1.25, 0.02));
+
+    game.fightSeconds = 120;
+    knockOut(game.players);
+    game.resolveKnockouts();
+    expect(game.phase, MatchPhase.defeat);
+    expect(ads.calls, 0);
+
+    game.retryFromDefeat();
+    game.finishEntrance();
+    game.fightSeconds = 120.1;
+    knockOut(game.players);
+    game.resolveKnockouts();
+    expect(ads.calls, 1);
+    expect(ads.lastSeconds, closeTo(120.1, 0.01));
+
+    game.exitToMenu();
+    expect(ads.calls, 1);
+
+    game.fightSeconds = 200;
+    game.exitToMenu();
+    expect(ads.calls, 1);
+  });
+
+  testWidgets('leaving mid-fight does not show an ad', (tester) async {
+    final ads = _RecordingEndAd();
+    final game = (await boot(tester, MetaState(), endAd: ads)).game;
+    game.fightSeconds = 200;
+    game.exitToMenu();
+    expect(game.phase, MatchPhase.fight);
+    expect(ads.calls, 0);
+
+    game.pauseMatch();
+    game.exitToMenu();
+    expect(ads.calls, 1);
   });
 
   testWidgets('clearing a wave opens the shop and the next wave grows', (
@@ -829,6 +880,17 @@ void main() {
     expect(game.camera.viewport.size.x, closeTo(1280, 1));
     expect(game.camera.viewport.size.y, closeTo(720, 1));
   });
+}
+
+class _RecordingEndAd extends EndAd {
+  int calls = 0;
+  double lastSeconds = 0;
+
+  @override
+  Future<void> onRunEnded({required double fightSeconds}) async {
+    calls += 1;
+    lastSeconds = fightSeconds;
+  }
 }
 
 void knockOut(Iterable<KidComponent> kids) {

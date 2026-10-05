@@ -16,12 +16,14 @@ class SettingsOverlay extends StatefulWidget {
     required this.onChanged,
     required this.onClose,
     this.feel,
+    this.onAdPrivacy,
   });
 
   final GameSettings settings;
   final Future<void> Function(GameSettings next) onChanged;
   final VoidCallback onClose;
   final FeelBus? feel;
+  final Future<void> Function()? onAdPrivacy;
 
   @override
   State<SettingsOverlay> createState() => _SettingsOverlayState();
@@ -131,6 +133,18 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                             textAlign: TextAlign.center,
                             style: BarrageType.muted,
                           ),
+                          if (widget.onAdPrivacy != null) ...[
+                            const SizedBox(height: 12),
+                            DraftImageButton(
+                              key: const Key('ad-privacy'),
+                              label: 'Ad privacy',
+                              secondary: true,
+                              width: 180,
+                              height: 48,
+                              feel: widget.feel,
+                              onPressed: () => widget.onAdPrivacy!.call(),
+                            ),
+                          ],
                         ],
                       ),
                     ),

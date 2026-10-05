@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
+import 'ads/end_ad.dart';
 import 'feel/feel_bus.dart';
 import 'game/backyard_barrage_game.dart';
 import 'meta/meta_state.dart';
@@ -23,11 +24,13 @@ class BackyardBarrageApp extends StatefulWidget {
     this.saveStore,
     this.settingsStore,
     this.feel,
+    this.endAd = const NoEndAd(),
   });
 
   final SaveStore? saveStore;
   final SettingsStore? settingsStore;
   final FeelBus? feel;
+  final EndAd endAd;
 
   @override
   State<BackyardBarrageApp> createState() => _BackyardBarrageAppState();
@@ -39,6 +42,12 @@ class _BackyardBarrageAppState extends State<BackyardBarrageApp> {
       widget.settingsStore ?? SettingsStore();
   late final FeelBus _feel = widget.feel ?? FeelBus();
   MetaState? _running;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(widget.endAd.prepare());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,12 +81,15 @@ class _BackyardBarrageAppState extends State<BackyardBarrageApp> {
                 settingsStore: _settingsStore,
                 feel: _feel,
                 onPlay: (meta) => setState(() => _running = meta),
+                onAdPrivacy: widget.endAd.showPrivacyOptions,
               )
             : GameScreen(
                 meta: running,
                 saveStore: _store,
                 settingsStore: _settingsStore,
                 feel: _feel,
+                endAd: widget.endAd,
+                onAdPrivacy: widget.endAd.showPrivacyOptions,
                 onExit: () {
                   unawaited(_feel.enterMenu());
                   setState(() => _running = null);
@@ -96,6 +108,8 @@ class GameScreen extends StatefulWidget {
     required this.settingsStore,
     required this.feel,
     required this.onExit,
+    this.endAd = const NoEndAd(),
+    this.onAdPrivacy,
     this.game,
   });
 
@@ -104,6 +118,8 @@ class GameScreen extends StatefulWidget {
   final SettingsStore settingsStore;
   final FeelBus feel;
   final VoidCallback onExit;
+  final EndAd endAd;
+  final Future<void> Function()? onAdPrivacy;
   final BackyardBarrageGame? game;
 
   @override
@@ -124,6 +140,7 @@ class _GameScreenState extends State<GameScreen> {
           settingsStore: widget.settingsStore,
           feel: widget.feel,
           onExitToMenu: widget.onExit,
+          endAd: widget.endAd,
         );
   }
 
@@ -140,6 +157,7 @@ class _GameScreenState extends State<GameScreen> {
             feel: game.feel,
             onChanged: game.commitSettings,
             onClose: game.closeSettings,
+            onAdPrivacy: widget.onAdPrivacy,
           ),
           'shop': (context, game) => ShopOverlay(game: game),
           'defeat': (context, game) => DefeatOverlay(game: game),

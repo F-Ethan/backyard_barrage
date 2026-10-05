@@ -19,12 +19,14 @@ class MainMenu extends StatefulWidget {
     required this.settingsStore,
     required this.feel,
     required this.onPlay,
+    this.onAdPrivacy,
   });
 
   final SaveStore saveStore;
   final SettingsStore settingsStore;
   final FeelBus feel;
   final ValueChanged<MetaState> onPlay;
+  final Future<void> Function()? onAdPrivacy;
 
   @override
   State<MainMenu> createState() => _MainMenuState();
@@ -180,6 +182,7 @@ class _MainMenuState extends State<MainMenu> {
                 feel: widget.feel,
                 onChanged: _commitSettings,
                 onClose: () => setState(() => _settingsOpen = false),
+                onAdPrivacy: widget.onAdPrivacy,
               ),
           ],
         ),

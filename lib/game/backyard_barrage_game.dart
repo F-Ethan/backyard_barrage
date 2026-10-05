@@ -8,6 +8,8 @@ import 'package:flame/game.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
+import '../ads/ad_policy.dart';
+import '../ads/end_ad.dart';
 import '../feel/feel_bus.dart';
 import '../meta/difficulty.dart';
 import '../meta/game_settings.dart';
@@ -41,6 +43,7 @@ class BackyardBarrageGame extends FlameGame {
     FeelBus? feel,
     math.Random? random,
     this.onExitToMenu,
+    this.endAd = const NoEndAd(),
   }) : _save = saveStore ?? SaveStore(),
        _settings = settingsStore ?? SettingsStore(),
        feel = feel ?? FeelBus(),
@@ -62,6 +65,7 @@ class BackyardBarrageGame extends FlameGame {
 
   final MetaState meta;
   final VoidCallback? onExitToMenu;
+  final EndAd endAd;
   final FeelBus feel;
   final SaveStore _save;
   final SettingsStore _settings;
@@ -117,6 +121,11 @@ class BackyardBarrageGame extends FlameGame {
   static const double entranceSpeed = 280;
 
   static const double _offstage = 180;
+
+  /// Seconds spent in the fight this run. Shop, pause, and banners do not
+  /// count. An end ad needs this to be longer than two minutes.
+  double fightSeconds = 0;
+  bool _endAdOffered = false;
 
   /// Right-hand share of the screen. A hold there charges; release throws.
   static const double chargeScreenFraction = 2 / 3;
@@ -276,6 +285,10 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   void startWave() {
+    if (wave <= 1) {
+      fightSeconds = 0;
+      _endAdOffered = false;
+    }
     _pendingBanner = _Banner.none;
     _bannerTime = 0;
     _clearBanner();
@@ -446,6 +459,7 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   void exitToMenu() {
+    _offerEndAd();
     overlays.clear();
     if (paused) resumeEngine();
     unawaited(persist());
@@ -493,6 +507,7 @@ class BackyardBarrageGame extends FlameGame {
     carriedCoins = meta.coins;
     meta.resetRun();
     unawaited(persist());
+    _offerEndAd();
     _publishHud();
     _showBanner(
       'Crew down',
@@ -622,6 +637,19 @@ class BackyardBarrageGame extends FlameGame {
       Difficulty.easy,
       wave: wave,
     ).scaled(gapScale: meta.allyGapScale, chargeScale: meta.allyChargeScale);
+  }
+
+  /// One interstitial after the run, and never during the fight.
+  void _offerEndAd() {
+    if (!AdPolicy.allows(
+      fightSeconds: fightSeconds,
+      alreadyShown: _endAdOffered,
+      inFight: phase == MatchPhase.fight,
+    )) {
+      return;
+    }
+    _endAdOffered = true;
+    unawaited(endAd.onRunEnded(fightSeconds: fightSeconds));
   }
 
   double _playerChargeSeconds() =>
@@ -1083,6 +1111,7 @@ class BackyardBarrageGame extends FlameGame {
     if (paused || phase == MatchPhase.paused) return;
     super.update(dt);
     _tickEntrance(dt);
+    if (phase == MatchPhase.fight) fightSeconds += dt;
     _tickMove(dt);
     if (_charging) {
       final kid = _selected;

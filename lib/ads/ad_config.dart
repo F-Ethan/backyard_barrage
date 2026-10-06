@@ -24,11 +24,9 @@ class AdConfig {
   static const String androidInterstitialId =
       'ca-app-pub-3940256099942544/1033173712';
 
-  /// A run must last longer than this, in fight time, before an end ad.
-  static const double minFightSeconds = 120;
-
-  /// Or this many cleared waves, whichever comes first.
-  static const int minWavesBeforeAd = 3;
+  /// Wall-clock gap after an interstitial that actually showed.
+  /// The timer is for the app session. It is not saved.
+  static const Duration interstitialCooldown = Duration(minutes: 3);
 
   /// Non-consumable Remove Ads product. Create this same id in App Store
   /// Connect (and sign the Paid Apps agreement) before a store build.

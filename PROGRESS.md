@@ -1,6 +1,6 @@
 # Backyard Barrage progress
 
-Flutter + Flame landscape arena game (winter snowballs / summer water balloons), publisher GameLogic / Ethan. Version `0.1.0+3`. This file tracks leftovers so agents do not drop them.
+Flutter + Flame landscape arena game (winter snowballs / summer water balloons), publisher GameLogic / Ethan. Version `0.1.0+4`. This file tracks leftovers so agents do not drop them.
 
 ## Shipped
 
@@ -38,7 +38,7 @@ Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you n
 - **App icon is unused inside the game UI.** The clash icon is the store/launcher icon only. `web/favicon.png` and `web/icons/` are still the Flutter defaults.
 - **MVP draft generator still paints a placeholder app icon.** `scripts/generate_mvp_drafts.py` writes `ui/app_icon_1024_draft.png`. Re-running it would replace the locked clash bytes.
 - **Walk and throw are single frames.** No multi-frame cycles yet (`docs/STATUS.md`).
-- **End-of-run ads use Google's sample IDs.** An interstitial can show once a run's fight time is longer than 2 minutes or 3 waves are cleared, whichever comes first, once, and never during the fight. A wave clear offers it when the shop opens. A knockout offers it when the coin beat ends. Shop, pause, and walk-on time do not count. Real AdMob IDs are not in the repo. iOS has the test app ID, SKAdNetworkItems, UMP, ATT, and a privacy manifest. Android has the test app ID only. Remove Ads is the non-consumable `dev.gamelogic.backyardbarrage.removeads`. The product still has to be created in App Store Connect, and the Paid Apps agreement still has to be signed. A refund does not clear the on-device entitlement. The Play Billing product is not set up.
+- **End-of-run ads use Google's sample IDs.** An interstitial can show at the end of a run, after the coin beat and before the defeat summary, and when Pause returns to the menu. It never shows during the fight, and a wave-clear shop does not offer one. Another show waits until 3 minutes of wall-clock time have passed since the last interstitial that actually displayed. That timer is for the app session and is not saved. Real AdMob IDs are not in the repo. iOS has the test app ID, SKAdNetworkItems, UMP, ATT, and a privacy manifest. Android has the test app ID only. Remove Ads is the non-consumable `dev.gamelogic.backyardbarrage.removeads`. The product still has to be created in App Store Connect, and the Paid Apps agreement still has to be signed. A refund does not clear the on-device entitlement. The Play Billing product is not set up.
 - **No CI yet.** No `.github/workflows` — analyze/test are local (`flutter analyze`, `flutter test`).
 - **`flutter analyze` reports one pre-existing info.** `prefer_initializing_formals` in `lib/feel/feel_bus.dart`. It is already on `main` and is not part of the icon change.
 - **Classic kit has no icon, toggle, or HUD-chip sprites.** Pause, settings, close, and the on/off switches are drawn in the classic ink/cream style when Modern UI is off. Buttons, panels, chips, hearts, coins, the wordmark, shop cards, and the fort meter use the classic PNGs.

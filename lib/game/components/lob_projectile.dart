@@ -96,7 +96,7 @@ class LobProjectile extends SpriteComponent {
   final bool manualThrow;
   final bool scripted;
 
-  /// Straight depth line for hits. The sprite lofts above [hitPosition].
+  /// Straight depth line for hits. The sprite climbs and drops above it.
   final bool groundTrack;
   final double travelSpeed;
   final double flightRange;
@@ -274,7 +274,15 @@ class LobProjectile extends SpriteComponent {
   void _syncVisual() {
     if (groundTrack && !_falling) {
       final u = flightRange <= 1 ? 1.0 : (_traveled / flightRange);
-      position.setValues(_hit.x, _hit.y - ThrowPhysics.loftAt(u, flightRange));
+      position.setValues(
+        _hit.x,
+        ThrowPhysics.drawnLobY(
+          originY: originY,
+          landingY: landingY,
+          u: u,
+          range: flightRange,
+        ),
+      );
       return;
     }
     position.setValues(

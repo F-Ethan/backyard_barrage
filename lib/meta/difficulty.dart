@@ -18,6 +18,7 @@ class DifficultyTuning {
     required this.allyStunScale,
     required this.enemyHitsToKo,
     this.chargeScale = 1,
+    this.paceScale = 1,
   });
 
   /// Seconds from one enemy throw to the next.
@@ -58,8 +59,14 @@ class DifficultyTuning {
   final double allyStunScale;
 
   /// Hits to put a rival down. Easy is 1, Normal is 2, Hard is 3.
-  /// Allies stay on [CombatRules.hitsToKo].
+  /// Allies stay on [CombatRules.hitsToKo]. Wave 5 and later add
+  /// [WavePlan.bonusHp] on top when the rival curve is on.
   final int enemyHitsToKo;
+
+  /// Extra multiplier on a bot's windup. Throw gaps are already scaled by
+  /// this when the tuning is built. 1 on waves 1–3. The strength rounds use
+  /// [WavePlan.fasterThrowScale].
+  final double paceScale;
 
   /// How long a bot holds the charge pose before releasing.
   ///
@@ -83,7 +90,7 @@ class DifficultyTuning {
     } else {
       seconds = player * chargeVersusPlayer;
     }
-    final scaled = seconds * chargeScale;
+    final scaled = seconds * chargeScale * paceScale;
     if (scaled < 0.2) return 0.2;
     return scaled;
   }
@@ -102,11 +109,41 @@ class DifficultyTuning {
       allyStunScale: allyStunScale,
       enemyHitsToKo: enemyHitsToKo,
       chargeScale: this.chargeScale * chargeScale,
+      paceScale: paceScale,
     );
   }
 
-  static DifficultyTuning of(Difficulty difficulty, {int wave = 1}) {
+  /// Rival pressure from [plan], on top of this difficulty's base.
+  ///
+  /// Faster throws shorten the windup and the gap. Quicker steps raise
+  /// [enemyStepSpeed]. [WavePlan.bonusHp] is added to [enemyHitsToKo].
+  /// Lane rules (how often they step, whether they match a row) stay put.
+  DifficultyTuning withWavePlan(WavePlan plan) {
+    final pace = plan.fasterThrows ? WavePlan.fasterThrowScale : 1.0;
+    final step = plan.quickerSteps ? WavePlan.quickerStepScale : 1.0;
+    return DifficultyTuning(
+      throwGapMin: throwGapMin * pace,
+      throwGapMax: throwGapMax * pace,
+      throwsPerStep: throwsPerStep,
+      matchPlayerRow: matchPlayerRow,
+      friendlyFortDamage: friendlyFortDamage,
+      enemyStepSpeed: enemyStepSpeed * step,
+      chargeVersusPlayer: chargeVersusPlayer,
+      playerChargeTimeScale: playerChargeTimeScale,
+      allyStunScale: allyStunScale,
+      enemyHitsToKo: enemyHitsToKo + plan.bonusHp,
+      chargeScale: chargeScale,
+      paceScale: paceScale * pace,
+    );
+  }
+
+  static DifficultyTuning of(
+    Difficulty difficulty, {
+    int wave = 1,
+    bool rivalCurve = false,
+  }) {
     final steps = wave < 1 ? 0 : wave - 1;
+    final DifficultyTuning base;
     switch (difficulty) {
       case Difficulty.easy:
         // Longer than a full player charge, so the player finishes first.
@@ -115,7 +152,7 @@ class DifficultyTuning {
         final max = (hold + 1.1 - steps * 0.05)
             .clamp(hold, hold + 1.1)
             .toDouble();
-        return DifficultyTuning(
+        base = DifficultyTuning(
           throwGapMin: hold,
           throwGapMax: max,
           throwsPerStep: 2,
@@ -129,7 +166,7 @@ class DifficultyTuning {
         );
       case Difficulty.hard:
         final max = (1.5 - steps * 0.025).clamp(1.08, 1.5).toDouble();
-        return DifficultyTuning(
+        base = DifficultyTuning(
           throwGapMin: 1,
           throwGapMax: max,
           throwsPerStep: 1,
@@ -148,7 +185,7 @@ class DifficultyTuning {
         final max = (hold + 0.6 - steps * 0.04)
             .clamp(hold, hold + 0.6)
             .toDouble();
-        return DifficultyTuning(
+        base = DifficultyTuning(
           throwGapMin: hold,
           throwGapMax: max,
           throwsPerStep: 1,
@@ -161,6 +198,8 @@ class DifficultyTuning {
           enemyHitsToKo: 2,
         );
     }
+    if (!rivalCurve) return base;
+    return base.withWavePlan(WavePlan.forWave(wave));
   }
 
   double throwGap(double random01) {

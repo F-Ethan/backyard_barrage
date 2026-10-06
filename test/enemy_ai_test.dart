@@ -221,6 +221,68 @@ void main() {
       expect(later.throwGapMax, lessThan(normal.throwGapMax));
     });
 
+    test('the six-wave curve speeds rivals, then adds a hit', () {
+      final base = DifficultyTuning.of(Difficulty.normal);
+      final wave4 = DifficultyTuning.of(
+        Difficulty.normal,
+        wave: 4,
+        rivalCurve: true,
+      );
+      final wave5 = DifficultyTuning.of(
+        Difficulty.normal,
+        wave: 5,
+        rivalCurve: true,
+      );
+      final charge = CombatRules.playerChargeSeconds(0);
+      expect(wave4.enemyHitsToKo, base.enemyHitsToKo);
+      expect(wave4.throwGapMin, lessThan(base.throwGapMin));
+      expect(
+        wave4.throwGapMin,
+        closeTo(base.throwGapMin * WavePlan.fasterThrowScale, 0.01),
+      );
+      expect(
+        wave4.botChargeSeconds(charge),
+        closeTo(
+          base.botChargeSeconds(charge) * WavePlan.fasterThrowScale,
+          0.02,
+        ),
+      );
+      expect(
+        wave4.enemyStepSpeed,
+        closeTo(base.enemyStepSpeed * WavePlan.quickerStepScale, 0.01),
+      );
+      expect(wave4.throwsPerStep, base.throwsPerStep);
+      expect(wave4.matchPlayerRow, base.matchPlayerRow);
+      expect(wave5.enemyHitsToKo, base.enemyHitsToKo + 1);
+      expect(
+        DifficultyTuning.of(
+          Difficulty.easy,
+          wave: 5,
+          rivalCurve: true,
+        ).enemyHitsToKo,
+        2,
+      );
+      expect(
+        DifficultyTuning.of(
+          Difficulty.hard,
+          wave: 5,
+          rivalCurve: true,
+        ).enemyHitsToKo,
+        4,
+      );
+      expect(DifficultyTuning.of(Difficulty.easy, wave: 6).enemyHitsToKo, 1);
+      final hardPressed = DifficultyTuning.of(
+        Difficulty.hard,
+        wave: 6,
+        rivalCurve: true,
+      );
+      expect(
+        hardPressed.enemyStepSpeed,
+        lessThan(ThrowPhysics.kidMoveSpeed() * 4),
+      );
+      expect(hardPressed.botChargeSeconds(charge), greaterThanOrEqualTo(0.2));
+    });
+
     test('aim jitter stays inside the requested angle', () {
       final base = Vector2(-1, -0.4);
       final baseAngle = math.atan2(base.y, base.x);

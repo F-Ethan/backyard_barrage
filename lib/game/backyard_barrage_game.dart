@@ -674,8 +674,11 @@ class BackyardBarrageGame extends FlameGame {
     }
   }
 
-  DifficultyTuning _tuning() =>
-      DifficultyTuning.of(feel.settings.difficulty, wave: wave);
+  DifficultyTuning _tuning() => DifficultyTuning.of(
+    feel.settings.difficulty,
+    wave: wave,
+    rivalCurve: true,
+  );
 
   DifficultyTuning _allyTuning() {
     return DifficultyTuning.of(

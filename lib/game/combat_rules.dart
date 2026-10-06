@@ -23,6 +23,95 @@ class HitResolution {
   final bool knockedOut;
 }
 
+/// How one wave is staffed. The climb is six waves, then the last step holds.
+///
+/// | Wave | Rivals | Throws and steps | HP on top of Easy/Normal/Hard |
+/// | --- | --- | --- | --- |
+/// | 1 | 1 | base | +0 |
+/// | 2 | 2 | base | +0 |
+/// | 3 | 3 | base | +0 |
+/// | 4 | 3 | faster throws, quicker steps | +0 |
+/// | 5 | 3 | those buffs | +1 |
+/// | 6 | 4 | those buffs | +1 |
+/// | 7+ | 5 | those buffs | +1 |
+///
+/// Waves 1–3 add bodies. Waves 4 and 5 stay at 3 and make each rival
+/// harder. Waves 6 and 7 add bodies again, then the count stops so a long
+/// run does not keep filling the yard.
+class WavePlan {
+  const WavePlan({
+    required this.rivalCount,
+    required this.fasterThrows,
+    required this.quickerSteps,
+    required this.bonusHp,
+  });
+
+  final int rivalCount;
+
+  /// Shorter windup and a shorter gap between throws.
+  final bool fasterThrows;
+
+  /// Higher step speed. Lane rules stay on the difficulty.
+  final bool quickerSteps;
+
+  /// Added to Easy 1 / Normal 2 / Hard 3. Allies do not use this.
+  final int bonusHp;
+
+  /// Multiplier on rival windup and throw gap when [fasterThrows] is set.
+  static const double fasterThrowScale = 0.78;
+
+  /// Multiplier on rival step speed when [quickerSteps] is set.
+  static const double quickerStepScale = 1.35;
+
+  static WavePlan forWave(int wave) {
+    final n = wave < 1 ? 1 : wave;
+    return switch (n) {
+      1 => const WavePlan(
+        rivalCount: 1,
+        fasterThrows: false,
+        quickerSteps: false,
+        bonusHp: 0,
+      ),
+      2 => const WavePlan(
+        rivalCount: 2,
+        fasterThrows: false,
+        quickerSteps: false,
+        bonusHp: 0,
+      ),
+      3 => const WavePlan(
+        rivalCount: 3,
+        fasterThrows: false,
+        quickerSteps: false,
+        bonusHp: 0,
+      ),
+      4 => const WavePlan(
+        rivalCount: 3,
+        fasterThrows: true,
+        quickerSteps: true,
+        bonusHp: 0,
+      ),
+      5 => const WavePlan(
+        rivalCount: 3,
+        fasterThrows: true,
+        quickerSteps: true,
+        bonusHp: 1,
+      ),
+      6 => const WavePlan(
+        rivalCount: 4,
+        fasterThrows: true,
+        quickerSteps: true,
+        bonusHp: 1,
+      ),
+      _ => const WavePlan(
+        rivalCount: 5,
+        fasterThrows: true,
+        quickerSteps: true,
+        bonusHp: 1,
+      ),
+    };
+  }
+}
+
 /// Wave size, fort cover, and upgrade scaling. Pure so tests can lock it.
 class CombatRules {
   const CombatRules._();
@@ -41,10 +130,7 @@ class CombatRules {
   /// Half of the previous 5.625s lock.
   static const double allyStunSeconds = 7.5 * 3 / 8;
 
-  static int enemyCountForWave(int wave) {
-    if (wave <= 1) return 1;
-    return 3;
-  }
+  static int enemyCountForWave(int wave) => WavePlan.forWave(wave).rivalCount;
 
   /// Fort HP regenerates to this value at the start of every wave.
   static int fortMaxHp(int stage) {

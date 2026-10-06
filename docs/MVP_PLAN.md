@@ -57,7 +57,7 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | Depth | Kids and snowballs draw smaller toward the far edge (75% of the near-edge size) and full size toward the camera. Scale is anchored at a kid's feet. Rivals still take about 1.2s per column |
 | Walk | Left two-thirds of the screen. Drag and the selected kid follows the finger inside their half, at the locked rate of six times the old cell walk. Difficulty does not change that speed. A tap on a kid selects them |
 | Active thrower | One kid is selected and shows a soft glow. The others throw on Easy |
-| Enemy count | Wave 1 is 1 rival. Later waves are 3 |
+| Enemy count | Waves 1–6 climb: 1, 2, 3, then 3 with faster throws and steps, then 3 with those buffs plus 1 HP on the difficulty base, then 4. Wave 7+ holds at 5 with the buffs |
 | Win | All enemies KO’d |
 | Lose | All player kids KO’d |
 

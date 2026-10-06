@@ -23,7 +23,9 @@ void main() {
     final metaStore = SaveStore(preferences: prefs);
     final settingsStore = SettingsStore(preferences: prefs);
 
-    await metaStore.save((await metaStore.load())..coins = 9);
+    final profile = await metaStore.load();
+    profile.arcade.coins = 9;
+    await metaStore.save(profile.arcade);
     await settingsStore.save(
       const GameSettings(
         sfxEnabled: false,
@@ -38,7 +40,7 @@ void main() {
     expect(loaded.musicEnabled, isFalse);
     expect(loaded.hapticsEnabled, isFalse);
     expect(await SaveStore(preferences: prefs).load(), isNotNull);
-    expect((await SaveStore(preferences: prefs).load()).coins, 9);
+    expect((await SaveStore(preferences: prefs).load()).arcade.coins, 9);
     expect(SettingsStore.storageKey, isNot(SaveStore.storageKey));
   });
 

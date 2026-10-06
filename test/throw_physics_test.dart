@@ -48,38 +48,32 @@ void main() {
       expect(velocity.y, lessThan(0));
     });
 
-    test(
-      'charge anchors: tap is a third, one second is half, three seconds is full',
-      () {
-        const duration = 3.0;
-        expect(
-          ThrowPhysics.chargeForHold(0, duration),
-          closeTo(ThrowPhysics.minThrowCharge, 0.001),
-        );
-        expect(
-          ThrowPhysics.chargeForHold(0.12, duration),
-          closeTo(1 / 3, 0.02),
-        );
-        expect(ThrowPhysics.chargeForHold(1, duration), closeTo(0.5, 0.03));
-        expect(ThrowPhysics.chargeForHold(duration, duration), 1);
-        expect(ThrowPhysics.chargeForHold(4, duration), 1);
+    test('charge anchors: tap is a third, one second is half, three seconds is full', () {
+      const duration = 3.0;
+      expect(
+        ThrowPhysics.chargeForHold(0, duration),
+        closeTo(ThrowPhysics.minThrowCharge, 0.001),
+      );
+      expect(ThrowPhysics.chargeForHold(0.12, duration), closeTo(1 / 3, 0.02));
+      expect(ThrowPhysics.chargeForHold(1, duration), closeTo(0.5, 0.03));
+      expect(ThrowPhysics.chargeForHold(duration, duration), 1);
+      expect(ThrowPhysics.chargeForHold(4, duration), 1);
 
-        // The top half of the bar (1/2 → 1) takes the remaining two seconds.
-        expect(ThrowPhysics.chargeForHold(0.85, duration), lessThan(0.5));
-        expect(ThrowPhysics.chargeForHold(2, duration), greaterThan(0.5));
-        expect(ThrowPhysics.chargeForHold(2, duration), lessThan(1));
+      // The top half of the bar (1/2 → 1) takes the remaining two seconds.
+      expect(ThrowPhysics.chargeForHold(0.85, duration), lessThan(0.5));
+      expect(ThrowPhysics.chargeForHold(2, duration), greaterThan(0.5));
+      expect(ThrowPhysics.chargeForHold(2, duration), lessThan(1));
 
-        double step(double t) {
-          const dt = 0.25;
-          return ThrowPhysics.chargeForHold(t + dt, duration) -
-              ThrowPhysics.chargeForHold(t, duration);
-        }
+      double step(double t) {
+        const dt = 0.25;
+        return ThrowPhysics.chargeForHold(t + dt, duration) -
+            ThrowPhysics.chargeForHold(t, duration);
+      }
 
-        // Past the halfway mark the half-bell keeps slowing down.
-        expect(step(1.1), greaterThan(step(1.8)));
-        expect(step(1.8), greaterThan(step(2.5)));
-      },
-    );
+      // Past the halfway mark the half-bell keeps slowing down.
+      expect(step(1.1), greaterThan(step(1.8)));
+      expect(step(1.8), greaterThan(step(2.5)));
+    });
 
     test('full power reaches the enemy half and a tap does not', () {
       final size = Vector2(152, 152);
@@ -250,9 +244,54 @@ void main() {
         }
         previousX = x;
       }
-      expect(ThrowPhysics.loftAt(0.5, lob.range), greaterThan(40));
+      expect(ThrowPhysics.loftAt(0.5, lob.range), ThrowPhysics.visualLoftPeak);
       expect(ThrowPhysics.loftAt(0, lob.range), closeTo(0, 0.001));
       expect(ThrowPhysics.loftAt(1, lob.range), closeTo(0, 0.001));
+    });
+
+    test('drawn loft stays short and does not fight up-aim or down-aim', () {
+      final short = ThrowPhysics.loftAt(0.5, 200);
+      final long = ThrowPhysics.loftAt(0.5, 1000);
+      expect(short, ThrowPhysics.visualLoftPeak);
+      expect(long, short);
+      expect(short, lessThanOrEqualTo(16));
+      expect(ThrowPhysics.loftAt(0, 1000), closeTo(0, 0.001));
+      expect(ThrowPhysics.loftAt(1, 1000), closeTo(0, 0.001));
+      expect(ThrowPhysics.loftAt(0.25, 800), lessThan(short));
+
+      final originY = ArenaGrid.laneY(4);
+      final up = ThrowPhysics.planPlayerLob(
+        throwerRow: 4,
+        throwerColumn: 1,
+        aimDirection: ThrowPhysics.aimForElevation(
+          ThrowPhysics.maxAimRadians,
+          facingRight: true,
+        ),
+        charge: 1,
+        facingRight: true,
+        originY: originY,
+      );
+      final down = ThrowPhysics.planPlayerLob(
+        throwerRow: 4,
+        throwerColumn: 1,
+        aimDirection: ThrowPhysics.aimForElevation(
+          -ThrowPhysics.maxAimRadians,
+          facingRight: true,
+        ),
+        charge: 1,
+        facingRight: true,
+        originY: originY,
+      );
+      expect(up.groundTrack, isTrue);
+      expect(down.groundTrack, isTrue);
+      expect(down.yAt(0.5), greaterThan(up.yAt(0.5)));
+      final upDrawn = up.yAt(0.5) - ThrowPhysics.loftAt(0.5, up.range);
+      final downDrawn = down.yAt(0.5) - ThrowPhysics.loftAt(0.5, down.range);
+      expect(downDrawn - upDrawn, closeTo(down.yAt(0.5) - up.yAt(0.5), 0.001));
+      expect(
+        up.yAt(0.5) - upDrawn,
+        lessThanOrEqualTo(ThrowPhysics.visualLoftPeak),
+      );
     });
 
     test('a short enemy lob is the cue to step closer', () {

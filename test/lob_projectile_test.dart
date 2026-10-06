@@ -26,6 +26,33 @@ void main() {
     sprite = Sprite(image);
   });
 
+  test('a ground-track lob draws only a short loft above the hit path', () {
+    final lane = ArenaGrid.laneY(4);
+    final shot = LobProjectile(
+      sprite: sprite,
+      position: Vector2(220, lane),
+      velocity: Vector2(ThrowPhysics.playerTravelSpeed, 0),
+      targets: <KidComponent>[],
+      onHit: (_, _) {},
+      groundTrack: true,
+      travelSpeed: ThrowPhysics.playerTravelSpeed,
+      flightRange: 800,
+      throwerRow: 4,
+      landingRow: 4,
+      landingY: lane,
+    );
+
+    var peakLift = 0.0;
+    for (var i = 0; i < 40; i++) {
+      shot.update(1 / 60);
+      final lift = shot.hitPosition.y - shot.position.y;
+      if (lift > peakLift) peakLift = lift;
+    }
+
+    expect(peakLift, greaterThan(0));
+    expect(peakLift, lessThanOrEqualTo(ThrowPhysics.visualLoftPeak + 0.01));
+  });
+
   test('a scripted miss arches, then splats on the ground once', () {
     final lane = ArenaGrid.laneY(4);
     final origin = Vector2(220, lane);

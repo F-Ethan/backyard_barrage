@@ -32,7 +32,7 @@ import 'throw_physics.dart';
 
 enum MatchPhase { entering, fight, clearing, defeat, shop, paused }
 
-enum _Banner { none, waveKo, waveDone, defeatKo, defeatCoins }
+enum _Banner { none, waveIntro, waveKo, waveDone, defeatKo, defeatCoins }
 
 /// Landscape backyard arena: charge on the swivel, lob, then shop between waves.
 class BackyardBarrageGame extends FlameGame {
@@ -385,6 +385,7 @@ class BackyardBarrageGame extends FlameGame {
     );
     fort.placeOnRow(ArenaGrid.rollFortRow(_rng));
     enemyFort.placeOnRow(ArenaGrid.rollFortRow(_rng));
+    _showWaveIntro();
     _publishHud();
     unawaited(feel.enterBattle(meta.season));
   }
@@ -416,7 +417,7 @@ class BackyardBarrageGame extends FlameGame {
       poses: player ? _kit.playerPoses : _kit.enemyPoses,
       position: ArenaGrid.slot(side, slot),
       size: Vector2.all(ArenaGrid.kidSize),
-      maxHp: CombatRules.hitsToKo,
+      maxHp: player ? CombatRules.hitsToKo : _tuning().enemyHitsToKo,
     );
   }
 
@@ -567,6 +568,9 @@ class BackyardBarrageGame extends FlameGame {
         _offerEndAd();
         overlays.add('defeat');
         pauseEngine();
+      case _Banner.waveIntro:
+        _pendingBanner = _Banner.none;
+        _clearBanner();
       case _Banner.none:
         break;
     }
@@ -592,6 +596,20 @@ class BackyardBarrageGame extends FlameGame {
   void _clearBanner() {
     _banner?.removeFromParent();
     _banner = null;
+  }
+
+  /// Center title for the walk-on. Cleared when the crews reach their spots.
+  void _showWaveIntro() {
+    _showBanner('Wave $wave', fontSize: 56, color: const Color(0xFF1A2332));
+    _pendingBanner = _Banner.waveIntro;
+    _bannerTime = 0;
+  }
+
+  void _clearWaveIntro() {
+    if (_pendingBanner != _Banner.waveIntro) return;
+    _pendingBanner = _Banner.none;
+    _bannerTime = 0;
+    _clearBanner();
   }
 
   /// Label while the coin beat is on screen. Null before and after it.
@@ -636,6 +654,7 @@ class BackyardBarrageGame extends FlameGame {
     if (!waiting) {
       final held = _chargeArmed;
       _entrance.clear();
+      _clearWaveIntro();
       phase = MatchPhase.fight;
       if (held) _beginHeldCharge();
     }
@@ -701,7 +720,8 @@ class BackyardBarrageGame extends FlameGame {
 
   /// Throw-rank hold before Easy or Normal shortens the player's bar.
   /// Bots scale from this, so their windup stays put when the bar speeds up.
-  double _baseChargeSeconds() => CombatRules.playerChargeSeconds(meta.throwRank);
+  double _baseChargeSeconds() =>
+      CombatRules.playerChargeSeconds(meta.throwRank);
 
   double _playerChargeSeconds() =>
       _baseChargeSeconds() * _tuning().playerChargeTimeScale;
@@ -975,6 +995,8 @@ class BackyardBarrageGame extends FlameGame {
     final hits = fromPlayer ? meta.hitsFor(manualThrow: shot.manualThrow) : 1;
     final ally = target.side == KidSide.player;
     var scale = meta.stunScaleFor(ally: ally);
+    // Difficulty shortens ally stun only. Rival brush-off and knockdown
+    // stay the same length on Easy, Normal, and Hard.
     if (ally) scale *= _tuning().allyStunScale;
     for (var i = 0; i < hits && !target.isKo; i++) {
       target.takeHit(stunScale: scale);
@@ -1201,7 +1223,9 @@ class BackyardBarrageGame extends FlameGame {
         _publishCharge();
       }
     }
-    if (_pendingBanner != _Banner.none) {
+    // The wave title stays up for the whole walk-on, then _tickEntrance
+    // clears it. Other banners still run on a timer.
+    if (_pendingBanner != _Banner.none && _pendingBanner != _Banner.waveIntro) {
       _bannerTime -= dt;
       if (_bannerTime <= 0) _advanceBanner();
     }

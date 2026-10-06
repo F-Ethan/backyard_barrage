@@ -321,12 +321,22 @@ class ThrowPhysics {
     return Vector2(forward * math.cos(clamped), -math.sin(clamped));
   }
 
+  /// Peak of the drawn snowball hump, in pixels.
+  ///
+  /// Collision stays on the ground track. This lift is only so the sprite
+  /// reads as a throw. It does not grow with range, so an up-aim and a
+  /// down-aim keep the depth the ground track already chose.
+  static const double visualLoftPeak = 12;
+
   /// Drawn loft above the ground track. Zero at the hand and at the landing.
+  ///
+  /// [range] does not change the height. A long throw and a short throw
+  /// share [visualLoftPeak].
   static double loftAt(double u, double range) {
     final uu = u.clamp(0.0, 1.0);
-    final height = (range.abs() * 0.18).clamp(48.0, 120.0);
+    if (range.isNaN) return 0;
     final s = math.sin(math.pi * uu);
-    return height * s * s;
+    return visualLoftPeak * s * s;
   }
 
   /// Contact in ground-track space. The depth window is tighter than the

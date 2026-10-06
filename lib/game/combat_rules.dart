@@ -27,8 +27,8 @@ class HitResolution {
 class CombatRules {
   const CombatRules._();
 
-  /// Snowballs to put a rival down for good. An ally can go out sooner if
-  /// they are hit again while the first hit's stun is still up.
+  /// Snowballs to put an ally down for good, unless a second hit lands
+  /// during the first hit's stun. Rivals use DifficultyTuning.enemyHitsToKo.
   static const int hitsToKo = 3;
 
   /// Enemy hit 1. A short flinch; they cannot throw through it.
@@ -89,10 +89,12 @@ class CombatRules {
 
   /// One snowball.
   ///
-  /// Rivals always take [hitsToKo] hits: a brief brush-off, a knockdown
-  /// they get up from, then out. Allies lock up for [allyStunSeconds] on a
-  /// hit that does not finish them; another hit while that stun (or the
-  /// fragile flag it sets) is up knocks them out.
+  /// Rivals take [maxHp] hits. With three, that is a brief brush-off, a
+  /// knockdown they get up from, then out. Fewer hits skip the later beats
+  /// and KO sooner. The brush-off and knockdown lengths do not change with
+  /// difficulty. Allies lock up for [allyStunSeconds] on a hit that does
+  /// not finish them; another hit while that stun (or the fragile flag it
+  /// sets) is up knocks them out.
   static HitResolution resolveHit({
     required bool ally,
     required int hp,

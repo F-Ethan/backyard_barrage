@@ -195,10 +195,14 @@ void main() {
       expect(hard.throwGapMin, greaterThanOrEqualTo(1));
       expect(easy.playerChargeTimeScale, 0.5);
       expect(easy.allyStunScale, 0.5);
+      expect(easy.enemyHitsToKo, 1);
       expect(normal.playerChargeTimeScale, closeTo(2 / 3, 0.0001));
       expect(normal.allyStunScale, 0.75);
+      expect(normal.enemyHitsToKo, 2);
       expect(hard.playerChargeTimeScale, 1);
       expect(hard.allyStunScale, 1);
+      expect(hard.enemyHitsToKo, 3);
+      expect(easy.scaled().enemyHitsToKo, easy.enemyHitsToKo);
       expect(normal.friendlyFortDamage, isFalse);
       expect(easy.friendlyFortDamage, isFalse);
       expect(hard.friendlyFortDamage, isTrue);

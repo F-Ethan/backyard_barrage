@@ -166,6 +166,40 @@ void main() {
       expect(after.hp, 1);
     });
 
+    test('fewer enemy hits KO sooner and keep the brush-off length', () {
+      final one = CombatRules.resolveHit(
+        ally: false,
+        hp: 1,
+        maxHp: 1,
+        stunned: false,
+        fragile: false,
+      );
+      expect(one.knockedOut, isTrue);
+      expect(one.lockSeconds, 0);
+
+      final brush = CombatRules.resolveHit(
+        ally: false,
+        hp: 2,
+        maxHp: 2,
+        stunned: false,
+        fragile: false,
+      );
+      expect(brush.knockedOut, isFalse);
+      expect(brush.knockdown, isFalse);
+      expect(brush.hp, 1);
+      expect(brush.lockSeconds, CombatRules.enemyBrushOffSeconds);
+
+      final ko = CombatRules.resolveHit(
+        ally: false,
+        hp: brush.hp,
+        maxHp: 2,
+        stunned: true,
+        fragile: false,
+      );
+      expect(ko.knockedOut, isTrue);
+      expect(ko.hp, 0);
+    });
+
     test('taller forts reach higher', () {
       final anchor = Vector2(280, 670);
       final size = Vector2.all(360);

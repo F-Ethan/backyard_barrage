@@ -39,11 +39,11 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 ## 3. Core gameplay (MVP)
 
 ### 3.1 Match loop
-1. Pick season (Winter / Summer) — or default last played  
+1. Pick Arcade or Campaign, and a season (Winter / Summer) — or default last played  
 2. Enter backyard arena (landscape)  
 3. Control one kid; hold to charge, release on the swivel to throw  
 4. KO all enemies → win round → earn currency → upgrade shop → next wave  
-5. Lose all kids → run over → summary + retry  
+5. Lose all kids → Arcade wipes skills (coins stay) or Campaign keeps skills → summary + retry at wave 1  
 
 ### 3.2 Combat rules
 | Rule | MVP value |
@@ -67,7 +67,9 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 - Left two-thirds: drag and the selected kid follows the finger inside their half. They are not snapped to a cell. A tap on a living kid selects them and keeps their feet until the finger moves. A tap on open ground sends them to that spot. The yard's columns and rows still place forts, rivals, and throw lanes.
 - Kids you are not controlling throw and step like Easy rivals.
 - Each side stays on its own half. The middle band is neutral. The yard grid still places rivals and forts. It does not lock the player's feet or the snowball's hit row.
-- A loss resets the run: wave progress and every skill node (crew, fort, throw, and the rest of the tree) go back to a new game. Unspent coins carry into the next run's wallet. Season and best wave stay. Retry starts at wave 1.
+- Arcade loss: wave progress and every skill node (crew, fort, throw, and the rest of the tree) go back to a new game. Unspent coins stay in the Arcade wallet. Retry starts at wave 1.
+- Campaign loss: skills and coins stay. Retry starts at wave 1, not the wave you lost. Campaign coins are a separate wallet.
+- Season is shared. Best wave is kept per mode. The home screen shows the highest Campaign wave.
 - Lock orientation: landscape left/right only  
 
 ### 3.4 AI (simple)
@@ -104,7 +106,7 @@ Same rules; swap:
 - Arena tint / props (snow vs grass)  
 - Kid outerwear (coat vs tee)  
 
-Player **chooses** season on main menu. No real-world lock in MVP.
+Player **chooses** season on main menu (a small text toggle; the mode cards lead). No real-world lock in MVP. The home backdrop follows the season.
 
 ### 3.7 Explicitly deferred
 - Spring / fall seasons  
@@ -119,11 +121,11 @@ Player **chooses** season on main menu. No real-world lock in MVP.
 ## 4. Screens & UX flow
 
 1. **Splash / title** — Backyard Barrage  
-2. **Main menu** — Play, Season toggle (Winter/Summer), Upgrades preview, Settings  
+2. **Main menu** — Arcade and Campaign, a quiet season control, Settings. The yard behind the menu follows the season. Highest Campaign wave is shown large.  
 3. **Arena HUD** — kid HP pips, fort bar, charge bar, pause  
 4. **Wave clear** — coins earned, Continue  
 5. **Skill tree** — buy the next node in a branch, Continue to next wave  
-6. **Defeat summary** — a short coin beat for the unspent amount, then waves cleared, coins carried over, Skills / Retry / Menu  
+6. **Defeat summary** — a short coin beat for the unspent amount, then waves cleared, coins carried over, Skills / Retry / Menu. Arcade has wiped skills. Campaign still has them. Retry is wave 1 either way.  
 7. **Settings** — SFX/music, haptics, credits  
 
 Accessibility: large hit targets; consider OpenDyslexic-friendly UI font option later.

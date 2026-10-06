@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:backyard_barrage/meta/meta_state.dart';
+import 'package:backyard_barrage/meta/play_mode.dart';
+import 'package:backyard_barrage/meta/player_save.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
 import 'package:backyard_barrage/meta/skill_tree.dart';
 import 'package:backyard_barrage/seasons/season.dart';
@@ -70,6 +74,61 @@ void main() {
       expect(meta.bestWave, 6);
       expect(meta.buyThrowSpeed(), isTrue);
       expect(meta.throwRank, 1);
+    });
+
+    test('campaign defeat keeps skills, coins, and the best wave', () {
+      final meta = MetaState(
+        mode: PlayMode.campaign,
+        coins: 80,
+        crewSize: 3,
+        fortStage: 2,
+        throwRank: 2,
+        season: Season.summer,
+        bestWave: 6,
+      );
+      meta.buy('shield-1');
+      meta.resetRun();
+      expect(meta.mode, PlayMode.campaign);
+      expect(meta.coins, 80 - 36);
+      expect(meta.owns('team-2'), isTrue);
+      expect(meta.owns('team-3'), isTrue);
+      expect(meta.owns('fort-2'), isTrue);
+      expect(meta.owns('throw-2'), isTrue);
+      expect(meta.owns('shield-1'), isTrue);
+      expect(meta.crewSize, 3);
+      expect(meta.fortStage, 2);
+      expect(meta.throwRank, 2);
+      expect(meta.season, Season.summer);
+      expect(meta.bestWave, 6);
+    });
+
+    test('arcade and campaign wallets do not share coins or skills', () {
+      final profile = PlayerSave(
+        season: Season.winter,
+        arcade: MetaState(mode: PlayMode.arcade, coins: 100, bestWave: 2),
+        campaign: MetaState(
+          mode: PlayMode.campaign,
+          coins: 100,
+          crewSize: 2,
+          bestWave: 5,
+        ),
+      );
+      expect(profile.arcade.buyExtraKid(), isTrue);
+      profile.arcade.resetRun();
+      expect(profile.arcade.coins, 82);
+      expect(profile.arcade.skills, isEmpty);
+      expect(profile.arcade.bestWave, 2);
+      expect(profile.campaign.coins, 100);
+      expect(profile.campaign.crewSize, 2);
+      expect(profile.campaign.bestWave, 5);
+
+      profile.campaign.noteWaveCleared(7);
+      profile.campaign.resetRun();
+      expect(profile.campaign.bestWave, 7);
+      expect(profile.campaign.crewSize, 2);
+      expect(profile.campaign.coins, 100);
+      expect(profile.arcade.bestWave, 2);
+      expect(profile.arcade.coins, 82);
     });
 
     test('a node stays locked until its parent is owned', () {
@@ -179,11 +238,12 @@ void main() {
     );
   });
 
-  test('save store round trip', () async {
+  test('save store round trip keeps the other wallet', () async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final store = SaveStore(preferences: prefs);
-    final state = MetaState(
+    final arcade = MetaState(
+      mode: PlayMode.arcade,
       coins: 18,
       crewSize: 2,
       fortStage: 2,
@@ -191,13 +251,74 @@ void main() {
       season: Season.summer,
       bestWave: 4,
     );
-    await store.save(state);
-    final loaded = await store.load();
-    expect(loaded.coins, 18);
-    expect(loaded.crewSize, 2);
-    expect(loaded.fortStage, 2);
-    expect(loaded.throwRank, 1);
+    await store.save(arcade);
+    await store.save(
+      MetaState(
+        mode: PlayMode.campaign,
+        coins: 9,
+        crewSize: 3,
+        season: Season.summer,
+        bestWave: 6,
+      ),
+    );
+    final loaded = await SaveStore(preferences: prefs).load();
     expect(loaded.season, Season.summer);
-    expect(loaded.bestWave, 4);
+    expect(loaded.mode, PlayMode.campaign);
+    expect(loaded.arcade.coins, 18);
+    expect(loaded.arcade.crewSize, 2);
+    expect(loaded.arcade.fortStage, 2);
+    expect(loaded.arcade.throwRank, 1);
+    expect(loaded.arcade.bestWave, 4);
+    expect(loaded.arcade.skills, isNot(contains('team-3')));
+    expect(loaded.campaign.coins, 9);
+    expect(loaded.campaign.crewSize, 3);
+    expect(loaded.campaign.bestWave, 6);
+    expect(loaded.campaign.owns('team-3'), isTrue);
+  });
+
+  test('an older single-meta save migrates into arcade', () async {
+    final legacy = {
+      'coins': 21,
+      'crewSize': 2,
+      'fortStage': 1,
+      'throwRank': 1,
+      'skills': ['team-2', 'throw-1'],
+      'season': 'summer',
+      'bestWave': 4,
+    };
+    SharedPreferences.setMockInitialValues({
+      SaveStore.storageKey: jsonEncode(legacy),
+    });
+    final prefs = await SharedPreferences.getInstance();
+    final store = SaveStore(preferences: prefs);
+    final profile = await store.load();
+    expect(profile.mode, PlayMode.arcade);
+    expect(profile.season, Season.summer);
+    expect(profile.arcade.coins, 21);
+    expect(profile.arcade.crewSize, 2);
+    expect(profile.arcade.throwRank, 1);
+    expect(profile.arcade.bestWave, 4);
+    expect(profile.arcade.owns('team-2'), isTrue);
+    expect(profile.campaign.coins, 0);
+    expect(profile.campaign.skills, isEmpty);
+    expect(profile.campaign.bestWave, 0);
+
+    profile.campaign.coins = 8;
+    profile.campaign.bestWave = 2;
+    profile.campaign.mode = PlayMode.campaign;
+    await store.save(profile.campaign);
+    final again = await SaveStore(preferences: prefs).load();
+    expect(again.arcade.coins, 21);
+    expect(again.arcade.owns('throw-1'), isTrue);
+    expect(again.campaign.coins, 8);
+    expect(again.campaign.bestWave, 2);
+    expect(again.campaign.skills, isEmpty);
+    expect(again.season, Season.summer);
+    final raw =
+        jsonDecode(prefs.getString(SaveStore.storageKey)!)
+            as Map<String, dynamic>;
+    expect(raw['v'], 2);
+    expect(raw['arcade'], isA<Map<String, dynamic>>());
+    expect(raw['campaign'], isA<Map<String, dynamic>>());
   });
 }

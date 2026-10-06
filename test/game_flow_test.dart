@@ -17,6 +17,7 @@ import 'package:backyard_barrage/game/components/overlay_banner.dart';
 import 'package:backyard_barrage/game/throw_physics.dart';
 import 'package:backyard_barrage/meta/difficulty.dart';
 import 'package:backyard_barrage/meta/meta_state.dart';
+import 'package:backyard_barrage/meta/play_mode.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
 import 'package:backyard_barrage/meta/settings_store.dart';
 import 'package:backyard_barrage/seasons/season.dart';
@@ -525,6 +526,10 @@ void main() {
     await tester.pump();
     expect(game.coinCarryLabel, isNull);
     expect(find.byKey(const Key('retry')), findsOneWidget);
+    expect(
+      find.text('Skills reset. Unspent coins carry over.'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const Key('retry')));
     await tester.pump();
@@ -535,6 +540,72 @@ void main() {
     expect(game.players.single.hp, CombatRules.hitsToKo);
     expect(game.phase, MatchPhase.fight);
     expect(game.enemies, hasLength(1));
+  });
+
+  testWidgets('campaign defeat keeps skills and restarts at wave 1', (
+    tester,
+  ) async {
+    final meta = MetaState(
+      mode: PlayMode.campaign,
+      coins: 40,
+      crewSize: 2,
+      fortStage: 2,
+      throwRank: 1,
+      bestWave: 5,
+      season: Season.summer,
+    );
+    final booted = await boot(tester, meta);
+    final game = booted.game;
+    await booted.store.save(
+      MetaState(
+        mode: PlayMode.arcade,
+        coins: 77,
+        crewSize: 2,
+        bestWave: 3,
+        season: Season.summer,
+      ),
+    );
+
+    game.wave = 4;
+    knockOut(game.players);
+    game.resolveKnockouts();
+    expect(game.phase, MatchPhase.defeat);
+    expect(game.meta.coins, 40);
+    expect(game.meta.crewSize, 2);
+    expect(game.meta.fortStage, 2);
+    expect(game.meta.throwRank, 1);
+    expect(game.meta.bestWave, 5);
+    expect(game.wave, 4);
+
+    game.update(0.7);
+    game.update(1.5);
+    await tester.pump();
+    expect(find.text('Skills stay. You restart at wave 1.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('retry')));
+    await tester.pump();
+    expect(game.phase, MatchPhase.entering);
+    game.finishEntrance();
+    expect(game.wave, 1);
+    expect(game.players, hasLength(2));
+    expect(game.players.first.hp, CombatRules.hitsToKo);
+    expect(game.players.last.hp, CombatRules.hitsToKo);
+    expect(game.fort.stage, 2);
+    expect(game.enemies, hasLength(1));
+
+    await game.persist();
+    final profile = await SaveStore(
+      preferences: await SharedPreferences.getInstance(),
+    ).load();
+    expect(profile.arcade.coins, 77);
+    expect(profile.arcade.bestWave, 3);
+    expect(profile.arcade.owns('fort-2'), isFalse);
+    expect(profile.campaign.coins, 40);
+    expect(profile.campaign.bestWave, 5);
+    expect(profile.campaign.crewSize, 2);
+    expect(profile.campaign.fortStage, 2);
+    expect(profile.campaign.throwRank, 1);
+    expect(profile.season, Season.summer);
   });
 
   testWidgets('coins spent on the defeat skill tree start the next run', (

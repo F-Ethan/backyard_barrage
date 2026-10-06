@@ -1,10 +1,13 @@
 import '../seasons/season.dart';
+import 'play_mode.dart';
 import 'skill_tree.dart';
 
-/// Persistent soft-currency meta: skill tree, last season, best wave.
+/// One mode's skill tree, coins, and best wave.
 ///
 /// Crew size, fort stage, and throw rank are the team, fort, and throw
-/// chains. A defeat clears every node and keeps the unspent coins.
+/// chains. Season is shared by both modes and stored here so a match can
+/// swap it. Arcade defeat clears every node and keeps the unspent coins.
+/// Campaign defeat keeps the nodes.
 class MetaState {
   MetaState({
     this.coins = 0,
@@ -14,6 +17,7 @@ class MetaState {
     Set<String>? skills,
     this.season = Season.winter,
     this.bestWave = 0,
+    this.mode = PlayMode.arcade,
   }) {
     if (skills != null) {
       _skills.addAll(_closed(skills));
@@ -45,6 +49,7 @@ class MetaState {
   int coins;
   Season season;
   int bestWave;
+  PlayMode mode;
 
   final Set<String> _skills = {};
 
@@ -176,9 +181,22 @@ class MetaState {
     if (wave > bestWave) bestWave = wave;
   }
 
-  /// Drop every skill. Unspent coins, season, and best wave stay.
+  /// Arcade drops every skill. Campaign keeps bought nodes.
+  ///
+  /// Unspent coins, season, and best wave stay either way. The caller
+  /// restarts the match at wave 1.
   void resetRun() {
-    _skills.clear();
+    if (mode == PlayMode.arcade) {
+      _skills.clear();
+    }
+  }
+
+  /// Replace the owned set with [owned], closing any gap back to the root.
+  void replaceSkills(Set<String> owned) {
+    final next = _closed(owned);
+    _skills
+      ..clear()
+      ..addAll(next);
   }
 
   /// Soft currency for knocking out one rival.
@@ -195,6 +213,7 @@ class MetaState {
     'skills': _skills.toList()..sort(),
     'season': season.name,
     'bestWave': bestWave,
+    'mode': mode.name,
   };
 
   factory MetaState.fromJson(Map<String, dynamic> json) {
@@ -221,6 +240,7 @@ class MetaState {
       skills: skills,
       season: Season.tryParse(json['season'] as String?) ?? Season.winter,
       bestWave: _clampInt(_asInt(json['bestWave']), 0, 9999),
+      mode: PlayMode.tryParse(json['mode'] as String?) ?? PlayMode.arcade,
     );
   }
 

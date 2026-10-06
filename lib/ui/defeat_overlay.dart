@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../game/backyard_barrage_game.dart';
+import '../meta/play_mode.dart';
 import '../seasons/season.dart';
 import 'barrage_colors.dart';
 import 'coin_amount.dart';
@@ -44,10 +45,14 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    Text(meta.mode.label, style: BarrageType.heading),
+                    const SizedBox(height: 2),
                     const Text('Crew down', style: BarrageType.title),
                     const SizedBox(height: 4),
-                    const Text(
-                      'The run resets. Unspent coins carry over.',
+                    Text(
+                      meta.mode == PlayMode.arcade
+                          ? 'Skills reset. Unspent coins carry over.'
+                          : 'Skills stay. You restart at wave 1.',
                       style: BarrageType.body,
                       textAlign: TextAlign.center,
                     ),

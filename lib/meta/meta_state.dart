@@ -146,10 +146,26 @@ class MetaState {
     if (id == null) return false;
     final node = SkillTree.node(id);
     if (node == null || owns(id)) return false;
-    final parent = node.parentId;
-    if (parent != null && !owns(parent)) return false;
+    if (skillLock(id) != SkillLock.open) return false;
     return coins >= node.cost;
   }
+
+  /// Parent chain first, then the second-kid gate. Owned nodes are open.
+  SkillLock skillLock(String id) {
+    final node = SkillTree.node(id);
+    if (node == null || owns(id)) return SkillLock.open;
+    final parent = node.parentId;
+    if (parent != null && !owns(parent)) return SkillLock.parent;
+    if (node.needsTeammate && crewSize < 2) return SkillLock.teammate;
+    return SkillLock.open;
+  }
+
+  /// Copy for a greyed node. Null when the node is owned or ready to buy.
+  String? lockReason(String id) => switch (skillLock(id)) {
+    SkillLock.open => null,
+    SkillLock.parent => SkillTree.parentLockReason,
+    SkillLock.teammate => SkillTree.teammateLockReason,
+  };
 
   bool buy(String id) {
     if (!canBuy(id)) return false;

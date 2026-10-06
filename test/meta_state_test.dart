@@ -131,6 +131,154 @@ void main() {
       expect(profile.arcade.coins, 82);
     });
 
+    test('skill ids and costs stay stable for saves', () {
+      expect(
+        [for (final node in SkillTree.nodes) '${node.id}:${node.cost}'],
+        [
+          'team-2:18',
+          'team-3:55',
+          'fort-2:22',
+          'fort-3:60',
+          'fort-hp-1:90',
+          'fort-hp-2:130',
+          'throw-1:16',
+          'throw-2:34',
+          'throw-3:58',
+          'throw-4:88',
+          'throw-5:124',
+          'poise-1:20',
+          'poise-2:42',
+          'poise-3:70',
+          'poise-4:105',
+          'pressure-1:20',
+          'pressure-2:42',
+          'pressure-3:70',
+          'pressure-4:105',
+          'aim-1:22',
+          'aim-2:46',
+          'aim-3:78',
+          'react-1:22',
+          'react-2:46',
+          'react-3:78',
+          'charge-1:22',
+          'charge-2:46',
+          'charge-3:78',
+          'shield-1:36',
+          'shield-2:72',
+          'shield-3:120',
+          'lanes:48',
+          'blast-1:24',
+          'blast-2:48',
+          'blast-3:80',
+          'blast-4:120',
+          'damage-1:40',
+          'damage-2:85',
+          'damage-3:140',
+          'damage-4:200',
+        ],
+      );
+      expect(
+        [
+          for (final node in SkillTree.nodes)
+            if (node.needsTeammate) node.id,
+        ],
+        [
+          'aim-1',
+          'aim-2',
+          'aim-3',
+          'react-1',
+          'react-2',
+          'react-3',
+          'charge-1',
+          'charge-2',
+          'charge-3',
+          'damage-3',
+          'damage-4',
+        ],
+      );
+    });
+
+    test('branches sit in three shop groups', () {
+      expect(SkillGroup.values.map((group) => group.label), [
+        'Crew',
+        'Fight',
+        'Defense',
+      ]);
+      final seen = <SkillBranch>{};
+      for (final group in SkillGroup.values) {
+        for (final branch in group.branches) {
+          expect(seen.add(branch), isTrue, reason: branch.name);
+          expect(SkillGroup.of(branch), group);
+        }
+      }
+      expect(seen, SkillBranch.values.toSet());
+    });
+
+    test('teammate skills stay locked until the crew has a second kid', () {
+      final solo = MetaState(coins: 900);
+      for (final id in ['aim-1', 'react-1', 'charge-1']) {
+        expect(solo.skillLock(id), SkillLock.teammate, reason: id);
+        expect(solo.lockReason(id), SkillTree.teammateLockReason, reason: id);
+        expect(solo.buy(id), isFalse, reason: id);
+        expect(solo.owns(id), isFalse, reason: id);
+      }
+      expect(solo.skillLock('aim-2'), SkillLock.parent);
+      expect(solo.lockReason('aim-2'), SkillTree.parentLockReason);
+      expect(solo.buy('damage-1'), isTrue);
+      expect(solo.buy('damage-2'), isTrue);
+      expect(solo.hitsFor(manualThrow: true), 3);
+      expect(solo.skillLock('damage-3'), SkillLock.teammate);
+      expect(solo.lockReason('damage-3'), SkillTree.teammateLockReason);
+      expect(solo.skillLock('damage-4'), SkillLock.parent);
+      expect(solo.buy('damage-3'), isFalse);
+      expect(solo.hitsFor(manualThrow: false), 1);
+      expect(solo.allyAimScale, 1);
+      expect(solo.skillLock('throw-1'), SkillLock.open);
+      expect(solo.skillLock('fort-2'), SkillLock.open);
+
+      expect(solo.buy('team-2'), isTrue);
+      expect(solo.crewSize, 2);
+      expect(solo.skillLock('aim-1'), SkillLock.open);
+      expect(solo.lockReason('aim-1'), isNull);
+      expect(solo.buy('aim-1'), isTrue);
+      expect(solo.allyAimScale, 0.72);
+      expect(solo.buy('react-1'), isTrue);
+      expect(solo.allyGapScale, 0.84);
+      expect(solo.buy('charge-1'), isTrue);
+      expect(solo.allyChargeScale, 0.86);
+      expect(solo.buy('damage-3'), isTrue);
+      expect(solo.hitsFor(manualThrow: false), 2);
+      expect(solo.skillLock('damage-4'), SkillLock.open);
+      expect(solo.buy('damage-4'), isTrue);
+      expect(solo.hitsFor(manualThrow: false), 3);
+    });
+
+    test('a save that already owns teammate nodes does not gain a kid', () {
+      final saved = MetaState(
+        coins: 50,
+        skills: {'aim-1', 'react-2', 'charge-1', 'damage-3'},
+      );
+      expect(saved.crewSize, 1);
+      expect(saved.owns('team-2'), isFalse);
+      expect(saved.allyAimScale, 0.72);
+      expect(saved.allyGapScale, 0.68);
+      expect(saved.allyChargeScale, 0.86);
+      expect(saved.hitsFor(manualThrow: true), 3);
+      expect(saved.hitsFor(manualThrow: false), 2);
+      expect(saved.skillLock('aim-1'), SkillLock.open);
+      expect(saved.skillLock('aim-2'), SkillLock.teammate);
+      expect(saved.buy('aim-2'), isFalse);
+      expect(saved.owns('aim-2'), isFalse);
+      expect(saved.owns('team-2'), isFalse);
+
+      final again = MetaState.fromJson(saved.toJson());
+      expect(again.skills, saved.skills);
+      expect(again.crewSize, 1);
+      expect(again.owns('team-2'), isFalse);
+      expect(again.allyAimScale, 0.72);
+      expect(again.hitsFor(manualThrow: false), 2);
+    });
+
     test('a node stays locked until its parent is owned', () {
       final meta = MetaState(coins: 500);
       expect(meta.buy('team-3'), isFalse);
@@ -314,9 +462,9 @@ void main() {
     expect(again.campaign.bestWave, 2);
     expect(again.campaign.skills, isEmpty);
     expect(again.season, Season.summer);
-    final raw =
-        jsonDecode(prefs.getString(SaveStore.storageKey)!)
-            as Map<String, dynamic>;
+    final raw = jsonDecode(
+      prefs.getString(SaveStore.storageKey)!,
+    ) as Map<String, dynamic>;
     expect(raw['v'], 2);
     expect(raw['arcade'], isA<Map<String, dynamic>>());
     expect(raw['campaign'], isA<Map<String, dynamic>>());

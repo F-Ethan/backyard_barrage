@@ -530,6 +530,8 @@ void main() {
       find.text('Skills reset. Unspent coins carry over.'),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('season-summer')), findsOneWidget);
+    expect(find.byKey(const ValueKey('chip-summer-true')), findsNothing);
 
     await tester.tap(find.byKey(const Key('retry')));
     await tester.pump();
@@ -687,10 +689,60 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byKey(const Key('buy-throw')), findsOneWidget);
     expect(find.text('Next wave'), findsOneWidget);
-    await tester.tap(find.text('Team'));
+    expect(find.byKey(const Key('season-winter')), findsOneWidget);
+    expect(find.byKey(const ValueKey('chip-winter-true')), findsNothing);
+    await tester.tap(find.byKey(const Key('skill-group-crew')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('skill-branch-team')));
     await tester.pump();
     expect(find.byKey(const Key('skill-team-2')), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('aim stays grey until a second kid is bought', (tester) async {
+    await _useSurface(tester, const Size(844, 390));
+    final game = (await boot(tester, MetaState(coins: 400))).game;
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+
+    expect(find.byKey(const Key('skill-group-fight')), findsOneWidget);
+    expect(find.byKey(const Key('skill-branch-throwSpeed')), findsOneWidget);
+    expect(find.text('Aim'), findsNothing);
+    expect(find.text('Poise'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('skill-group-crew')));
+    await tester.pump();
+    expect(find.text('Aim'), findsOneWidget);
+    expect(find.text('Throw'), findsNothing);
+    expect(find.byKey(const Key('skill-branch-team')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('skill-branch-aim')));
+    await tester.pump();
+    expect(find.byKey(const Key('locked-aim-1')), findsOneWidget);
+    expect(find.text('Buy a second kid first.'), findsWidgets);
+    expect(find.text('Locked'), findsWidgets);
+    await tester.tap(find.byKey(const Key('skill-aim-1')));
+    await tester.pump();
+    expect(game.meta.owns('aim-1'), isFalse);
+    expect(game.meta.crewSize, 1);
+
+    await tester.tap(find.byKey(const Key('skill-branch-team')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('skill-team-2')));
+    await tester.pump();
+    expect(game.meta.crewSize, 2);
+
+    await tester.tap(find.byKey(const Key('skill-branch-aim')));
+    await tester.pump();
+    expect(find.byKey(const Key('locked-aim-1')), findsNothing);
+    expect(find.byKey(const Key('open-aim-1')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('skill-aim-1')));
+    await tester.pump();
+    expect(game.meta.owns('aim-1'), isTrue);
+    expect(game.meta.allyAimScale, 0.72);
   });
 
   testWidgets('pause freezes the clear timer until resume', (tester) async {

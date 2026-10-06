@@ -7,7 +7,7 @@ import 'barrage_colors.dart';
 import 'coin_amount.dart';
 import 'draft_button.dart';
 import 'kit_panel.dart';
-import 'season_chip.dart';
+import 'season_toggle.dart';
 
 class DefeatOverlay extends StatefulWidget {
   const DefeatOverlay({super.key, required this.game});
@@ -64,21 +64,17 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                     const SizedBox(height: 4),
                     CoinAmount(amount: meta.coins),
                     const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SeasonChip(
-                          season: Season.winter,
-                          selected: meta.season == Season.winter,
-                          onTap: () => _setSeason(Season.winter),
+                    Center(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: const Color(0xE6FFF8F0),
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        const SizedBox(width: 8),
-                        SeasonChip(
-                          season: Season.summer,
-                          selected: meta.season == Season.summer,
-                          onTap: () => _setSeason(Season.summer),
+                        child: SeasonToggle(
+                          season: meta.season,
+                          onChanged: _setSeason,
                         ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DraftImageButton(

@@ -19,6 +19,49 @@ enum SkillBranch {
   final String label;
 }
 
+/// Shop tabs. Each group holds a few branches; the shop shows one chain.
+enum SkillGroup {
+  crew('Crew'),
+  fight('Fight'),
+  defense('Defense');
+
+  const SkillGroup(this.label);
+
+  final String label;
+
+  List<SkillBranch> get branches => switch (this) {
+    SkillGroup.crew => const [
+      SkillBranch.team,
+      SkillBranch.aim,
+      SkillBranch.reaction,
+      SkillBranch.charge,
+    ],
+    SkillGroup.fight => const [
+      SkillBranch.throwSpeed,
+      SkillBranch.poise,
+      SkillBranch.pressure,
+      SkillBranch.blast,
+      SkillBranch.damage,
+    ],
+    SkillGroup.defense => const [
+      SkillBranch.fort,
+      SkillBranch.shield,
+      SkillBranch.lanes,
+    ],
+  };
+
+  static SkillGroup of(SkillBranch branch) {
+    for (final group in SkillGroup.values) {
+      if (group.branches.contains(branch)) return group;
+    }
+    throw StateError('No skill group for ${branch.name}');
+  }
+}
+
+/// Why a node cannot be bought yet. Coins are separate: an open node can
+/// still be too expensive.
+enum SkillLock { open, parent, teammate }
+
 /// One purchase. Costs rise along a chain. Balance lives next to each node.
 class SkillNode {
   const SkillNode({
@@ -36,12 +79,30 @@ class SkillNode {
   final String detail;
   final int cost;
   final String? parentId;
+
+  /// True when the rank only helps teammates. Buying it needs a second kid.
+  /// This is not a [parentId]: an older save can own the node without `team-2`.
+  bool get needsTeammate => switch (branch) {
+    SkillBranch.aim || SkillBranch.reaction || SkillBranch.charge => true,
+    SkillBranch.damage => id == 'damage-3' || id == 'damage-4',
+    SkillBranch.team ||
+    SkillBranch.fort ||
+    SkillBranch.throwSpeed ||
+    SkillBranch.poise ||
+    SkillBranch.pressure ||
+    SkillBranch.shield ||
+    SkillBranch.lanes ||
+    SkillBranch.blast => false,
+  };
 }
 
 /// Catalog. A full clear of every chain is a few long runs of saving,
 /// because a defeat refunds nothing that was already spent.
 class SkillTree {
   const SkillTree._();
+
+  static const parentLockReason = 'Unlock the node above first.';
+  static const teammateLockReason = 'Buy a second kid first.';
 
   static const List<SkillNode> nodes = [
     SkillNode(
@@ -287,8 +348,7 @@ class SkillTree {
       id: 'lanes',
       branch: SkillBranch.lanes,
       title: 'Open fort',
-      detail:
-          'Your snowballs pass through your own fort. The base rule stays until you buy this.',
+      detail: 'Your snowballs pass through your own fort. The base rule stays until you buy this.',
       cost: 48,
     ),
     SkillNode(

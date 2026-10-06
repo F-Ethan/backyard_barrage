@@ -12,6 +12,7 @@ import '../seasons/season.dart';
 import 'barrage_colors.dart';
 import 'draft_button.dart';
 import 'season_home_backdrop.dart';
+import 'season_toggle.dart';
 import 'settings_panel.dart';
 import 'ui_kit.dart';
 
@@ -166,19 +167,9 @@ class _MainMenuState extends State<MainMenu> {
                                           ),
                                         ),
                                         const SizedBox(width: 4),
-                                        _SeasonLink(
-                                          key: const Key('season-winter'),
-                                          label: 'Winter',
-                                          selected: season == Season.winter,
-                                          onTap: () =>
-                                              _setSeason(Season.winter),
-                                        ),
-                                        _SeasonLink(
-                                          key: const Key('season-summer'),
-                                          label: 'Summer',
-                                          selected: season == Season.summer,
-                                          onTap: () =>
-                                              _setSeason(Season.summer),
+                                        SeasonToggle(
+                                          season: season,
+                                          onChanged: _setSeason,
                                         ),
                                       ],
                                     ),
@@ -316,40 +307,6 @@ class _ModeCard extends StatelessWidget {
                 style: BarrageType.muted,
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SeasonLink extends StatelessWidget {
-  const _SeasonLink({
-    super.key,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-            color: selected ? BarrageColors.player : BarrageColors.inkMuted,
-            decoration: selected ? TextDecoration.underline : null,
-            decorationColor: BarrageColors.player,
           ),
         ),
       ),

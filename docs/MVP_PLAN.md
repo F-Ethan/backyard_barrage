@@ -83,7 +83,7 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 - Per-wave: slightly shorter gaps and tighter landing scatter  
 
 ### 3.5 Skill tree (between waves, and from the defeat screen)
-Each rival KO pays 8 coins. Clearing the wave pays a bonus on top (`12 + wave * 8`). Spend that soft currency in the tree, which replaces the three-card shop. Each branch is a short chain: a node unlocks after its parent, and costs rise along the chain. Balance numbers live in `PROGRESS.md`.
+Each rival KO pays 8 coins. Clearing the wave pays a bonus on top (`12 + wave * 8`). Spend that soft currency in the tree, which replaces the three-card shop. The shop has three tabs: Crew (Team, Aim, Reaction, Charge), Fight (Throw, Poise, Pressure, Blast, Damage), and Defense (Fort, Shield, Lanes). One chain shows at a time. Aim, Reaction, Charge, and Damage ranks that only help teammates stay locked until the player owns a second kid. Each branch is a short chain: a node unlocks after its parent, and costs rise along the chain. Balance numbers live in `PROGRESS.md`.
 
 | Branch | Effect |
 | --- | --- |
@@ -106,7 +106,7 @@ Same rules; swap:
 - Arena tint / props (snow vs grass)  
 - Kid outerwear (coat vs tee)  
 
-Player **chooses** season on main menu (a small text toggle; the mode cards lead). No real-world lock in MVP. The home backdrop follows the season.
+Player **chooses** season with a small text toggle on the home screen, the shop, and the defeat screen. No real-world lock in MVP. The home backdrop follows the season.
 
 ### 3.7 Explicitly deferred
 - Spring / fall seasons  

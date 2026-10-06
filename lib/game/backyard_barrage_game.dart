@@ -132,9 +132,15 @@ class BackyardBarrageGame extends FlameGame {
   static const double _offstage = 180;
 
   /// Seconds spent in the fight this run. Shop, pause, and banners do not
-  /// count. An end ad needs this to be longer than two minutes.
+  /// count.
   double fightSeconds = 0;
-  bool _endAdOffered = false;
+
+  /// Wall clock for the interstitial cooldown. Tests replace this.
+  @visibleForTesting
+  DateTime Function() adClock = DateTime.now;
+
+  DateTime? _lastAdShownAt;
+  var _adInFlight = false;
 
   /// Right-hand share of the screen. A hold there charges; release throws.
   static const double chargeScreenFraction = 2 / 3;
@@ -300,7 +306,6 @@ class BackyardBarrageGame extends FlameGame {
   void startWave() {
     if (wave <= 1) {
       fightSeconds = 0;
-      _endAdOffered = false;
     }
     _pendingBanner = _Banner.none;
     _bannerTime = 0;
@@ -552,7 +557,6 @@ class BackyardBarrageGame extends FlameGame {
         _pendingBanner = _Banner.none;
         _clearBanner();
         phase = MatchPhase.shop;
-        _offerEndAd();
         overlays.add('shop');
         pauseEngine();
       case _Banner.defeatKo:
@@ -680,31 +684,34 @@ class BackyardBarrageGame extends FlameGame {
     ).scaled(gapScale: meta.allyGapScale, chargeScale: meta.allyChargeScale);
   }
 
-  /// One interstitial per run, and never during the fight.
-  /// It can show after two minutes of fight time or three cleared waves,
-  /// whichever comes first: at the shop, after the defeat coin beat, or
-  /// when leaving from the pause menu. A purchased Remove Ads entitlement
-  /// skips it without spending the once-flag.
+  /// One interstitial outside the fight, at least three minutes after the
+  /// last one that actually showed. Offered after the defeat coin beat,
+  /// before the summary, and when Pause returns to the menu. A wave-clear
+  /// shop does not offer one. Remove Ads skips it and does not start the
+  /// cooldown.
   void _offerEndAd() {
+    if (_adInFlight) return;
     if (adsRemoved?.call() ?? false) return;
+    final now = adClock();
+    final last = _lastAdShownAt;
     if (!AdPolicy.allows(
-      fightSeconds: fightSeconds,
-      wavesCleared: _wavesCleared(),
-      alreadyShown: _endAdOffered,
       inFight: phase == MatchPhase.fight,
+      sinceLastShow: last == null ? null : now.difference(last),
     )) {
       return;
     }
-    _endAdOffered = true;
-    unawaited(endAd.onRunEnded(fightSeconds: fightSeconds));
+    _adInFlight = true;
+    unawaited(_finishAdOffer(now));
   }
 
-  /// Waves finished this run. The wave on screen still counts once it
-  /// has cleared and the shop is up.
-  int _wavesCleared() {
-    if (phase == MatchPhase.clearing || phase == MatchPhase.shop) return wave;
-    if (wave < 1) return 0;
-    return wave - 1;
+  Future<void> _finishAdOffer(DateTime offeredAt) async {
+    var shown = false;
+    try {
+      shown = await endAd.onRunEnded(fightSeconds: fightSeconds);
+    } finally {
+      _adInFlight = false;
+      if (shown) _lastAdShownAt = offeredAt;
+    }
   }
 
   void _payKnockouts() {

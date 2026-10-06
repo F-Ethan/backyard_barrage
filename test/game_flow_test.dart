@@ -161,16 +161,17 @@ void main() {
     expect(game.fort.shelters(game.players[1]), isFalse);
   });
 
-  testWidgets('an end ad waits for a long fight and shows once', (
+  testWidgets('an end ad shows after the coin beat, then waits three minutes', (
     tester,
   ) async {
+    var now = DateTime.utc(2026, 1, 1);
     final ads = _RecordingEndAd();
     final game = (await boot(tester, MetaState(), endAd: ads)).game;
+    game.adClock = () => now;
     final before = game.fightSeconds;
     game.update(1.25);
     expect(game.fightSeconds, closeTo(before + 1.25, 0.02));
 
-    game.fightSeconds = 120;
     knockOut(game.players);
     game.resolveKnockouts();
     expect(game.phase, MatchPhase.defeat);
@@ -181,35 +182,34 @@ void main() {
     expect(ads.calls, 0);
     game.update(1.5);
     expect(game.coinCarryLabel, isNull);
-    expect(ads.calls, 0);
+    expect(ads.calls, 1);
+    expect(ads.lastSeconds, closeTo(game.fightSeconds, 0.01));
+
+    game.exitToMenu();
+    expect(ads.calls, 1);
+    await tester.pump();
 
     game.retryFromDefeat();
     game.finishEntrance();
-    game.fightSeconds = 120.1;
     knockOut(game.players);
     game.resolveKnockouts();
-    expect(game.coinCarryLabel, isNull);
-    expect(ads.calls, 0);
     game.update(0.7);
-    expect(game.coinCarryLabel, isNotNull);
-    expect(ads.calls, 0);
     game.update(1.5);
-    expect(game.coinCarryLabel, isNull);
-    expect(ads.calls, 1);
-    expect(ads.lastSeconds, closeTo(120.1, 0.01));
-
-    game.exitToMenu();
     expect(ads.calls, 1);
 
-    game.fightSeconds = 200;
-    game.exitToMenu();
-    expect(ads.calls, 1);
+    now = now.add(const Duration(minutes: 3));
+    game.retryFromDefeat();
+    game.finishEntrance();
+    knockOut(game.players);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(1.5);
+    expect(ads.calls, 2);
   });
 
   testWidgets('leaving mid-fight does not show an ad', (tester) async {
     final ads = _RecordingEndAd();
     final game = (await boot(tester, MetaState(), endAd: ads)).game;
-    game.fightSeconds = 200;
     game.exitToMenu();
     expect(game.phase, MatchPhase.fight);
     expect(ads.calls, 0);
@@ -227,7 +227,6 @@ void main() {
       endAd: ads,
       adsRemoved: () => true,
     )).game;
-    game.fightSeconds = 200;
     knockOut(game.players);
     game.resolveKnockouts();
     expect(game.phase, MatchPhase.defeat);
@@ -244,35 +243,49 @@ void main() {
     expect(ads.calls, 0);
   });
 
-  testWidgets('three cleared waves offer an ad before two minutes', (
-    tester,
-  ) async {
+  testWidgets('a wave-clear shop does not offer an ad', (tester) async {
     final ads = _RecordingEndAd();
     final game = (await boot(tester, MetaState(), endAd: ads)).game;
 
-    for (var cleared = 0; cleared < 2; cleared++) {
+    for (var cleared = 0; cleared < 3; cleared++) {
       knockOut(game.enemies);
       game.resolveKnockouts();
       game.update(0.7);
       game.update(0.6);
+      expect(game.phase, MatchPhase.shop);
       expect(ads.calls, 0);
       game.continueFromShop();
       game.finishEntrance();
     }
 
-    knockOut(game.enemies);
-    game.resolveKnockouts();
-    game.update(0.7);
-    game.update(0.6);
-    expect(game.phase, MatchPhase.shop);
-    expect(ads.calls, 1);
-
-    game.continueFromShop();
-    game.finishEntrance();
-    game.fightSeconds = 200;
     game.pauseMatch();
+    expect(game.phase, MatchPhase.paused);
+    expect(ads.calls, 0);
     game.exitToMenu();
     expect(ads.calls, 1);
+  });
+
+  testWidgets('a missed interstitial does not start the cooldown', (
+    tester,
+  ) async {
+    final ads = _RecordingEndAd()..shown = false;
+    final game = (await boot(tester, MetaState(), endAd: ads)).game;
+
+    knockOut(game.players);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(1.5);
+    expect(ads.calls, 1);
+    await tester.pump();
+
+    ads.shown = true;
+    game.retryFromDefeat();
+    game.finishEntrance();
+    knockOut(game.players);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(1.5);
+    expect(ads.calls, 2);
   });
 
   testWidgets('easy charges twice as fast and halves your stun', (
@@ -1152,11 +1165,13 @@ void main() {
 class _RecordingEndAd extends EndAd {
   int calls = 0;
   double lastSeconds = 0;
+  bool shown = true;
 
   @override
-  Future<void> onRunEnded({required double fightSeconds}) async {
+  Future<bool> onRunEnded({required double fightSeconds}) async {
     calls += 1;
     lastSeconds = fightSeconds;
+    return shown;
   }
 }
 

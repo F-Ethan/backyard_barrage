@@ -8,7 +8,7 @@ import 'ad_config.dart';
 import 'end_ad.dart';
 import 'remove_ads.dart';
 
-/// UMP consent, the iOS tracking prompt, then one interstitial per ending.
+/// UMP consent, the iOS tracking prompt, then an interstitial when allowed.
 class MobileEndAd extends EndAd {
   MobileEndAd(this.removeAds);
 
@@ -83,33 +83,37 @@ class MobileEndAd extends EndAd {
   }
 
   @override
-  Future<void> onRunEnded({required double fightSeconds}) async {
+  Future<bool> onRunEnded({required double fightSeconds}) async {
     if (removeAds.owned) {
       _ready?.dispose();
       _ready = null;
-      return;
+      return false;
     }
-    if (_showing) return;
+    if (_showing) return false;
     final ad = _ready;
     _ready = null;
     if (ad == null) {
       _load();
-      return;
+      return false;
     }
     _showing = true;
-    final done = Completer<void>();
+    final done = Completer<bool>();
+    var presented = false;
     ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (_) {
+        presented = true;
+      },
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
         _showing = false;
         _load();
-        if (!done.isCompleted) done.complete();
+        if (!done.isCompleted) done.complete(presented);
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
         ad.dispose();
         _showing = false;
         _load();
-        if (!done.isCompleted) done.complete();
+        if (!done.isCompleted) done.complete(false);
       },
     );
     try {
@@ -118,9 +122,9 @@ class MobileEndAd extends EndAd {
       _showing = false;
       ad.dispose();
       _load();
-      return;
+      return false;
     }
-    await done.future;
+    return done.future;
   }
 
   @override

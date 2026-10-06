@@ -5,52 +5,32 @@ import 'package:backyard_barrage/ads/ad_policy.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('an end ad needs two minutes or three cleared waves', () {
+  test('an interstitial waits three minutes and never shows in a fight', () {
+    expect(AdConfig.interstitialCooldown, const Duration(minutes: 3));
+    expect(AdPolicy.allows(inFight: false, sinceLastShow: null), isTrue);
     expect(
       AdPolicy.allows(
-        fightSeconds: 120,
-        wavesCleared: 2,
-        alreadyShown: false,
         inFight: false,
+        sinceLastShow:
+            const Duration(minutes: 3) - const Duration(milliseconds: 1),
       ),
       isFalse,
     );
     expect(
       AdPolicy.allows(
-        fightSeconds: 120.01,
-        wavesCleared: 0,
-        alreadyShown: false,
         inFight: false,
+        sinceLastShow: const Duration(minutes: 3),
       ),
       isTrue,
     );
     expect(
       AdPolicy.allows(
-        fightSeconds: 10,
-        wavesCleared: 3,
-        alreadyShown: false,
-        inFight: false,
-      ),
-      isTrue,
-    );
-    expect(
-      AdPolicy.allows(
-        fightSeconds: 400,
-        wavesCleared: 3,
-        alreadyShown: false,
         inFight: true,
+        sinceLastShow: const Duration(minutes: 10),
       ),
       isFalse,
     );
-    expect(
-      AdPolicy.allows(
-        fightSeconds: 400,
-        wavesCleared: 3,
-        alreadyShown: true,
-        inFight: false,
-      ),
-      isFalse,
-    );
+    expect(AdPolicy.allows(inFight: true, sinceLastShow: null), isFalse);
   });
 
   test('native app ids match the single Dart config', () {
@@ -87,7 +67,9 @@ void main() {
 
   test('the iOS build allows the ads plugin private header include', () {
     final podfile = File('ios/Podfile').readAsStringSync();
-    final project = File('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
+    final project = File(
+      'ios/Runner.xcodeproj/project.pbxproj',
+    ).readAsStringSync();
     const flag = 'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES';
     expect(podfile, contains("$flag'] = 'YES'"));
     expect(flag.allMatches(project), hasLength(6));

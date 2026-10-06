@@ -13,6 +13,7 @@ import 'package:backyard_barrage/game/components/enemy_controller.dart';
 import 'package:backyard_barrage/game/components/fort_component.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
 import 'package:backyard_barrage/game/components/lob_projectile.dart';
+import 'package:backyard_barrage/game/components/overlay_banner.dart';
 import 'package:backyard_barrage/game/throw_physics.dart';
 import 'package:backyard_barrage/meta/difficulty.dart';
 import 'package:backyard_barrage/meta/meta_state.dart';
@@ -278,9 +279,7 @@ void main() {
     tester,
   ) async {
     final game = (await boot(tester, MetaState())).game;
-    game.feel.apply(
-      game.feel.settings.copyWith(difficulty: Difficulty.easy),
-    );
+    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.easy));
     final kid = game.players.single;
     game.pressChargeZone();
     game.update(CombatRules.playerChargeSeconds(0) / 2);
@@ -302,6 +301,119 @@ void main() {
     );
   });
 
+  testWidgets('rival hits to KO follow difficulty and allies stay at three', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    expect(
+      game.enemies.single.maxHp,
+      DifficultyTuning.of(Difficulty.normal).enemyHitsToKo,
+    );
+    expect(game.players.single.maxHp, CombatRules.hitsToKo);
+
+    for (final difficulty in Difficulty.values) {
+      game.feel.apply(game.feel.settings.copyWith(difficulty: difficulty));
+      game.startWave();
+      game.finishEntrance();
+      final hits = DifficultyTuning.of(difficulty).enemyHitsToKo;
+      final rival = game.enemies.single;
+      expect(rival.maxHp, hits);
+      expect(rival.hp, hits);
+      expect(game.players.single.maxHp, CombatRules.hitsToKo);
+      expect(game.players.single.hp, CombatRules.hitsToKo);
+      if (difficulty == Difficulty.easy) {
+        rival.takeHit();
+        expect(rival.isKo, isTrue);
+      }
+    }
+  });
+
+  testWidgets('difficulty shortens ally stun and leaves rival stun alone', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));
+    game.startWave();
+    game.finishEntrance();
+    final kid = game.players.single;
+    final rival = game.enemies.single;
+    expect(rival.maxHp, 3);
+
+    final rivalShot = LobProjectile(
+      sprite: kid.sprite!,
+      position: kid.position.clone(),
+      velocity: Vector2(-1, 0),
+      targets: [kid],
+      owner: rival,
+      onHit: (_, _) {},
+    );
+    final allyShot = LobProjectile(
+      sprite: kid.sprite!,
+      position: rival.position.clone(),
+      velocity: Vector2(1, 0),
+      targets: [rival],
+      owner: kid,
+      onHit: (_, _) {},
+    );
+
+    for (final difficulty in Difficulty.values) {
+      game.feel.apply(game.feel.settings.copyWith(difficulty: difficulty));
+      kid.revive();
+      game.applySnowballHit(shot: rivalShot, target: kid);
+      expect(
+        kid.stunRemaining,
+        closeTo(
+          CombatRules.allyStunSeconds *
+              DifficultyTuning.of(difficulty).allyStunScale,
+          0.001,
+        ),
+      );
+
+      rival.revive();
+      game.applySnowballHit(shot: allyShot, target: rival);
+      expect(rival.isKo, isFalse);
+      expect(
+        rival.stunRemaining,
+        closeTo(CombatRules.enemyBrushOffSeconds, 0.001),
+      );
+    }
+  });
+
+  testWidgets('each wave opens with a Wave N banner during the walk-on', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState(), settle: false)).game;
+    expect(game.phase, MatchPhase.entering);
+    expect(
+      game.world.children.whereType<OverlayBanner>().single.label,
+      'Wave 1',
+    );
+
+    game.finishEntrance();
+    expect(game.phase, MatchPhase.fight);
+    // Removal is applied on the next tick.
+    game.update(0.016);
+    expect(game.world.children.whereType<OverlayBanner>(), isEmpty);
+
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    game.continueFromShop();
+    expect(game.phase, MatchPhase.entering);
+    expect(game.wave, 2);
+    // The new banner mounts on the next tick, after the clear banner drops.
+    game.update(0.016);
+    expect(
+      game.world.children.whereType<OverlayBanner>().single.label,
+      'Wave 2',
+    );
+
+    game.finishEntrance();
+    game.update(0.016);
+    expect(game.world.children.whereType<OverlayBanner>(), isEmpty);
+  });
+
   testWidgets('easy and normal rivals keep the unscaled windup', (
     tester,
   ) async {
@@ -312,9 +424,7 @@ void main() {
     game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.easy));
     expect(brain.windupSeconds, closeTo(4.5, 0.001));
 
-    game.feel.apply(
-      game.feel.settings.copyWith(difficulty: Difficulty.normal),
-    );
+    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.normal));
     expect(brain.windupSeconds, closeTo(3, 0.001));
   });
 
@@ -322,9 +432,7 @@ void main() {
     tester,
   ) async {
     final game = (await boot(tester, MetaState())).game;
-    game.feel.apply(
-      game.feel.settings.copyWith(difficulty: Difficulty.normal),
-    );
+    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.normal));
     game.pressChargeZone();
     game.update(CombatRules.playerChargeSeconds(0) * 2 / 3);
     expect(game.chargeListenable.value, 1);
@@ -480,7 +588,7 @@ void main() {
       ),
       target: enemy,
     );
-    expect(before, CombatRules.hitsToKo);
+    expect(before, DifficultyTuning.of(Difficulty.normal).enemyHitsToKo);
     expect(enemy.isKo, isTrue);
   });
 
@@ -709,81 +817,86 @@ void main() {
     game.releaseChargeZone();
   });
 
-  testWidgets('rivals take three hits; an ally stun can end on the next hit', (
-    tester,
-  ) async {
-    final game = (await boot(tester, MetaState(crewSize: 2))).game;
-    final enemy = game.enemies.first;
-    enemy.takeHit();
-    expect(enemy.isKo, isFalse);
-    expect(enemy.isDown, isFalse);
-    expect(enemy.isStunned, isTrue);
-    expect(
-      enemy.stunRemaining,
-      closeTo(CombatRules.enemyBrushOffSeconds, 0.001),
-    );
-    expect(enemy.sprite, enemy.hitSprite);
-    game.update(CombatRules.enemyBrushOffSeconds + 0.05);
-    expect(enemy.isStunned, isFalse);
-    expect(enemy.hp, 2);
+  testWidgets(
+    'hard rivals take three hits; an ally stun can end on the next hit',
+    (tester) async {
+      final game = (await boot(tester, MetaState(crewSize: 2))).game;
+      game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));
+      game.startWave();
+      game.finishEntrance();
+      final enemy = game.enemies.first;
+      expect(enemy.maxHp, 3);
+      enemy.takeHit();
+      expect(enemy.isKo, isFalse);
+      expect(enemy.isDown, isFalse);
+      expect(enemy.isStunned, isTrue);
+      expect(
+        enemy.stunRemaining,
+        closeTo(CombatRules.enemyBrushOffSeconds, 0.001),
+      );
+      expect(enemy.sprite, enemy.hitSprite);
+      game.update(CombatRules.enemyBrushOffSeconds + 0.05);
+      expect(enemy.isStunned, isFalse);
+      expect(enemy.hp, 2);
 
-    enemy.takeHit();
-    expect(enemy.isKo, isFalse);
-    expect(enemy.isDown, isTrue);
-    expect(enemy.sprite, enemy.koSprite);
-    expect(enemy.paint.colorFilter, isNull);
-    expect(
-      enemy.stunRemaining,
-      closeTo(CombatRules.enemyKnockdownSeconds, 0.001),
-    );
-    game.update(CombatRules.enemyKnockdownSeconds + 0.05);
-    expect(enemy.isDown, isFalse);
-    expect(enemy.isStunned, isFalse);
-    expect(enemy.isKo, isFalse);
-    expect(enemy.sprite, isNot(enemy.koSprite));
+      enemy.takeHit();
+      expect(enemy.isKo, isFalse);
+      expect(enemy.isDown, isTrue);
+      expect(enemy.sprite, enemy.koSprite);
+      expect(enemy.paint.colorFilter, isNull);
+      expect(
+        enemy.stunRemaining,
+        closeTo(CombatRules.enemyKnockdownSeconds, 0.001),
+      );
+      game.update(CombatRules.enemyKnockdownSeconds + 0.05);
+      expect(enemy.isDown, isFalse);
+      expect(enemy.isStunned, isFalse);
+      expect(enemy.isKo, isFalse);
+      expect(enemy.sprite, isNot(enemy.koSprite));
 
-    enemy.takeHit();
-    expect(enemy.isKo, isTrue);
-    expect(enemy.sprite, enemy.koSprite);
-    expect(enemy.paint.colorFilter, KidComponent.knockoutFilter);
+      enemy.takeHit();
+      expect(enemy.isKo, isTrue);
+      expect(enemy.sprite, enemy.koSprite);
+      expect(enemy.paint.colorFilter, KidComponent.knockoutFilter);
 
-    final ally = game.players[1];
-    ally.takeHit();
-    expect(ally.isKo, isFalse);
-    expect(ally.isFragile, isTrue);
-    expect(ally.stunRemaining, closeTo(CombatRules.allyStunSeconds, 0.001));
-    ally.takeHit();
-    expect(ally.isKo, isTrue);
+      final ally = game.players[1];
+      ally.takeHit();
+      expect(ally.isKo, isFalse);
+      expect(ally.isFragile, isTrue);
+      expect(ally.stunRemaining, closeTo(CombatRules.allyStunSeconds, 0.001));
+      ally.takeHit();
+      expect(ally.isKo, isTrue);
 
-    final lead = game.players.first;
-    lead.takeHit();
-    expect(lead.isKo, isFalse);
-    expect(lead.isFragile, isTrue);
-    game.pressMoveZone(lead.hitCenter);
-    game.releaseMoveZone();
-    expect(game.selectedKid, lead);
-    expect(game.isCharging, isFalse);
-    final pos = lead.position.clone();
-    final cell = ArenaGrid.nearestCell(KidSide.player, pos);
-    game.pressMoveZone(
-      ArenaGrid.cellCenter(KidSide.player, cell.column, cell.row + 1),
-    );
-    game.pressChargeZone();
-    expect(game.isCharging, isFalse);
-    game.update(0.4);
-    expect(lead.position.x, closeTo(pos.x, 0.5));
-    expect(lead.position.y, closeTo(pos.y, 0.5));
-    game.releaseMoveZone();
+      final lead = game.players.first;
+      lead.takeHit();
+      expect(lead.isKo, isFalse);
+      expect(lead.isFragile, isTrue);
+      game.pressMoveZone(lead.hitCenter);
+      game.releaseMoveZone();
+      expect(game.selectedKid, lead);
+      expect(game.isCharging, isFalse);
+      final pos = lead.position.clone();
+      final cell = ArenaGrid.nearestCell(KidSide.player, pos);
+      game.pressMoveZone(
+        ArenaGrid.cellCenter(KidSide.player, cell.column, cell.row + 1),
+      );
+      game.pressChargeZone();
+      expect(game.isCharging, isFalse);
+      game.update(0.4);
+      expect(lead.position.x, closeTo(pos.x, 0.5));
+      expect(lead.position.y, closeTo(pos.y, 0.5));
+      game.releaseMoveZone();
 
-    lead.update(CombatRules.allyStunSeconds);
-    expect(lead.isStunned, isFalse);
-    expect(lead.isFragile, isFalse);
-    expect(lead.hp, CombatRules.hitsToKo - 1);
-    lead.takeHit();
-    expect(lead.isKo, isFalse);
-    expect(lead.isFragile, isTrue);
-    expect(lead.hp, 1);
-  });
+      lead.update(CombatRules.allyStunSeconds);
+      expect(lead.isStunned, isFalse);
+      expect(lead.isFragile, isFalse);
+      expect(lead.hp, CombatRules.hitsToKo - 1);
+      lead.takeHit();
+      expect(lead.isKo, isFalse);
+      expect(lead.isFragile, isTrue);
+      expect(lead.hp, 1);
+    },
+  );
 
   testWidgets('a KO kid is greyed out and a living fort shelters cover', (
     tester,
@@ -980,11 +1093,7 @@ void main() {
   testWidgets('a charge held through the walk-on starts when they arrive', (
     tester,
   ) async {
-    final game = (await boot(
-      tester,
-      MetaState(),
-      settle: false,
-    )).game;
+    final game = (await boot(tester, MetaState(), settle: false)).game;
     expect(game.phase, MatchPhase.entering);
     await tester.pump();
     expect(find.byKey(const Key('charge-zone')), findsOneWidget);

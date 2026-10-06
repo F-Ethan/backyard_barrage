@@ -80,7 +80,16 @@ class ArenaGrid {
   }
 
   static const List<(int, int)> playerSlots = [(1, 4), (0, 2), (3, 6)];
-  static const List<(int, int)> enemySlots = [(2, 3), (3, 1), (1, 6)];
+
+  /// Five distinct cells. Waves 1–5 use the first three. Wave 6 uses four.
+  /// Wave 7 and later use all five, so extra rivals do not stack on one spot.
+  static const List<(int, int)> enemySlots = [
+    (2, 3),
+    (3, 1),
+    (1, 6),
+    (0, 4),
+    (2, 0),
+  ];
 
   static double get columnStep =>
       (playerRight - playerLeft) / (columnsPerSide - 1);

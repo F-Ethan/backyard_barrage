@@ -1,7 +1,7 @@
 name: backyard_barrage
 description: "Backyard Barrage — seasonal backyard arena game (Flutter + Flame)"
 publish_to: 'none'
-version: 0.1.0+6
+version: 0.1.0+7
 
 environment:
   sdk: ^3.10.7

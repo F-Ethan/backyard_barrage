@@ -481,10 +481,39 @@ void main() {
     expect(game.phase, MatchPhase.entering);
     game.finishEntrance();
     expect(game.wave, 2);
-    expect(game.enemies, hasLength(3));
+    expect(game.enemies, hasLength(2));
     expect(game.players.single.hp, CombatRules.hitsToKo);
     expect(game.fort.hp, CombatRules.fortMaxHp(1));
     expect(game.phase, MatchPhase.fight);
+
+    game.wave = 4;
+    game.startWave();
+    game.finishEntrance();
+    expect(game.enemies, hasLength(3));
+    expect(game.enemies.first.maxHp, 2);
+
+    game.wave = 5;
+    game.startWave();
+    game.finishEntrance();
+    expect(game.enemies, hasLength(3));
+    expect(game.enemies.first.maxHp, 3);
+
+    game.wave = 6;
+    game.startWave();
+    game.finishEntrance();
+    expect(game.enemies, hasLength(4));
+
+    game.wave = 9;
+    game.startWave();
+    game.finishEntrance();
+    expect(game.enemies, hasLength(5));
+    expect(game.enemies.first.maxHp, 3);
+    final spots = game.enemies.map((kid) => kid.position.clone()).toList();
+    for (var i = 0; i < spots.length; i++) {
+      for (var j = i + 1; j < spots.length; j++) {
+        expect(spots[i].distanceTo(spots[j]), greaterThan(20));
+      }
+    }
   });
 
   testWidgets('a wiped crew can retry at full HP', (tester) async {
@@ -689,6 +718,27 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byKey(const Key('buy-throw')), findsOneWidget);
     expect(find.text('Next wave'), findsOneWidget);
+    final sheet = tester.getRect(find.byKey(const Key('shop-sheet')));
+    final crew = tester.getRect(find.byKey(const Key('skill-group-crew')));
+    final fight = tester.getRect(find.byKey(const Key('skill-group-fight')));
+    final defense = tester.getRect(
+      find.byKey(const Key('skill-group-defense')),
+    );
+    final branch = tester.getRect(
+      find.byKey(const Key('skill-branch-throwSpeed')),
+    );
+    final node = tester.getRect(find.byKey(const Key('open-throw-1')));
+    final child = tester.getRect(find.byKey(const Key('locked-throw-2')));
+    final margin = sheet.width * 0.045;
+    expect(fight.left, greaterThan(crew.right - 4));
+    expect(defense.left, greaterThan(fight.right - 4));
+    expect((crew.center.dy - fight.center.dy).abs(), lessThan(8));
+    expect(branch.top, greaterThan(fight.bottom));
+    expect(branch.right, lessThanOrEqualTo(node.left + 8));
+    expect(child.top, greaterThan(node.bottom - 4));
+    expect(node.left, greaterThanOrEqualTo(sheet.left + margin));
+    expect(node.right, lessThanOrEqualTo(sheet.right - margin));
+    expect(branch.left, greaterThanOrEqualTo(sheet.left + margin));
     expect(find.byKey(const Key('season-winter')), findsOneWidget);
     expect(find.byKey(const ValueKey('chip-winter-true')), findsNothing);
     await tester.tap(find.byKey(const Key('skill-group-crew')));
@@ -1044,6 +1094,20 @@ void main() {
     expect(down.isKo, isTrue);
     expect(down.sprite, down.koSprite);
     expect(down.paint.colorFilter, KidComponent.knockoutFilter);
+    expect(down.opacity, 1);
+    down.update(KidComponent.koFadeDelay - 0.1);
+    expect(down.opacity, 1);
+    down.update(0.2);
+    expect(down.opacity, lessThan(1));
+    expect(down.opacity, greaterThan(0));
+    down.update(KidComponent.koFadeSeconds);
+    expect(down.opacity, 0);
+    down.revive();
+    expect(down.opacity, 1);
+    expect(down.isKo, isFalse);
+    down.takeHit();
+    down.takeHit();
+    expect(down.isKo, isTrue);
     game.debugPointerDown(down.hitCenter);
     expect(game.selectedKid, isNot(down));
 

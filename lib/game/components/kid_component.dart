@@ -83,6 +83,12 @@ class KidComponent extends SpriteComponent {
 
   bool _selected = false;
 
+  /// Hold the slumped pose this long, then fade. About 2.5s plus the fade.
+  static const double koFadeDelay = 2.5;
+
+  /// How long the fade from slumped to gone takes.
+  static const double koFadeSeconds = 0.5;
+
   /// Grey, dim, and marked so a downed kid does not read as still in the fight.
   static const ColorFilter knockoutFilter = ColorFilter.matrix(<double>[
     0.30,
@@ -131,6 +137,7 @@ class KidComponent extends SpriteComponent {
 
   double get stunRemaining => _stunTimer;
 
+  double _koAge = 0;
   double _throwPoseTimer = 0;
   double _hitPoseTimer = 0;
   double _stunTimer = 0;
@@ -213,7 +220,6 @@ class KidComponent extends SpriteComponent {
     _chargingPose = false;
     _walking = false;
     _throwPoseTimer = 0;
-    _flash();
     if (result.knockedOut) {
       _stunTimer = 0;
       _downTimer = 0;
@@ -222,6 +228,7 @@ class KidComponent extends SpriteComponent {
       _applyKoLook();
       return;
     }
+    _flash();
     _fragile = result.fragile;
     final lock = result.lockSeconds * stunScale;
     _stunTimer = lock;
@@ -255,6 +262,7 @@ class KidComponent extends SpriteComponent {
     for (final effect in children.whereType<Effect>().toList()) {
       effect.removeFromParent();
     }
+    _koAge = 0;
     opacity = 1;
     _refreshSprite();
   }
@@ -264,7 +272,11 @@ class KidComponent extends SpriteComponent {
     _chargingPose = false;
     _walking = false;
     _selected = false;
+    _koAge = 0;
     paint.colorFilter = knockoutFilter;
+    for (final effect in children.whereType<Effect>().toList()) {
+      effect.removeFromParent();
+    }
     opacity = 1;
     _refreshSprite();
   }
@@ -346,11 +358,46 @@ class KidComponent extends SpriteComponent {
       _throwPoseTimer -= dt;
       if (_throwPoseTimer <= 0) refresh = true;
     }
+    if (isKo) {
+      _koAge += dt;
+      final t = (_koAge - koFadeDelay) / koFadeSeconds;
+      if (t <= 0) {
+        opacity = 1;
+      } else if (t >= 1) {
+        opacity = 0;
+      } else {
+        opacity = 1 - t;
+      }
+    }
     if (refresh) _refreshSprite();
   }
 
   @override
   void render(Canvas canvas) {
+    final fade = opacity.clamp(0.0, 1.0);
+    if (fade <= 0) {
+      super.render(canvas);
+      return;
+    }
+    // Sprite paint already carries [opacity]. Custom marks (the X, the
+    // ring) do not, so fade the whole body in one layer and draw the
+    // sprite at full paint alpha inside it.
+    if (fade < 0.999) {
+      final saved = paint.color;
+      paint.color = saved.withValues(alpha: 1);
+      canvas.saveLayer(
+        null,
+        Paint()..color = Color.fromRGBO(255, 255, 255, fade),
+      );
+      _renderBody(canvas);
+      canvas.restore();
+      paint.color = saved;
+      return;
+    }
+    _renderBody(canvas);
+  }
+
+  void _renderBody(Canvas canvas) {
     if (selected && !isKo) {
       final glow = Paint()
         ..color = const Color(0x663D7CFF)

@@ -5,10 +5,29 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('CombatRules', () {
-    test('enemy count starts at 1 and caps at 3', () {
+    test('enemy count climbs across six waves, then holds', () {
       expect(CombatRules.enemyCountForWave(1), 1);
-      expect(CombatRules.enemyCountForWave(2), 3);
-      expect(CombatRules.enemyCountForWave(8), 3);
+      expect(CombatRules.enemyCountForWave(2), 2);
+      expect(CombatRules.enemyCountForWave(3), 3);
+      expect(CombatRules.enemyCountForWave(4), 3);
+      expect(CombatRules.enemyCountForWave(5), 3);
+      expect(CombatRules.enemyCountForWave(6), 4);
+      expect(CombatRules.enemyCountForWave(7), 5);
+      expect(CombatRules.enemyCountForWave(8), 5);
+
+      final early = WavePlan.forWave(3);
+      final faster = WavePlan.forWave(4);
+      final tougher = WavePlan.forWave(5);
+      final more = WavePlan.forWave(6);
+      expect(early.fasterThrows, isFalse);
+      expect(early.bonusHp, 0);
+      expect(faster.fasterThrows, isTrue);
+      expect(faster.quickerSteps, isTrue);
+      expect(faster.bonusHp, 0);
+      expect(tougher.bonusHp, 1);
+      expect(tougher.rivalCount, faster.rivalCount);
+      expect(more.rivalCount, greaterThan(tougher.rivalCount));
+      expect(more.bonusHp, tougher.bonusHp);
     });
 
     test('fort HP grows by stage and refills to that max', () {

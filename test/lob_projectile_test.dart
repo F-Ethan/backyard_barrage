@@ -26,7 +26,7 @@ void main() {
     sprite = Sprite(image);
   });
 
-  test('a ground-track lob draws only a short loft above the hit path', () {
+  test('a ground-track lob climbs above the hit path and comes back down', () {
     final lane = ArenaGrid.laneY(4);
     final shot = LobProjectile(
       sprite: sprite,
@@ -43,14 +43,63 @@ void main() {
     );
 
     var peakLift = 0.0;
-    for (var i = 0; i < 40; i++) {
+    var cameDown = false;
+    for (var i = 0; i < 90; i++) {
       shot.update(1 / 60);
       final lift = shot.hitPosition.y - shot.position.y;
       if (lift > peakLift) peakLift = lift;
+      if (peakLift > 40 && lift < peakLift * 0.35) cameDown = true;
     }
 
-    expect(peakLift, greaterThan(0));
+    expect(peakLift, greaterThan(ThrowPhysics.visualLoftPeak * 0.9));
     expect(peakLift, lessThanOrEqualTo(ThrowPhysics.visualLoftPeak + 0.01));
+    expect(cameDown, isTrue);
+  });
+
+  test('a down-aim climbs, then falls, while the hit stays on the chord', () {
+    final originY = ArenaGrid.laneY(4);
+    final lob = ThrowPhysics.planPlayerLob(
+      throwerRow: 4,
+      throwerColumn: 1,
+      aimDirection: ThrowPhysics.aimForElevation(
+        -ThrowPhysics.maxAimRadians,
+        facingRight: true,
+      ),
+      charge: 1,
+      facingRight: true,
+      originY: originY,
+    );
+    final shot = LobProjectile(
+      sprite: sprite,
+      position: Vector2(220, lob.originY),
+      velocity: Vector2(lob.travelSpeed, 0),
+      targets: <KidComponent>[],
+      onHit: (_, _) {},
+      groundTrack: true,
+      travelSpeed: lob.travelSpeed,
+      flightRange: lob.range,
+      throwerRow: 4,
+      landingRow: lob.landingRow,
+      landingY: lob.landingY,
+    );
+
+    var climbed = 0.0;
+    var sawFall = false;
+    var previousHitY = shot.hitPosition.y;
+    for (var i = 0; i < 80; i++) {
+      shot.update(1 / 60);
+      final lift = shot.hitPosition.y - shot.position.y;
+      if (lift > climbed) climbed = lift;
+      expect(shot.hitPosition.y, greaterThanOrEqualTo(previousHitY - 0.01));
+      previousHitY = shot.hitPosition.y;
+      if (shot.hitPosition.y > originY + 12 && shot.position.y > originY) {
+        sawFall = true;
+      }
+    }
+
+    expect(climbed, greaterThan(24));
+    expect(sawFall, isTrue);
+    expect(shot.hitPosition.y, greaterThan(originY));
   });
 
   test('a scripted miss arches, then splats on the ground once', () {

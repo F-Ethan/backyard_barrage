@@ -321,22 +321,41 @@ class ThrowPhysics {
     return Vector2(forward * math.cos(clamped), -math.sin(clamped));
   }
 
-  /// Peak of the drawn snowball hump, in pixels.
+  /// Peak of the drawn snowball hump, in pixels, for every aim and range.
   ///
-  /// Collision stays on the ground track. This lift is only so the sprite
-  /// reads as a throw. It does not grow with range, so an up-aim and a
-  /// down-aim keep the depth the ground track already chose.
-  static const double visualLoftPeak = 12;
+  /// Tall enough that the sprite climbs off the hand and drops onto the
+  /// landing. It does not grow with range. The old hump did (`range * 0.18`,
+  /// clamped to 48–120), so a full down-aim still hung in the far lanes and
+  /// up-aims were the ones that looked like they connected. Hits stay on the
+  /// ground track, and this lift is the same for an up-aim and a down-aim,
+  /// so the picture keeps the depth the track already chose.
+  static const double visualLoftPeak = 64;
 
   /// Drawn loft above the ground track. Zero at the hand and at the landing.
   ///
   /// [range] does not change the height. A long throw and a short throw
-  /// share [visualLoftPeak].
+  /// share [visualLoftPeak]. The shape is `4 u (1-u)`, so the ball leaves
+  /// the hand climbing and is back on the track at the landing.
   static double loftAt(double u, double range) {
     final uu = u.clamp(0.0, 1.0);
-    if (range.isNaN) return 0;
-    final s = math.sin(math.pi * uu);
-    return visualLoftPeak * s * s;
+    if (range.isNaN || range.abs() < 1) return 0;
+    return visualLoftPeak * 4 * uu * (1 - uu);
+  }
+
+  /// Sprite Y for a ground-track lob. [u] is distance traveled / range.
+  ///
+  /// The chord from [originY] to [landingY] is the hit path. The loft sits
+  /// on that chord, so aiming up draws higher on the screen than aiming
+  /// down by the same gap the hit path uses.
+  static double drawnLobY({
+    required double originY,
+    required double landingY,
+    required double u,
+    required double range,
+  }) {
+    final uu = u.clamp(0.0, 1.0);
+    final chord = originY + (landingY - originY) * uu;
+    return chord - loftAt(uu, range);
   }
 
   /// Contact in ground-track space. The depth window is tighter than the

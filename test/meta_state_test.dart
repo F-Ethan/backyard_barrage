@@ -72,7 +72,7 @@ void main() {
       expect(meta.throwRank, 0);
       expect(meta.shieldCharges, 0);
       expect(meta.season, Season.winter);
-      expect(meta.bestWaveFor(Difficulty.normal), 6);
+      expect(meta.bestWave, 6);
       expect(meta.buyThrowSpeed(), isTrue);
       expect(meta.throwRank, 1);
     });
@@ -100,36 +100,43 @@ void main() {
       expect(meta.fortStage, 2);
       expect(meta.throwRank, 2);
       expect(meta.season, Season.winter);
-      expect(meta.bestWaveFor(Difficulty.normal), 6);
+      expect(meta.bestWave, 6);
     });
 
     test('arcade and campaign wallets do not share coins or skills', () {
       final profile = PlayerSave(
         season: Season.winter,
-        arcade: MetaState(mode: PlayMode.arcade, coins: 100, bestWave: 2),
-        campaign: MetaState(
-          mode: PlayMode.campaign,
-          coins: 100,
-          crewSize: 2,
-          bestWave: 5,
-        ),
+        wallets: {
+          PlayMode.arcade: {
+            Difficulty.normal: MetaState(coins: 100, bestWave: 2),
+          },
+          PlayMode.campaign: {
+            Difficulty.normal: MetaState(coins: 100, crewSize: 2, bestWave: 5),
+          },
+        },
       );
-      expect(profile.arcade.buyExtraKid(), isTrue);
-      profile.arcade.resetRun();
-      expect(profile.arcade.coins, 82);
-      expect(profile.arcade.skills, isEmpty);
-      expect(profile.arcade.bestWaveFor(Difficulty.normal), 2);
-      expect(profile.campaign.coins, 100);
-      expect(profile.campaign.crewSize, 2);
-      expect(profile.campaign.bestWaveFor(Difficulty.normal), 5);
+      expect(
+        profile.wallet(PlayMode.arcade, Difficulty.normal).buyExtraKid(),
+        isTrue,
+      );
+      profile.wallet(PlayMode.arcade, Difficulty.normal).resetRun();
+      expect(profile.wallet(PlayMode.arcade, Difficulty.normal).coins, 82);
+      expect(
+        profile.wallet(PlayMode.arcade, Difficulty.normal).skills,
+        isEmpty,
+      );
+      expect(profile.wallet(PlayMode.arcade, Difficulty.normal).bestWave, 2);
+      expect(profile.wallet(PlayMode.campaign, Difficulty.normal).coins, 100);
+      expect(profile.wallet(PlayMode.campaign, Difficulty.normal).crewSize, 2);
+      expect(profile.wallet(PlayMode.campaign, Difficulty.normal).bestWave, 5);
 
-      profile.campaign.noteWaveCleared(7, difficulty: Difficulty.normal);
-      profile.campaign.resetRun();
-      expect(profile.campaign.bestWaveFor(Difficulty.normal), 7);
-      expect(profile.campaign.crewSize, 2);
-      expect(profile.campaign.coins, 100);
-      expect(profile.arcade.bestWaveFor(Difficulty.normal), 2);
-      expect(profile.arcade.coins, 82);
+      profile.wallet(PlayMode.campaign, Difficulty.normal).noteWaveCleared(7);
+      profile.wallet(PlayMode.campaign, Difficulty.normal).resetRun();
+      expect(profile.wallet(PlayMode.campaign, Difficulty.normal).bestWave, 7);
+      expect(profile.wallet(PlayMode.campaign, Difficulty.normal).crewSize, 2);
+      expect(profile.wallet(PlayMode.campaign, Difficulty.normal).coins, 100);
+      expect(profile.wallet(PlayMode.arcade, Difficulty.normal).bestWave, 2);
+      expect(profile.wallet(PlayMode.arcade, Difficulty.normal).coins, 82);
     });
 
     test('skill ids and costs stay stable for saves', () {
@@ -324,9 +331,9 @@ void main() {
     test('wave rewards grow and best wave only moves forward', () {
       expect(MetaState.coinsForWave(2), greaterThan(MetaState.coinsForWave(1)));
       final meta = MetaState();
-      meta.noteWaveCleared(2, difficulty: Difficulty.normal);
-      meta.noteWaveCleared(1, difficulty: Difficulty.normal);
-      expect(meta.bestWaveFor(Difficulty.normal), 2);
+      meta.noteWaveCleared(2);
+      meta.noteWaveCleared(1);
+      expect(meta.bestWave, 2);
     });
 
     test('json round trip clamps junk values', () {
@@ -343,7 +350,7 @@ void main() {
       expect(restored.fortStage, 1);
       expect(restored.throwRank, MetaState.maxThrowRank);
       expect(restored.season, Season.winter);
-      expect(restored.bestWaveFor(Difficulty.normal), 3);
+      expect(restored.bestWave, 3);
 
       final saved = MetaState(
         coins: 12,
@@ -359,7 +366,7 @@ void main() {
       expect(again.fortStage, 3);
       expect(again.throwRank, 4);
       expect(again.season, Season.winter);
-      expect(again.bestWaveFor(Difficulty.normal), 6);
+      expect(again.bestWave, 6);
       expect(again.owns('team-2'), isTrue);
       expect(again.owns('throw-4'), isTrue);
       expect(again.owns('fort-3'), isTrue);
@@ -413,16 +420,22 @@ void main() {
     final loaded = await SaveStore(preferences: prefs).load();
     expect(loaded.season, Season.winter);
     expect(loaded.mode, PlayMode.campaign);
-    expect(loaded.arcade.coins, 18);
-    expect(loaded.arcade.crewSize, 2);
-    expect(loaded.arcade.fortStage, 2);
-    expect(loaded.arcade.throwRank, 1);
-    expect(loaded.arcade.bestWaveFor(Difficulty.normal), 4);
-    expect(loaded.arcade.skills, isNot(contains('team-3')));
-    expect(loaded.campaign.coins, 9);
-    expect(loaded.campaign.crewSize, 3);
-    expect(loaded.campaign.bestWaveFor(Difficulty.normal), 6);
-    expect(loaded.campaign.owns('team-3'), isTrue);
+    expect(loaded.wallet(PlayMode.arcade, Difficulty.normal).coins, 18);
+    expect(loaded.wallet(PlayMode.arcade, Difficulty.normal).crewSize, 2);
+    expect(loaded.wallet(PlayMode.arcade, Difficulty.normal).fortStage, 2);
+    expect(loaded.wallet(PlayMode.arcade, Difficulty.normal).throwRank, 1);
+    expect(loaded.wallet(PlayMode.arcade, Difficulty.normal).bestWave, 4);
+    expect(
+      loaded.wallet(PlayMode.arcade, Difficulty.normal).skills,
+      isNot(contains('team-3')),
+    );
+    expect(loaded.wallet(PlayMode.campaign, Difficulty.normal).coins, 9);
+    expect(loaded.wallet(PlayMode.campaign, Difficulty.normal).crewSize, 3);
+    expect(loaded.wallet(PlayMode.campaign, Difficulty.normal).bestWave, 6);
+    expect(
+      loaded.wallet(PlayMode.campaign, Difficulty.normal).owns('team-3'),
+      isTrue,
+    );
   });
 
   test('an older single-meta save migrates into arcade', () async {
@@ -443,62 +456,142 @@ void main() {
     final profile = await store.load();
     expect(profile.mode, PlayMode.arcade);
     expect(profile.season, Season.winter);
-    expect(profile.arcade.coins, 21);
-    expect(profile.arcade.crewSize, 2);
-    expect(profile.arcade.throwRank, 1);
-    expect(profile.arcade.bestWaveFor(Difficulty.normal), 4);
-    expect(profile.arcade.owns('team-2'), isTrue);
-    expect(profile.campaign.coins, 0);
-    expect(profile.campaign.skills, isEmpty);
-    expect(profile.campaign.bestWaveFor(Difficulty.normal), 0);
+    expect(profile.wallet(PlayMode.arcade, Difficulty.normal).coins, 21);
+    expect(profile.wallet(PlayMode.arcade, Difficulty.normal).crewSize, 2);
+    expect(profile.wallet(PlayMode.arcade, Difficulty.normal).throwRank, 1);
+    expect(profile.wallet(PlayMode.arcade, Difficulty.normal).bestWave, 4);
+    expect(
+      profile.wallet(PlayMode.arcade, Difficulty.normal).owns('team-2'),
+      isTrue,
+    );
+    expect(profile.wallet(PlayMode.campaign, Difficulty.normal).coins, 0);
+    expect(
+      profile.wallet(PlayMode.campaign, Difficulty.normal).skills,
+      isEmpty,
+    );
+    expect(profile.wallet(PlayMode.campaign, Difficulty.normal).bestWave, 0);
 
-    profile.campaign.coins = 8;
-    profile.campaign.replaceBestWaves({Difficulty.normal: 2});
-    profile.campaign.mode = PlayMode.campaign;
-    await store.save(profile.campaign);
+    profile.wallet(PlayMode.campaign, Difficulty.normal).coins = 8;
+    profile.wallet(PlayMode.campaign, Difficulty.normal).bestWave = 2;
+    profile.wallet(PlayMode.campaign, Difficulty.normal).mode =
+        PlayMode.campaign;
+    await store.save(profile.wallet(PlayMode.campaign, Difficulty.normal));
     final again = await SaveStore(preferences: prefs).load();
-    expect(again.arcade.coins, 21);
-    expect(again.arcade.owns('throw-1'), isTrue);
-    expect(again.campaign.coins, 8);
-    expect(again.campaign.bestWaveFor(Difficulty.normal), 2);
-    expect(again.campaign.skills, isEmpty);
+    expect(again.wallet(PlayMode.arcade, Difficulty.normal).coins, 21);
+    expect(
+      again.wallet(PlayMode.arcade, Difficulty.normal).owns('throw-1'),
+      isTrue,
+    );
+    expect(again.wallet(PlayMode.campaign, Difficulty.normal).coins, 8);
+    expect(again.wallet(PlayMode.campaign, Difficulty.normal).bestWave, 2);
+    expect(again.wallet(PlayMode.campaign, Difficulty.normal).skills, isEmpty);
     expect(again.season, Season.winter);
     final raw =
         jsonDecode(prefs.getString(SaveStore.storageKey)!)
             as Map<String, dynamic>;
-    expect(raw['v'], 2);
-    expect(raw['arcade'], isA<Map<String, dynamic>>());
-    expect(raw['campaign'], isA<Map<String, dynamic>>());
+    expect(raw['v'], 3);
+    final wallets = raw['wallets'] as Map<String, dynamic>;
+    for (final m in PlayMode.values) {
+      final row = wallets[m.name] as Map<String, dynamic>;
+      expect(row.keys, unorderedEquals(Difficulty.values.map((d) => d.name)));
+    }
   });
 
-  group('best wave per difficulty', () {
-    test('each difficulty keeps its own record', () {
-      final meta = MetaState();
-      meta.noteWaveCleared(5, difficulty: Difficulty.easy);
-      meta.noteWaveCleared(2, difficulty: Difficulty.hard);
-      meta.noteWaveCleared(3, difficulty: Difficulty.easy);
-      expect(meta.bestWaveFor(Difficulty.easy), 5);
-      expect(meta.bestWaveFor(Difficulty.normal), 0);
-      expect(meta.bestWaveFor(Difficulty.hard), 2);
+  group('a wallet per mode and difficulty', () {
+    test('six wallets, and nothing crosses between them', () {
+      final profile = PlayerSave();
+      final seen = <MetaState>{};
+      for (final m in PlayMode.values) {
+        for (final d in Difficulty.values) {
+          final w = profile.wallet(m, d);
+          expect(w.mode, m);
+          expect(w.difficulty, d);
+          seen.add(w);
+        }
+      }
+      expect(seen, hasLength(6));
+
+      final easyCampaign = profile.wallet(PlayMode.arcade, Difficulty.easy);
+      easyCampaign.earn(500);
+      expect(easyCampaign.buyExtraKid(), isTrue);
+      easyCampaign.noteWaveCleared(9);
+      for (final w in profile.allWallets) {
+        if (identical(w, easyCampaign)) continue;
+        expect(w.coins, 0);
+        expect(w.skills, isEmpty);
+        expect(w.bestWave, 0);
+        expect(w.score, 0);
+      }
     });
 
-    test('per-difficulty bests survive a save round trip', () {
-      final meta = MetaState()
-        ..noteWaveCleared(7, difficulty: Difficulty.normal)
-        ..noteWaveCleared(4, difficulty: Difficulty.hard);
-      final back = MetaState.fromJson(meta.toJson());
-      expect(back.bestWaveFor(Difficulty.easy), 0);
-      expect(back.bestWaveFor(Difficulty.normal), 7);
-      expect(back.bestWaveFor(Difficulty.hard), 4);
+    test('v3 saves round-trip every wallet', () {
+      final profile = PlayerSave();
+      profile.wallet(PlayMode.arcade, Difficulty.hard)
+        ..earn(40)
+        ..noteWaveCleared(3);
+      profile.wallet(PlayMode.campaign, Difficulty.easy).earn(70);
+      final back = PlayerSave.fromJson(profile.toJson());
+      final hard = back.wallet(PlayMode.arcade, Difficulty.hard);
+      expect(hard.coins, 40);
+      expect(hard.score, 40);
+      expect(hard.bestWave, 3);
+      expect(hard.difficulty, Difficulty.hard);
+      expect(back.wallet(PlayMode.campaign, Difficulty.easy).score, 70);
+      expect(back.wallet(PlayMode.arcade, Difficulty.normal).coins, 0);
     });
 
-    test('an old single best wave loads as the Normal record', () {
-      final back = MetaState.fromJson({'bestWave': 6});
-      expect(back.bestWaveFor(Difficulty.normal), 6);
-      expect(back.bestWaveFor(Difficulty.easy), 0);
-      expect(back.bestWaveFor(Difficulty.hard), 0);
+    test('a v2 save keeps its wallet on Normal and splits the bests', () {
+      final back = PlayerSave.fromJson({
+        'v': 2,
+        'season': 'winter',
+        'mode': 'arcade',
+        'arcade': {
+          'coins': 55,
+          'skills': ['team-2'],
+          'bestWaves': {'easy': 9, 'normal': 4, 'hard': 2},
+        },
+        'campaign': {'coins': 11, 'bestWave': 6},
+      });
+      final normal = back.wallet(PlayMode.arcade, Difficulty.normal);
+      expect(normal.coins, 55);
+      expect(normal.owns('team-2'), isTrue);
+      expect(normal.bestWave, 4);
+      final easy = back.wallet(PlayMode.arcade, Difficulty.easy);
+      expect(easy.coins, 0);
+      expect(easy.skills, isEmpty);
+      expect(easy.bestWave, 9);
+      expect(back.wallet(PlayMode.arcade, Difficulty.hard).bestWave, 2);
+      // A lone old best wave counts as Normal.
+      expect(back.wallet(PlayMode.campaign, Difficulty.normal).bestWave, 6);
+      expect(back.wallet(PlayMode.campaign, Difficulty.normal).coins, 11);
+      expect(back.wallet(PlayMode.campaign, Difficulty.hard).bestWave, 0);
     });
   });
+
+  test('score follows every coin earned and is never spent or reset', () {
+    final meta = MetaState();
+    meta.earn(30);
+    meta.earn(12);
+    expect(meta.coins, 42);
+    expect(meta.score, 42);
+    expect(meta.buyExtraKid(), isTrue);
+    expect(meta.coins, lessThan(42));
+    meta.resetRun();
+    expect(meta.score, 42);
+    expect(MetaState.fromJson(meta.toJson()).score, 42);
+  });
+
+  test(
+    'the modes are labelled Campaign (skills wipe) and Arcade (skills stay)',
+    () {
+      expect(PlayMode.arcade.label, 'Campaign');
+      expect(PlayMode.arcade.blurb, 'Skills wipe on defeat. Coins stay.');
+      expect(PlayMode.arcade.showsScore, isFalse);
+      expect(PlayMode.campaign.label, 'Arcade');
+      expect(PlayMode.campaign.blurb, 'Skills stay. Restart at wave 1.');
+      expect(PlayMode.campaign.showsScore, isTrue);
+    },
+  );
 
   test('summer is switched off: saves and setters land on winter', () {
     expect(Season.playable, [Season.winter]);

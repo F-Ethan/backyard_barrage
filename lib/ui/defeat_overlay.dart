@@ -67,10 +67,17 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                   runSpacing: tokens.space.sm,
                   children: [
                     _Stat(label: 'CLEARED', value: '$cleared'),
-                    _Stat(
-                      label: '${difficulty.label.toUpperCase()} BEST',
-                      value: '${meta.bestWaveFor(difficulty)}',
-                    ),
+                    if (meta.mode.showsScore)
+                      _Stat(
+                        key: const Key('defeat-score'),
+                        label: '${difficulty.label.toUpperCase()} SCORE',
+                        value: '${meta.score}',
+                      )
+                    else
+                      _Stat(
+                        label: '${difficulty.label.toUpperCase()} BEST',
+                        value: '${meta.bestWave}',
+                      ),
                     TagPill(child: CoinAmount(amount: meta.coins)),
                   ],
                 ),
@@ -126,7 +133,7 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
+  const _Stat({super.key, required this.label, required this.value});
 
   final String label;
   final String value;

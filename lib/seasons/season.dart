@@ -49,11 +49,27 @@ class SeasonAssets {
     Season.summer => 'vfx/impact_splash_draft.png',
   };
 
+  /// Player-winter aim sweep: 30l, 15l, sheet charge, 15r, 30r.
+  ///
+  /// Center is the sheet-matched charge (`from_sheet`), not the hero still
+  /// `player_charge_winter_3d_v1.png`. Throw stays on the 2D draft.
+  static const _playerWinterAim = {
+    'turn_30l': 'characters/player/player_turn_30l_winter_3d_v1.png',
+    'turn_15l': 'characters/player/player_turn_15l_winter_3d_v1.png',
+    'charge': 'characters/player/player_charge_winter_3d_from_sheet.png',
+    'turn_15r': 'characters/player/player_turn_15r_winter_3d_v1.png',
+    'turn_30r': 'characters/player/player_turn_30r_winter_3d_v1.png',
+  };
+
   static String pose({
     required bool player,
     required Season season,
     required String pose,
   }) {
+    if (player && season == Season.winter) {
+      final aimed = _playerWinterAim[pose];
+      if (aimed != null) return aimed;
+    }
     final who = player ? 'player' : 'enemy';
     return 'characters/$who/${who}_${pose}_${season.name}_draft.png';
   }

@@ -5,11 +5,12 @@ import 'package:flutter/painting.dart';
 
 import '../arena_grid.dart';
 
-/// Aim preview near the throwing kid: charge glow at the hand, a dotted
-/// line on the yard floor along the swept track, and a landing mark where
-/// the ball comes down. When the line will hit a rival, the line stops at
-/// them and their feet get a lock ring. The power bar lives in the
-/// screen-space HUD.
+/// Aim preview near the throwing kid: charge glow at the hand, a faint
+/// dotted aim line on the yard floor across the whole yard, a bright stretch
+/// of it out to where the ball lands at the current power, and a landing
+/// mark. When [target] is set the bright stretch stops at that rival and
+/// their feet get a lock ring. Difficulty decides how much of this shows
+/// ([showPath], [target]). The power bar lives in the screen-space HUD.
 class ChargeIndicator extends PositionComponent {
   ChargeIndicator({Sprite? glowSprite})
     : _glowSprite = glowSprite,
@@ -24,7 +25,15 @@ class ChargeIndicator extends PositionComponent {
   /// Body-height start and end of the ground track. The floor marks draw
   /// [ArenaGrid.bodyLift] below these, where feet stand.
   Vector2? trackStart;
+
+  /// Where the ball lands at the current power.
   Vector2? trackEnd;
+
+  /// The aim line carried to the far side of the yard.
+  Vector2? aimEnd;
+
+  /// False hides the floor path, landing mark, and ring (Hard).
+  bool showPath = true;
 
   /// Hit center of the rival this release would hit, if any.
   Vector2? target;
@@ -50,8 +59,8 @@ class ChargeIndicator extends PositionComponent {
 
     final start = trackStart;
     final end = trackEnd;
-    if (start != null && end != null) {
-      _renderFloorPath(canvas, start, end, target);
+    if (showPath && start != null && end != null) {
+      _renderFloorPath(canvas, start, end, aimEnd ?? end, target);
     }
 
     final dir = aimDir.clone();
@@ -75,25 +84,35 @@ class ChargeIndicator extends PositionComponent {
     Canvas canvas,
     Vector2 start,
     Vector2 end,
+    Vector2 aim,
     Vector2? hit,
   ) {
     const lift = ArenaGrid.bodyLift;
     final from = Offset(start.x, start.y + lift);
     var to = Offset(end.x, end.y + lift);
+    final far = Offset(aim.x, aim.y + lift);
     if (hit != null && hit.x > start.x && hit.x < end.x) {
       final u = (hit.x - start.x) / (end.x - start.x);
       to = Offset.lerp(from, to, u)!;
     }
 
-    // Dots, skipping the stretch under the thrower's own body.
+    // Dots on one fixed spacing from the hand, skipping the stretch under
+    // the thrower's own body. Bright up to the landing, faint past it.
+    const gap = 22.0;
+    const skip = 60.0;
+    final reach = (to - from).distance;
+    final total = (far - from).distance;
+    final faint = Paint()..color = _ink.withValues(alpha: 0.3);
     final dot = Paint()..color = _charge.withValues(alpha: 0.9);
     final rim = Paint()..color = _ink.withValues(alpha: 0.35);
-    final length = (to - from).distance;
-    const gap = 22.0;
-    for (var d = 60.0; d < length - 10; d += gap) {
-      final p = Offset.lerp(from, to, d / length)!;
-      canvas.drawCircle(p.translate(0, 1.5), 4.5, rim);
-      canvas.drawCircle(p, 4, dot);
+    for (var d = skip; d < total - 4; d += gap) {
+      final p = Offset.lerp(from, far, d / total)!;
+      if (d < reach - 10) {
+        canvas.drawCircle(p.translate(0, 1.5), 4.5, rim);
+        canvas.drawCircle(p, 4, dot);
+      } else if (d > reach + 14) {
+        canvas.drawCircle(p, 3, faint);
+      }
     }
 
     if (hit != null) {

@@ -1,7 +1,30 @@
 import '../game/combat_rules.dart';
 
 /// How hard the backyard fight is. Stored with the other device settings.
-enum Difficulty { easy, normal, hard }
+enum Difficulty {
+  easy,
+  normal,
+  hard;
+
+  /// How much of the throw preview this mode draws while charging.
+  AimPreview get aimPreview => switch (this) {
+    Difficulty.easy => AimPreview.full,
+    Difficulty.normal => AimPreview.path,
+    Difficulty.hard => AimPreview.none,
+  };
+}
+
+/// Throw preview levels. The aim arrow and charge glow always show.
+enum AimPreview {
+  /// Floor path, landing mark, and a ring on the rival the throw will hit.
+  full,
+
+  /// Floor path and landing mark. No target ring.
+  path,
+
+  /// No floor path.
+  none,
+}
 
 /// Knobs that change with [Difficulty]. Row lanes, charge anchors, and the
 /// peak-of-arc fort clear stay the same on every mode.

@@ -21,6 +21,7 @@ import 'package:backyard_barrage/meta/meta_state.dart';
 import 'package:backyard_barrage/meta/play_mode.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
 import 'package:backyard_barrage/meta/settings_store.dart';
+import 'package:backyard_barrage/meta/skill_tree.dart';
 import 'package:backyard_barrage/seasons/season.dart';
 import 'package:backyard_barrage/ui/barrage_theme.dart';
 import 'package:flame/components.dart';
@@ -738,6 +739,11 @@ void main() {
     expect(node.left, greaterThanOrEqualTo(sheet.left + margin));
     expect(node.right, lessThanOrEqualTo(sheet.right - margin));
     expect(branch.left, greaterThanOrEqualTo(sheet.left + margin));
+    // The open branch's chain shows once, in the middle. The branch list
+    // does not repeat it under the selected tile.
+    for (final node in SkillTree.chain(SkillBranch.throwSpeed).take(2)) {
+      expect(find.text(node.title), findsOneWidget, reason: node.title);
+    }
     expect(find.byKey(const Key('season-winter')), findsOneWidget);
     expect(find.byKey(const ValueKey('chip-winter-true')), findsNothing);
     await tester.tap(find.byKey(const Key('skill-group-crew')));
@@ -892,12 +898,14 @@ void main() {
     game.pressChargeZone();
     game.update(0.12);
     await tester.pump();
-    expect(game.charge, closeTo(1 / 3, 0.04));
+    expect(game.charge, greaterThan(1 / 3));
+    expect(game.charge, lessThan(0.4));
     expect(find.byKey(const Key('charge-glow')), findsOneWidget);
     expect(find.byKey(const Key('power-bar')), findsNothing);
 
     game.update(0.9);
-    expect(game.charge, closeTo(0.5, 0.06));
+    // A steady climb: 1.02s into the 3s rank-0 hold.
+    expect(game.charge, closeTo(1 / 3 + 2 / 3 * (1.02 / 3), 0.02));
     game.update(2);
     expect(game.charge, greaterThan(0.98));
     game.releaseChargeZone();
@@ -1004,7 +1012,9 @@ void main() {
     final kid = game.players.first;
     final rival = game.enemies.first;
     const step = 0.1;
-    final free = math.sin(2 * math.pi * step / ThrowPhysics.swivelPeriod);
+    final free = ThrowPhysics.sweepWave(
+      2 * math.pi * step / ThrowPhysics.swivelPeriod,
+    );
 
     // Off the line: the sweep moves at full speed.
     rival.position = Vector2(1000, kid.position.y + ArenaGrid.rowStep * 3);
@@ -1066,6 +1076,63 @@ void main() {
       closeTo(0, 1e-9),
       reason: 'already on target, no nudge',
     );
+  });
+
+  testWidgets('the throw preview thins out on Normal and Hard', (tester) async {
+    final booted = await boot(tester, MetaState());
+    final game = booted.game;
+    freezeRivals(game);
+    final kid = game.players.first;
+    final rival = game.enemies.first;
+    rival.position = Vector2(1000, kid.position.y);
+    game.pressMoveZone(kid.hitCenter);
+    game.releaseMoveZone();
+
+    Future<void> holdUntilLocked(Difficulty difficulty) async {
+      game.feel.apply(game.feel.settings.copyWith(difficulty: difficulty));
+      game.pressChargeZone();
+      for (var i = 0; i < 300 && game.aimTarget == null; i++) {
+        game.update(1 / 60);
+      }
+      expect(game.aimTarget, rival);
+    }
+
+    // Drop the charge without throwing, so no ball ends the wave.
+    void letGo() {
+      game.pauseMatch();
+      game.resumeMatch();
+      expect(game.isCharging, isFalse);
+    }
+
+    await holdUntilLocked(Difficulty.easy);
+    expect(game.chargeHud.showPath, isTrue);
+    expect(game.chargeHud.target, isNotNull);
+    letGo();
+
+    await holdUntilLocked(Difficulty.normal);
+    expect(game.chargeHud.showPath, isTrue);
+    expect(game.chargeHud.target, isNull);
+    letGo();
+
+    await holdUntilLocked(Difficulty.hard);
+    expect(game.chargeHud.showPath, isFalse);
+    expect(game.chargeHud.target, isNull);
+    letGo();
+  });
+
+  testWidgets('the aim line spans the yard from the first frame', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    freezeRivals(game);
+    final kid = game.players.first;
+    game.pressMoveZone(kid.hitCenter);
+    game.releaseMoveZone();
+    game.pressChargeZone();
+    game.update(1 / 60);
+    final hud = game.chargeHud;
+    expect(hud.aimEnd!.x, closeTo(ThrowPhysics.yardFarEdge, 0.01));
+    expect(hud.trackEnd!.x, lessThan(hud.aimEnd!.x));
   });
 
   testWidgets('a near miss is nudged onto the rival, a clear miss is not', (
@@ -1167,12 +1234,9 @@ void main() {
     final enemy = game.enemies.first;
     final period = ThrowPhysics.swivelPeriod;
 
-    // Hold time where sin(2π t / period) equals [sine], after the up-screen
+    // Hold time where the triangle sweep equals [sine], after the up-screen
     // peak and before the down-screen end of the same cycle.
-    double holdForSine(double sine) {
-      final angle = math.pi - math.asin(sine);
-      return period * angle / (2 * math.pi);
-    }
+    double holdForSine(double sine) => period * (2 - sine) / 4;
 
     game.pressChargeZone();
     expect(kid.chargeYaw, ChargeYaw.across);

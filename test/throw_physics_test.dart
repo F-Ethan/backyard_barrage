@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:backyard_barrage/game/arena_grid.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
 import 'package:backyard_barrage/game/throw_physics.dart';
+import 'package:backyard_barrage/meta/difficulty.dart';
 import 'package:flame/extensions.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -48,38 +49,54 @@ void main() {
       expect(velocity.y, lessThan(0));
     });
 
+    test('charge starts at the tap minimum and climbs steadily to full', () {
+      const duration = 3.0;
+      const min = ThrowPhysics.minThrowCharge;
+      expect(ThrowPhysics.chargeForHold(0, duration), closeTo(min, 1e-9));
+      // No plateau: the bar is already moving a tenth of a second in.
+      expect(ThrowPhysics.chargeForHold(0.1, duration), greaterThan(min));
+      expect(
+        ThrowPhysics.chargeForHold(1, duration),
+        closeTo(min + (1 - min) / 3, 1e-9),
+      );
+      expect(ThrowPhysics.chargeForHold(duration, duration), 1);
+      expect(ThrowPhysics.chargeForHold(4, duration), 1);
+
+      double step(double t) {
+        const dt = 0.25;
+        return ThrowPhysics.chargeForHold(t + dt, duration) -
+            ThrowPhysics.chargeForHold(t, duration);
+      }
+
+      // Same rate the whole way up.
+      expect(step(0), closeTo(step(1.2), 1e-9));
+      expect(step(1.2), closeTo(step(2.5), 1e-9));
+    });
+
     test(
-      'charge anchors: tap is a third, one second is half, three seconds is full',
+      'the aim sweep pans at a constant speed with no pause at the ends',
       () {
-        const duration = 3.0;
-        expect(
-          ThrowPhysics.chargeForHold(0, duration),
-          closeTo(ThrowPhysics.minThrowCharge, 0.001),
-        );
-        expect(
-          ThrowPhysics.chargeForHold(0.12, duration),
-          closeTo(1 / 3, 0.02),
-        );
-        expect(ThrowPhysics.chargeForHold(1, duration), closeTo(0.5, 0.03));
-        expect(ThrowPhysics.chargeForHold(duration, duration), 1);
-        expect(ThrowPhysics.chargeForHold(4, duration), 1);
-
-        // The top half of the bar (1/2 → 1) takes the remaining two seconds.
-        expect(ThrowPhysics.chargeForHold(0.85, duration), lessThan(0.5));
-        expect(ThrowPhysics.chargeForHold(2, duration), greaterThan(0.5));
-        expect(ThrowPhysics.chargeForHold(2, duration), lessThan(1));
-
-        double step(double t) {
-          const dt = 0.25;
-          return ThrowPhysics.chargeForHold(t + dt, duration) -
-              ThrowPhysics.chargeForHold(t, duration);
-        }
-
-        // Past the halfway mark the half-bell keeps slowing down.
-        expect(step(1.1), greaterThan(step(1.8)));
-        expect(step(1.8), greaterThan(step(2.5)));
+        const quarter = math.pi / 2;
+        expect(ThrowPhysics.sweepWave(0), closeTo(0, 1e-9));
+        expect(ThrowPhysics.sweepWave(quarter), closeTo(1, 1e-9));
+        expect(ThrowPhysics.sweepWave(2 * quarter), closeTo(0, 1e-9));
+        expect(ThrowPhysics.sweepWave(3 * quarter), closeTo(-1, 1e-9));
+        expect(ThrowPhysics.sweepWave(4 * quarter), closeTo(0, 1e-9));
+        // Equal phase steps move the same distance, right up to the turn.
+        const d = 0.1;
+        final mid = ThrowPhysics.sweepWave(d) - ThrowPhysics.sweepWave(0);
+        final nearEnd =
+            ThrowPhysics.sweepWave(quarter) -
+            ThrowPhysics.sweepWave(quarter - d);
+        expect(nearEnd, closeTo(mid, 1e-9));
       },
     );
+
+    test('preview detail drops with difficulty', () {
+      expect(Difficulty.easy.aimPreview, AimPreview.full);
+      expect(Difficulty.normal.aimPreview, AimPreview.path);
+      expect(Difficulty.hard.aimPreview, AimPreview.none);
+    });
 
     test('full power reaches the enemy half and a tap does not', () {
       final size = Vector2(152, 152);

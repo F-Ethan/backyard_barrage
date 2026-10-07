@@ -394,7 +394,6 @@ class _BranchList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final motion = context.motion;
     return ListView(
       padding: EdgeInsets.zero,
       children: [
@@ -408,33 +407,6 @@ class _BranchList extends StatelessWidget {
               onTap: () => onSelect(branch),
             ),
           ),
-          if (branch == selected)
-            AnimatedSize(
-              duration: motion.medium,
-              curve: motion.enter,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: tokens.space.xl,
-                  bottom: tokens.space.xs,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final node in SkillTree.chain(branch))
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: Text(
-                          node.title,
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.ellipsis,
-                          style: BarrageType.muted.copyWith(fontSize: 12),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
         ],
       ],
     );
@@ -480,17 +452,6 @@ class _BranchTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            AnimatedRotation(
-              turns: selected ? 0.25 : 0,
-              duration: motion.medium,
-              curve: motion.enter,
-              child: Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: onColor,
-              ),
-            ),
-            const SizedBox(width: 2),
             Expanded(
               child: Text(
                 label,

@@ -76,6 +76,7 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 
 ### 3.4 AI (simple)
 - Rivals target a living player kid, throw on the difficulty timer, and step with the Easy / Normal / Hard lane rules
+- People vs snowmen: rivals come in types. **Snow ghost** is the standard lobber. **Frost kid** is long range: it works back to the column behind its fort, winds up longer with a glint on the ball, rarely lands short, and takes one hit less (never under one). **Rusher** (stand-in art: the original 2D rival kid) holds the front line and throws quick, loose lobs. Each wave's lineup comes from `RivalRoster`: slot 0 is always a ghost; frost kids join on wave 4 / 3 / 2 and rushers on wave 6 / 5 / 3 (Easy / Normal / Hard); the special share grows every two waves, so the mix keeps changing after the head count caps at five.
 - Charge: Easy bots hold about 4.5s at rank 0. Normal bots hold the unscaled rank-0 charge, about 3s. Hard bots keep a short windup (about 0.3–0.55s), so Hard still charges faster than the player
 - Throw about every 3s on Normal (slower on Easy, about 1–1.5s on Hard)
 - After a throw, step one row toward a living opponent if nobody is within one row. Easy does that every other throw. Normal does it every throw. Hard steps onto the closest opponent's exact row every throw

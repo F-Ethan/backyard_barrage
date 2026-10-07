@@ -25,6 +25,8 @@ class KidPoseSprites {
     required this.turn15r,
     required this.turn30r,
     this.uprightKo = false,
+    this.koDrop = 40,
+    this.drawScale = 1,
   });
 
   Sprite idle;
@@ -41,6 +43,14 @@ class KidPoseSprites {
 
   /// No lying-down KO frame (the 3D pack). The upright pose tips over.
   bool uprightKo;
+
+  /// How far the KO and knockdown frames sit below the feet. The 2D drafts
+  /// need 40px; renders that lie on the feet line use 0.
+  double koDrop;
+
+  /// Art drawn this much larger than the body box, from the feet. Hit
+  /// circles and depth do not change.
+  double drawScale;
 }
 
 /// Kid sprite with idle / walk / charge / throw / hit / KO poses.
@@ -64,6 +74,8 @@ class KidComponent extends SpriteComponent {
        turn15rSprite = poses.turn15r,
        turn30rSprite = poses.turn30r,
        _uprightKo = poses.uprightKo,
+       _koDrop = poses.koDrop,
+       _drawScale = poses.drawScale,
        super(
          sprite: poses.idle,
          position: position,
@@ -86,6 +98,16 @@ class KidComponent extends SpriteComponent {
   Sprite turn15rSprite;
   Sprite turn30rSprite;
   bool _uprightKo;
+  double _koDrop;
+  double _drawScale;
+
+  /// Shows a glint while winding up (long-range rivals).
+  bool glint = false;
+
+  /// Where the glint sits, from the feet, as a fraction of the art square
+  /// (x forward-right, y up is negative). Null uses the throwing hand.
+  Vector2? glintAt;
+  double _glintAge = 0;
   final int maxHp;
   int hp;
 
@@ -190,6 +212,8 @@ class KidComponent extends SpriteComponent {
     turn15rSprite = poses.turn15r;
     turn30rSprite = poses.turn30r;
     _uprightKo = poses.uprightKo;
+    _koDrop = poses.koDrop;
+    _drawScale = poses.drawScale;
     _refreshSprite();
   }
 
@@ -400,6 +424,7 @@ class KidComponent extends SpriteComponent {
       if (_throwPoseTimer <= 0) refresh = true;
     }
     if (_flashTimer > 0) _flashTimer -= dt;
+    _glintAge = _chargingPose ? _glintAge + dt : 0;
     if (_recoilTimer > 0) _recoilTimer -= dt;
     if (isKo) {
       _koAge += dt;
@@ -441,9 +466,44 @@ class KidComponent extends SpriteComponent {
   }
 
   void _renderBody(Canvas canvas) {
+    final scaled = _drawScale != 1;
+    if (scaled) {
+      final feet = Offset(size.x / 2, size.y);
+      canvas.save();
+      canvas.translate(feet.dx, feet.dy);
+      canvas.scale(_drawScale);
+      canvas.translate(-feet.dx, -feet.dy);
+    }
     final moved = _applyFeelTransform(canvas);
     _renderPosed(canvas);
     if (moved) canvas.restore();
+    if (scaled) canvas.restore();
+    if (glint && _chargingPose && !isKo && !isStunned) _drawGlint(canvas);
+  }
+
+  /// A pulsing four-point sparkle on the ball.
+  void _drawGlint(Canvas canvas) {
+    final at = glintAt;
+    final hand = at == null
+        ? throwOrigin - position + Vector2(size.x / 2, size.y)
+        : Vector2(size.x / 2, size.y) +
+              Vector2(at.x * size.x, at.y * size.y) * _drawScale;
+    final pulse = 0.6 + 0.4 * math.sin(_glintAge * 14);
+    final r = 14.0 * pulse;
+    final center = Offset(hand.x, hand.y);
+    canvas.drawCircle(
+      center,
+      r * 0.9,
+      Paint()
+        ..color = const Color(0x66FFFFFF)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+    final ray = Paint()
+      ..color = const Color(0xFFFFF8D6)
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(center.translate(-r, 0), center.translate(r, 0), ray);
+    canvas.drawLine(center.translate(0, -r), center.translate(0, r), ray);
   }
 
   /// Jolt, squash, and throw lunge, pivoting at the feet. Returns true when
@@ -481,10 +541,11 @@ class KidComponent extends SpriteComponent {
     }
     canvas.save();
     if (isKo) {
-      canvas.translate(0, 40);
+      canvas.translate(0, _koDrop);
     } else if (_downTimer > 0 && _downDuration > 0) {
       final t = (_downTimer / _downDuration).clamp(0.0, 1.0);
-      final down = t > 0.35 ? 30.0 : 30.0 * (t / 0.35);
+      final sink = _koDrop * 0.75;
+      final down = t > 0.35 ? sink : sink * (t / 0.35);
       canvas.translate(0, down);
     }
     super.render(canvas);

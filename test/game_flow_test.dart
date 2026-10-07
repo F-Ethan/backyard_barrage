@@ -15,6 +15,7 @@ import 'package:backyard_barrage/game/components/fort_component.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
 import 'package:backyard_barrage/game/components/lob_projectile.dart';
 import 'package:backyard_barrage/game/components/splash_particles.dart';
+import 'package:backyard_barrage/game/rival_type.dart';
 import 'package:backyard_barrage/game/throw_physics.dart';
 import 'package:backyard_barrage/meta/difficulty.dart';
 import 'package:backyard_barrage/meta/meta_state.dart';
@@ -52,6 +53,9 @@ void main() {
           for (final pose in SeasonAssets.poseNames)
             SeasonAssets.pose(player: player, season: season, pose: pose),
       ],
+      for (final type in RivalType.values)
+        for (final pose in SeasonAssets.poseNames)
+          ?SeasonAssets.rivalPose(type, pose),
       for (final stage in [1, 2, 3]) ...[
         'forts/fort_stage_${stage}_draft.png',
         'forts/fort_stage_${stage}_damaged_draft.png',
@@ -562,6 +566,40 @@ void main() {
     await tester.pump();
     expect(game.wave, 2);
     expect(game.arena, kept);
+  });
+
+  testWidgets('a Hard wave mixes rival types and each takes its post', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));
+    game.wave = 5;
+    game.startWave();
+    game.finishEntrance();
+    final types = [for (final e in game.enemies) game.rivalTypeOf(e)];
+    expect(types.first, RivalType.snowGhost);
+    expect(types, containsAll([RivalType.frostKid, RivalType.rusher]));
+    final base = DifficultyTuning.of(
+      Difficulty.hard,
+      wave: 5,
+      rivalCurve: true,
+    ).enemyHitsToKo;
+    for (final e in game.enemies) {
+      final type = game.rivalTypeOf(e);
+      final profile = RivalProfile.of(type);
+      expect(e.maxHp, profile.hitsToKo(base), reason: type.name);
+      expect(e.glint, profile.glint, reason: type.name);
+      final hold = profile.holdColumn;
+      if (hold != null) {
+        expect(
+          ArenaGrid.nearestCell(KidSide.enemy, e.position).column,
+          hold,
+          reason: '${type.name} walks on to its post',
+        );
+      }
+      final brain = e.children.whereType<EnemyController>().single;
+      expect(brain.profile.gapScale, profile.gapScale);
+    }
   });
 
   testWidgets('a wiped crew can retry at full HP', (tester) async {

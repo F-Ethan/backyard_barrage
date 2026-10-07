@@ -1,3 +1,5 @@
+import '../game/rival_type.dart';
+
 /// Winter snowballs or summer water balloons. Same rules, different art.
 enum Season {
   winter,
@@ -98,9 +100,64 @@ class SeasonAssets {
   /// 3D frame) puts the 3D kid on the same bottom-center anchor at the same
   /// height. Null for 2D drafts, which use the whole image.
   static (double, double, double)? crop(String path) {
+    if (path.startsWith(rivalDir)) {
+      // Rival renders are 512² with the feet on y≈471 (941/1024). A square
+      // as tall as the feet line sits them on the bottom-center anchor. The
+      // widest frames (throw, KO) lose a few pixels at the edges.
+      return (20.5, 0, 471);
+    }
     if (!path.contains('_3d_')) return null;
     return (116, 118, 792);
   }
+
+  static const rivalDir = 'characters/rivals/';
+
+  /// Rival art for [type], or null when the type uses the 2D enemy drafts.
+  ///
+  /// Both rivals charge on their windup, snowball raised, in the same look
+  /// as their throw. Their `aim_*` frames are a smoother sculpt and are not
+  /// drawn. The ghost windup is the v1 frame from `characters/enemy/ghost/`,
+  /// rescaled to the v2 framing.
+  static String? rivalPose(RivalType type, String pose) {
+    final (folder, frame) = switch (type) {
+      RivalType.snowGhost => (
+        'ghost',
+        switch (pose) {
+          'charge' ||
+          'turn_30l' ||
+          'turn_15l' ||
+          'turn_15r' ||
+          'turn_30r' => 'windup',
+          'walk' || 'pickup' => 'idle',
+          _ => pose,
+        },
+      ),
+      RivalType.frostKid => (
+        'frostkid',
+        switch (pose) {
+          'charge' ||
+          'turn_30l' ||
+          'turn_15l' ||
+          'turn_15r' ||
+          'turn_30r' => 'windup',
+          'walk' || 'pickup' => 'idle',
+          _ => pose,
+        },
+      ),
+      RivalType.rusher => (null, null),
+    };
+    if (folder == null) return null;
+    return '$rivalDir$folder/${folder}_${frame}_draft.png';
+  }
+
+  /// Drawn size of a rival's art relative to its 152px body box. The renders
+  /// leave headroom above the hat, so they draw a little larger to stand
+  /// about as tall as the player kid. Hit circles do not change.
+  static double rivalDrawScale(RivalType type) => switch (type) {
+    RivalType.snowGhost => 1.12,
+    RivalType.frostKid => 1.18,
+    RivalType.rusher => 1,
+  };
 
   /// 3D player frames whose lead arm points screen-left, at the kid's own
   /// fort. The player faces right toward the rivals (`docs/TURN_YAWS.md`),

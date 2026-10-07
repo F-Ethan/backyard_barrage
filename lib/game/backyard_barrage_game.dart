@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flame/camera.dart';
 import 'package:flame/components.dart';
@@ -170,6 +169,10 @@ class BackyardBarrageGame extends FlameGame {
 
   /// Sweep position in radians. Advances slower while the line is on a rival.
   double _sweepPhase = 0;
+
+  /// Sweep speed as a share of full speed. Eases toward the friction share
+  /// while the line is on a rival, and back to 1 off it.
+  double _sweepSpeed = 1;
   KidComponent? _aimTarget;
   Vector2 _aimDir = Vector2(1, 0);
   Vector2? _moveTarget;
@@ -927,6 +930,7 @@ class BackyardBarrageGame extends FlameGame {
     _charge = ThrowPhysics.minThrowCharge;
     _swivel = 0;
     _sweepPhase = 0;
+    _sweepSpeed = 1;
     _aimTarget = null;
     _moveTarget = null;
     _grabOffset = Vector2.zero();
@@ -1222,19 +1226,27 @@ class BackyardBarrageGame extends FlameGame {
     final start = _trackStart(kid);
     final range = ThrowPhysics.rangeForCharge(_charge);
     final elevation = ThrowPhysics.aimElevation(_aimDir, facingRight: true);
-    final far = math.min(range, ThrowPhysics.yardFarEdge - start.x);
-    chargeHud.trackStart = start;
-    chargeHud.trackEnd = Vector2(
-      start.x + far,
+    final edge = ThrowPhysics.yardFarEdge - start.x;
+    Vector2 along(double forward) => Vector2(
+      start.x + forward,
       ThrowPhysics.clampTrackY(
         ThrowPhysics.trackYAt(
           startY: start.y,
           elevation: elevation,
-          forward: far,
+          forward: forward,
         ),
       ),
     );
-    chargeHud.target = _aimTarget?.hitCenter;
+    final preview = feel.settings.difficulty.aimPreview;
+    chargeHud.showPath = preview != AimPreview.none;
+    chargeHud.trackStart = start;
+    // The aim line always runs the length of the yard, so the pan reads on
+    // its own. Power only moves the landing mark along it.
+    chargeHud.aimEnd = along(edge);
+    chargeHud.trackEnd = along(math.min(range, edge));
+    chargeHud.target = preview == AimPreview.full
+        ? _aimTarget?.hitCenter
+        : null;
   }
 
   void _publishCharge() {
@@ -1331,6 +1343,7 @@ class BackyardBarrageGame extends FlameGame {
     _chargeHeld = 0;
     _swivel = 0;
     _sweepPhase = 0;
+    _sweepSpeed = 1;
     _aimTarget = null;
     _moveTarget = null;
     _grabOffset = Vector2.zero();
@@ -1417,13 +1430,13 @@ class BackyardBarrageGame extends FlameGame {
         // The sweep lingers while the line crosses a rival (in reach or
         // not), so a release on target is a fair window.
         final onLine = _scanAim(kid, _swivel, double.infinity).hit != null;
+        final goal = onLine ? ThrowPhysics.aimFriction : 1.0;
+        final blend = math.min(1.0, dt * ThrowPhysics.aimFrictionBlend);
+        _sweepSpeed += (goal - _sweepSpeed) * blend;
         _sweepPhase +=
-            dt *
-            2 *
-            math.pi /
-            ThrowPhysics.swivelPeriod *
-            (onLine ? ThrowPhysics.aimFriction : 1);
-        _swivel = math.sin(_sweepPhase) * ThrowPhysics.maxAimRadians;
+            dt * 2 * math.pi / ThrowPhysics.swivelPeriod * _sweepSpeed;
+        _swivel =
+            ThrowPhysics.sweepWave(_sweepPhase) * ThrowPhysics.maxAimRadians;
         _aimDir = ThrowPhysics.aimForElevation(_swivel, facingRight: true);
         _aimTarget = _scanAim(
           kid,

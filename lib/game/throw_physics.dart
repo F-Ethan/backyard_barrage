@@ -225,10 +225,6 @@ class ThrowPhysics {
     return reach;
   }
 
-  /// `z` in `erf(z * u) / erf(z)`. Chosen so one third of the hold (1s of a
-  /// 3s charge) lands on half power.
-  static const double chargeBellZ = 1.33323;
-
   static const double _minLoft = 16 * math.pi / 180;
   static const double _maxLoft = 32 * math.pi / 180;
 
@@ -239,22 +235,32 @@ class ThrowPhysics {
 
   /// Charge in `[minThrowCharge, 1]` after holding for [held] seconds.
   ///
-  /// The shape is the rising half of a Gaussian CDF (`erf`), from the mean
-  /// out into the tail. Fill rate is the right half of a bell: fastest at
-  /// the start of the climb, then progressively slower.
-  ///
-  /// Anchors when [duration] is 3 seconds (throw rank 0):
-  /// a tap stays at about 1/3, ~1 second is half power, ~3 seconds is full.
-  /// The top half of the bar (1/2 → 1) takes the remaining two seconds.
+  /// Starts at the tap minimum and climbs at a steady rate from the first
+  /// frame, so the bar never sits still. Anchors when [duration] is 3 seconds
+  /// (throw rank 0): a tap is 1/3, ~1 second is a little over half, and
+  /// ~3 seconds is full.
   static double chargeForHold(double held, double duration) {
     if (duration <= 0 || held >= duration) return 1;
     if (held <= 0) return minThrowCharge;
     final u = (held / duration).clamp(0.0, 1.0);
-    final bell = _erf(chargeBellZ * u) / _erf(chargeBellZ);
-    if (bell < minThrowCharge) return minThrowCharge;
-    if (bell > 1) return 1;
-    return bell;
+    return minThrowCharge + (1 - minThrowCharge) * u;
   }
+
+  /// Aim sweep position in [-1, 1] for a [phase] in radians (2π per full
+  /// back-and-forth). A triangle wave: constant speed, so the pan never
+  /// eases to a stop at the ends. Phase 0 is straight across, heading
+  /// up-screen first.
+  static double sweepWave(double phase) {
+    var t = (phase / (2 * math.pi)) % 1.0;
+    if (t < 0) t += 1;
+    if (t < 0.25) return 4 * t;
+    if (t < 0.75) return 2 - 4 * t;
+    return 4 * t - 4;
+  }
+
+  /// How quickly the sweep speed blends into and out of [aimFriction], per
+  /// second. The pan slows smoothly on a rival instead of snapping.
+  static const double aimFrictionBlend = 10;
 
   /// Distance a player lob travels. Charge changes this, not the pace.
   /// Throw-rank speed is applied separately in [planPlayerLob].
@@ -987,22 +993,5 @@ class ThrowPhysics {
     if (value < min) return min;
     if (value > max) return max;
     return value;
-  }
-
-  /// Abramowitz and Stegun 7.1.26. Max error about 1.5e-7.
-  static double _erf(double x) {
-    final sign = x < 0 ? -1.0 : 1.0;
-    final a = x.abs();
-    const p = 0.3275911;
-    const a1 = 0.254829592;
-    const a2 = -0.284496736;
-    const a3 = 1.421413741;
-    const a4 = -1.453152027;
-    const a5 = 1.061405429;
-    final t = 1.0 / (1.0 + p * a);
-    final y =
-        1.0 -
-        (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * math.exp(-a * a);
-    return sign * y;
   }
 }

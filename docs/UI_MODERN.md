@@ -139,6 +139,13 @@ Legacy v1 wood/comic kit remains under `assets/images/ui/` and is not loaded by 
 
 ---
 
+## Flutter implementation (modern UI pass)
+
+- Tokens: `lib/ui/barrage_theme.dart` (`BarrageTokens` ThemeExtension, `BarrageMotion`). Palette swatches: `lib/ui/barrage_colors.dart`.
+- Type: Fredoka (SIL OFL 1.1) bundled in `assets/fonts/fredoka/` and wired through `ThemeData.textTheme`; the wordmark is set in Fredoka in code.
+- Drawn in Flutter (stadiums/radii per this doc): buttons, modal sheet, HUD chips, toggles, season segmented pill, shop cards, wordmark. Still PNG: icons, hearts, coin, fort bar.
+- Motion respects `MediaQuery.disableAnimations` (durations collapse to zero).
+
 ## Anti-patterns (explicit)
 
 - No heavy wood frames or sandbag UI chrome.

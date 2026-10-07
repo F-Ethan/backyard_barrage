@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import '../game/backyard_barrage_game.dart';
 import '../game/components/kid_component.dart';
 import 'barrage_colors.dart';
+import 'barrage_theme.dart';
 import 'coin_amount.dart';
 import 'draft_button.dart';
-import 'ui_kit.dart';
+import 'match_banner.dart';
+import 'ui_assets.dart';
 
-/// Screen-space fight chrome. Hearts, coins, the fort meter, and pause stay
-/// at logical pixels so the 1280×720 letterbox does not shrink them.
+/// Screen-space fight chrome. Hearts, coins, the fort meter, pause, and the
+/// center banner stay at logical pixels so the 1280×720 letterbox does not
+/// shrink them.
 class MatchHud extends StatelessWidget {
   const MatchHud({super.key, required this.game});
 
@@ -21,6 +24,7 @@ class MatchHud extends StatelessWidget {
         game.phaseListenable,
         game.hudRevision,
         game.chargeListenable,
+        game.bannerListenable,
       ]),
       builder: (context, _) {
         final phase = game.phase;
@@ -28,24 +32,32 @@ class MatchHud extends StatelessWidget {
             phase == MatchPhase.entering ||
             phase == MatchPhase.fight ||
             phase == MatchPhase.clearing;
-        if (!show) return const SizedBox.shrink();
+        // The banner also runs through the defeat beat, after the fight
+        // chrome is gone. Pause and the other modals stack above the HUD.
+        final banner = MatchBanner(spec: game.bannerListenable.value);
+        if (!show) return banner;
         final fort = game.fort;
         final fraction = fort.maxHp <= 0 ? 0.0 : fort.hp / fort.maxHp;
         final fighting = phase == MatchPhase.fight;
         final chargeZone = fighting || phase == MatchPhase.entering;
-        final modern = UiKitScope.of(context).modern;
         final charge = game.chargeListenable.value;
+        final tokens = context.tokens;
         return Stack(
           fit: StackFit.expand,
           children: [
             if (chargeZone) _PlayZones(game: game),
-            if (fighting && modern && charge > 0)
+            if (fighting && charge > 0)
               Positioned.fill(
                 child: IgnorePointer(child: _ChargeGlow(charge: charge)),
               ),
             SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                padding: EdgeInsets.fromLTRB(
+                  tokens.space.md,
+                  tokens.space.sm,
+                  tokens.space.md,
+                  tokens.space.sm,
+                ),
                 child: Column(
                   children: [
                     Align(
@@ -62,7 +74,7 @@ class MatchHud extends StatelessWidget {
                               feel: game.feel,
                               onPressed: game.pauseMatch,
                             ),
-                            const SizedBox(width: 8),
+                            SizedBox(width: tokens.space.sm),
                             _HudChip(
                               key: const Key('hud-crew'),
                               child: _HeartCluster(
@@ -71,7 +83,7 @@ class MatchHud extends StatelessWidget {
                                 idPrefix: 'you',
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            SizedBox(width: tokens.space.sm),
                             _HudChip(
                               key: const Key('hud-fort'),
                               child: Column(
@@ -89,7 +101,7 @@ class MatchHud extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            SizedBox(width: tokens.space.sm),
                             _HudChip(
                               key: const Key('hud-rivals'),
                               child: _HeartCluster(
@@ -98,7 +110,7 @@ class MatchHud extends StatelessWidget {
                                 idPrefix: 'rival',
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            SizedBox(width: tokens.space.sm),
                             _HudChip(
                               key: const Key('hud-coins'),
                               child: CoinAmount(
@@ -122,13 +134,12 @@ class MatchHud extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const Spacer(),
-                      if (!modern) _PowerBar(charge: charge),
                     ],
                   ],
                 ),
               ),
             ),
+            banner,
           ],
         );
       },
@@ -143,20 +154,19 @@ class _HudChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final chip = UiKitScope.of(context).hudChip;
+    final tokens = context.tokens;
     return DecoratedBox(
       decoration: BoxDecoration(
-        image: chip == null
-            ? null
-            : DecorationImage(image: AssetImage(chip), fit: BoxFit.fill),
-        color: chip == null ? const Color(0xF2FFF8F0) : null,
-        borderRadius: chip == null ? BorderRadius.circular(16) : null,
-        border: chip == null
-            ? Border.all(color: const Color(0xFF2C3E50), width: 3)
-            : null,
+        color: tokens.surfaceFrost,
+        borderRadius: tokens.radii.chipAll,
+        border: Border.all(color: tokens.hairline),
+        boxShadow: tokens.shadowSoft,
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: tokens.space.md,
+          vertical: tokens.space.sm,
+        ),
         child: child,
       ),
     );
@@ -179,20 +189,16 @@ class _HeartCluster extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: BarrageType.muted.copyWith(fontSize: 12)),
+        Text(label, style: BarrageType.overline.copyWith(letterSpacing: 0.6)),
         const SizedBox(width: 6),
         for (var row = 0; row < kids.length; row++) ...[
           if (row > 0) const SizedBox(width: 6),
           for (var i = 0; i < kids[row].maxHp; i++)
             Padding(
               padding: const EdgeInsets.only(right: 2),
-              child: Image.asset(
-                i < kids[row].hp
-                    ? UiKitScope.of(context).heart
-                    : UiKitScope.of(context).heartEmpty,
+              child: _Heart(
                 key: Key('hud-heart-$idPrefix-$row-$i'),
-                width: 20,
-                height: 20,
+                full: i < kids[row].hp,
               ),
             ),
         ],
@@ -201,6 +207,40 @@ class _HeartCluster extends StatelessWidget {
   }
 }
 
+/// One HUD heart. Losing it pops the empty outline in; regaining it bounces.
+class _Heart extends StatelessWidget {
+  const _Heart({super.key, required this.full});
+
+  final bool full;
+
+  @override
+  Widget build(BuildContext context) {
+    final motion = context.motion;
+    final image = Image.asset(
+      full ? UiAssets.heart : UiAssets.heartEmpty,
+      key: ValueKey(full),
+      width: 20,
+      height: 20,
+    );
+    return SizedBox(
+      width: 20,
+      height: 20,
+      child: motion.reduced
+          ? image
+          : AnimatedSwitcher(
+              duration: motion.slow,
+              switchInCurve: motion.spring,
+              transitionBuilder: (child, animation) => ScaleTransition(
+                scale: Tween(begin: 1.6, end: 1.0).animate(animation),
+                child: FadeTransition(opacity: animation, child: child),
+              ),
+              child: image,
+            ),
+    );
+  }
+}
+
+/// Slim fort capsule. HP changes ease toward the new width.
 class _FortMeter extends StatelessWidget {
   const _FortMeter({required this.fraction});
 
@@ -208,20 +248,25 @@ class _FortMeter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kit = UiKitScope.of(context);
+    final motion = context.motion;
     final amount = fraction.clamp(0.0, 1.0);
     return SizedBox(
       width: 148,
       height: 22,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(kit.fortEmpty, fit: BoxFit.fill),
-          ClipRect(
-            clipper: _WidthClipper(amount),
-            child: Image.asset(kit.fortFill, fit: BoxFit.fill),
-          ),
-        ],
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(end: amount),
+        duration: motion.slow,
+        curve: motion.enter,
+        builder: (context, value, _) => Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(UiAssets.fortEmpty, fit: BoxFit.fill),
+            ClipRect(
+              clipper: _WidthClipper(value),
+              child: Image.asset(UiAssets.fortFill, fit: BoxFit.fill),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -241,9 +286,9 @@ class _ChargeGlow extends StatelessWidget {
         gradient: RadialGradient(
           radius: 0.18 + t * 1.25,
           colors: [
-            const Color(0xFFFFE66D).withValues(alpha: 0.10 + t * 0.38),
-            const Color(0xFFFFE66D).withValues(alpha: 0.05 + t * 0.18),
-            const Color(0xFFFFE66D).withValues(alpha: 0),
+            BarrageColors.charge.withValues(alpha: 0.10 + t * 0.38),
+            BarrageColors.charge.withValues(alpha: 0.05 + t * 0.18),
+            BarrageColors.charge.withValues(alpha: 0),
           ],
           stops: const [0.0, 0.45, 1.0],
         ),
@@ -301,57 +346,6 @@ class _PlayZones extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class _PowerBar extends StatelessWidget {
-  const _PowerBar({required this.charge});
-
-  final double charge;
-
-  @override
-  Widget build(BuildContext context) {
-    final amount = charge.clamp(0.0, 1.0);
-    return SizedBox(
-      key: const Key('power-bar'),
-      height: 28,
-      width: double.infinity,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: const Color(0xFF8B5E3C),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF2C3E50), width: 3),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(3),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF8F0),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return Align(
-                  alignment: Alignment.centerLeft,
-                  child: SizedBox(
-                    width: constraints.maxWidth * amount,
-                    height: constraints.maxHeight,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: amount >= 0.995
-                            ? const Color(0xFFFFFFFF)
-                            : const Color(0xFFFFE66D),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

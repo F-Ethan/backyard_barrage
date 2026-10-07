@@ -7,11 +7,12 @@ import '../feel/feel_bus.dart';
 import '../meta/difficulty.dart';
 import '../meta/game_settings.dart';
 import 'barrage_colors.dart';
+import 'barrage_theme.dart';
 import 'draft_button.dart';
-import 'kit_panel.dart';
-import 'ui_kit.dart';
+import 'motion.dart';
 
-/// SFX, music, haptics, and a credits stub. Shared by the menu and pause.
+/// SFX, music, haptics, difficulty, and credits. Shared by the menu and
+/// pause.
 class SettingsOverlay extends StatefulWidget {
   const SettingsOverlay({
     super.key,
@@ -52,116 +53,115 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     final size = MediaQuery.sizeOf(context);
-    final width = (size.width - 32).clamp(280.0, 560.0).toDouble();
-    final height = (size.height - 24).clamp(220.0, 520.0).toDouble();
-    final kit = UiKit.from(_settings);
-    return Material(
-      key: Key(kit.modern ? 'ui-kit-modern' : 'ui-kit-classic'),
-      color: kit.scrim,
-      child: SafeArea(
-        child: Center(
-          child: SizedBox(
-            width: width,
-            height: height,
-            child: KitPanel(
-              padding: const EdgeInsets.fromLTRB(36, 28, 28, 20),
-              child: Column(
+    final height = (size.height - 32).clamp(220.0, 520.0).toDouble();
+    return ModalShell(
+      key: const Key('settings-sheet'),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 560, maxHeight: height),
+        child: SheetSurface(
+          padding: EdgeInsets.fromLTRB(
+            tokens.space.xl,
+            tokens.space.lg,
+            tokens.space.lg,
+            tokens.space.sm,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text('Settings', style: BarrageType.title),
-                      ),
-                      KitIconButton(
-                        key: const Key('settings-back'),
-                        kind: UiIconKind.close,
-                        semanticLabel: 'Back',
-                        size: 48,
-                        feel: widget.feel,
-                        onPressed: widget.onClose,
-                      ),
-                    ],
+                  const Expanded(
+                    child: Text('Settings', style: BarrageType.title),
                   ),
-                  const SizedBox(height: 4),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children: [
-                          _ToggleRow(
-                            label: 'Sound effects',
-                            value: _settings.sfxEnabled,
-                            switchKey: const Key('sfx-toggle'),
-                            onChanged: (value) =>
-                                _set(_settings.copyWith(sfxEnabled: value)),
-                          ),
-                          _ToggleRow(
-                            label: 'Music',
-                            value: _settings.musicEnabled,
-                            switchKey: const Key('music-toggle'),
-                            onChanged: (value) =>
-                                _set(_settings.copyWith(musicEnabled: value)),
-                          ),
-                          _ToggleRow(
-                            label: 'Haptics',
-                            value: _settings.hapticsEnabled,
-                            switchKey: const Key('haptics-toggle'),
-                            onChanged: (value) =>
-                                _set(_settings.copyWith(hapticsEnabled: value)),
-                          ),
-                          _ToggleRow(
-                            label: 'Modern UI',
-                            value: _settings.modernUi,
-                            switchKey: const Key('ui-style-toggle'),
-                            onChanged: (value) =>
-                                _set(_settings.copyWith(modernUi: value)),
-                          ),
-                          const SizedBox(height: 8),
-                          _DifficultyPicker(
-                            value: _settings.difficulty,
-                            onChanged: (value) =>
-                                _set(_settings.copyWith(difficulty: value)),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'Sound, music, and haptics for this device. Modern UI is the new kit; turn it off for the classic wood look. Easy charges twice as fast and cuts your stun in half. Normal charges 1.5× and shortens that stun to three quarters. Hard keeps the full charge and stun, throws more often, and can chip your own fort.',
-                            textAlign: TextAlign.center,
-                            style: BarrageType.muted,
-                          ),
-                          const SizedBox(height: 12),
-                          const Text('Credits', style: BarrageType.heading),
-                          const SizedBox(height: 2),
-                          const Text('GameLogic', style: BarrageType.body),
-                          const Text('Ethan', style: BarrageType.muted),
-                          const Text(
-                            'Snowballs and water balloons.',
-                            textAlign: TextAlign.center,
-                            style: BarrageType.muted,
-                          ),
-                          if (widget.removeAds != null)
-                            _RemoveAdsSection(
-                              removeAds: widget.removeAds!,
-                              feel: widget.feel,
-                            ),
-                          if (widget.onAdPrivacy != null) ...[
-                            const SizedBox(height: 12),
-                            DraftImageButton(
-                              key: const Key('ad-privacy'),
-                              label: 'Ad privacy',
-                              secondary: true,
-                              width: 180,
-                              height: 48,
-                              feel: widget.feel,
-                              onPressed: () => widget.onAdPrivacy!.call(),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                  KitIconButton(
+                    key: const Key('settings-back'),
+                    kind: UiIconKind.close,
+                    semanticLabel: 'Back',
+                    size: 48,
+                    feel: widget.feel,
+                    onPressed: widget.onClose,
                   ),
                 ],
               ),
-            ),
+              SizedBox(height: tokens.space.xs),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.only(right: tokens.space.sm),
+                  child: Column(
+                    children: [
+                      _ToggleRow(
+                        label: 'Sound effects',
+                        icon: Icons.volume_up_rounded,
+                        value: _settings.sfxEnabled,
+                        switchKey: const Key('sfx-toggle'),
+                        onChanged: (value) =>
+                            _set(_settings.copyWith(sfxEnabled: value)),
+                      ),
+                      _ToggleRow(
+                        label: 'Music',
+                        icon: Icons.music_note_rounded,
+                        value: _settings.musicEnabled,
+                        switchKey: const Key('music-toggle'),
+                        onChanged: (value) =>
+                            _set(_settings.copyWith(musicEnabled: value)),
+                      ),
+                      _ToggleRow(
+                        label: 'Haptics',
+                        icon: Icons.vibration_rounded,
+                        value: _settings.hapticsEnabled,
+                        switchKey: const Key('haptics-toggle'),
+                        onChanged: (value) =>
+                            _set(_settings.copyWith(hapticsEnabled: value)),
+                      ),
+                      SizedBox(height: tokens.space.sm),
+                      _DifficultyPicker(
+                        value: _settings.difficulty,
+                        onChanged: (value) =>
+                            _set(_settings.copyWith(difficulty: value)),
+                      ),
+                      SizedBox(height: tokens.space.sm),
+                      const Text(
+                        'Sound, music, and haptics for this device. Easy charges twice as fast and cuts your stun in half. Normal charges 1.5× and shortens that stun to three quarters. Hard keeps the full charge and stun, throws more often, and can chip your own fort.',
+                        textAlign: TextAlign.center,
+                        style: BarrageType.muted,
+                      ),
+                      SizedBox(height: tokens.space.lg),
+                      const Text('Credits', style: BarrageType.heading),
+                      SizedBox(height: tokens.space.xs),
+                      const Text('GameLogic', style: BarrageType.body),
+                      const Text('Ethan', style: BarrageType.muted),
+                      const Text(
+                        'Snowballs and water balloons.',
+                        textAlign: TextAlign.center,
+                        style: BarrageType.muted,
+                      ),
+                      if (widget.removeAds != null)
+                        _RemoveAdsSection(
+                          removeAds: widget.removeAds!,
+                          feel: widget.feel,
+                        ),
+                      if (widget.onAdPrivacy != null) ...[
+                        SizedBox(height: tokens.space.md),
+                        DraftImageButton(
+                          key: const Key('ad-privacy'),
+                          label: 'Ad privacy',
+                          secondary: true,
+                          leadingIcon: Icons.privacy_tip_rounded,
+                          width: 200,
+                          height: 48,
+                          fontSize: 15,
+                          feel: widget.feel,
+                          onPressed: () => widget.onAdPrivacy!.call(),
+                        ),
+                      ],
+                      SizedBox(height: tokens.space.md),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -177,6 +177,7 @@ class _RemoveAdsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return ListenableBuilder(
       listenable: removeAds,
       builder: (context, _) {
@@ -193,10 +194,11 @@ class _RemoveAdsSection extends StatelessWidget {
             (!owned && price == null ? RemoveAdsCopy.unavailable : null);
         return Column(
           children: [
-            const SizedBox(height: 12),
+            SizedBox(height: tokens.space.md),
             DraftImageButton(
               key: const Key('remove-ads'),
               label: label,
+              leadingIcon: owned ? Icons.check_circle_rounded : null,
               enabled: canBuy,
               width: 260,
               height: 52,
@@ -205,7 +207,7 @@ class _RemoveAdsSection extends StatelessWidget {
               onPressed: canBuy ? () => unawaited(removeAds.buy()) : null,
             ),
             if (note != null) ...[
-              const SizedBox(height: 6),
+              SizedBox(height: tokens.space.sm),
               Text(
                 note,
                 key: const Key('remove-ads-note'),
@@ -213,11 +215,12 @@ class _RemoveAdsSection extends StatelessWidget {
                 style: BarrageType.muted,
               ),
             ],
-            const SizedBox(height: 8),
+            SizedBox(height: tokens.space.sm),
             DraftImageButton(
               key: const Key('restore-purchases'),
               label: 'Restore Purchases',
               secondary: true,
+              leadingIcon: Icons.restore_rounded,
               width: 260,
               height: 52,
               fontSize: 15,
@@ -231,7 +234,8 @@ class _RemoveAdsSection extends StatelessWidget {
   }
 }
 
-/// Image toggle from `toggle_on_v2` / `toggle_off_v2`.
+/// Stadium switch from the v2 shape language: blue track when on, muted
+/// track when off; the knob springs across.
 class BarrageToggle extends StatelessWidget {
   const BarrageToggle({
     super.key,
@@ -244,58 +248,42 @@ class BarrageToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kit = UiKitScope.of(context);
-    final onAsset = kit.toggleOn;
-    final offAsset = kit.toggleOff;
+    final tokens = context.tokens;
+    final motion = context.motion;
     return Semantics(
       toggled: value,
       child: GestureDetector(
         onTap: () => onChanged(!value),
         behavior: HitTestBehavior.opaque,
         child: SizedBox(
-          width: 84,
+          width: 72,
           height: 48,
           child: Center(
-            child: onAsset != null && offAsset != null
-                ? Image.asset(value ? onAsset : offAsset, width: 76, height: 38)
-                : _ClassicSwitch(on: value, ink: kit.ink, cream: kit.cream),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ClassicSwitch extends StatelessWidget {
-  const _ClassicSwitch({
-    required this.on,
-    required this.ink,
-    required this.cream,
-  });
-
-  final bool on;
-  final Color ink;
-  final Color cream;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 76,
-      height: 36,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: on ? ink : cream,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: ink, width: 3),
-      ),
-      child: Align(
-        alignment: on ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          width: 26,
-          height: 26,
-          decoration: BoxDecoration(
-            color: on ? cream : ink,
-            shape: BoxShape.circle,
+            child: AnimatedContainer(
+              duration: motion.medium,
+              curve: motion.enter,
+              width: 60,
+              height: 34,
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: value ? tokens.primary : tokens.lockedRail,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: AnimatedAlign(
+                duration: motion.medium,
+                curve: motion.spring,
+                alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: tokens.surface,
+                    shape: BoxShape.circle,
+                    boxShadow: tokens.shadowSoft,
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -311,18 +299,18 @@ class _DifficultyPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kit = UiKitScope.of(context);
+    final tokens = context.tokens;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Difficulty', style: BarrageType.body),
-        const SizedBox(height: 6),
+        SizedBox(height: tokens.space.sm),
         Row(
           children: [
             for (final mode in Difficulty.values)
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  padding: EdgeInsets.symmetric(horizontal: tokens.space.xs),
                   child: _DifficultyChip(
                     key: Key('difficulty-${mode.name}'),
                     label: switch (mode) {
@@ -331,8 +319,6 @@ class _DifficultyPicker extends StatelessWidget {
                       Difficulty.hard => 'Hard',
                     },
                     selected: value == mode,
-                    ink: kit.ink,
-                    cream: kit.cream,
                     onTap: () => onChanged(mode),
                   ),
                 ),
@@ -349,38 +335,42 @@ class _DifficultyChip extends StatelessWidget {
     super.key,
     required this.label,
     required this.selected,
-    required this.ink,
-    required this.cream,
     required this.onTap,
   });
 
   final String label;
   final bool selected;
-  final Color ink;
-  final Color cream;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final motion = context.motion;
     return Semantics(
       button: true,
       selected: selected,
       label: label,
-      child: GestureDetector(
+      child: PressScale(
         onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          height: 40,
+        child: AnimatedContainer(
+          duration: motion.medium,
+          curve: motion.enter,
+          height: 42,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: selected ? ink : cream,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: ink, width: 3),
+            gradient: selected ? tokens.primaryGradient : null,
+            color: selected ? null : tokens.surface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected ? const Color(0x00000000) : tokens.hairline,
+              width: 1.5,
+            ),
+            boxShadow: selected ? tokens.shadowPrimary : null,
           ),
           child: Text(
             label,
-            style: BarrageType.body.copyWith(
-              color: selected ? cream : ink,
+            style: BarrageType.button.copyWith(
+              color: selected ? tokens.onPrimary : tokens.ink,
               fontSize: 15,
             ),
           ),
@@ -393,22 +383,27 @@ class _DifficultyChip extends StatelessWidget {
 class _ToggleRow extends StatelessWidget {
   const _ToggleRow({
     required this.label,
+    required this.icon,
     required this.value,
     required this.switchKey,
     required this.onChanged,
   });
 
   final String label;
+  final IconData icon;
   final bool value;
   final Key switchKey;
   final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return SizedBox(
       height: 52,
       child: Row(
         children: [
+          Icon(icon, size: 22, color: tokens.inkMuted),
+          SizedBox(width: tokens.space.md),
           Expanded(child: Text(label, style: BarrageType.body)),
           BarrageToggle(key: switchKey, value: value, onChanged: onChanged),
         ],

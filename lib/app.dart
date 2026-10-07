@@ -10,9 +10,8 @@ import 'game/backyard_barrage_game.dart';
 import 'meta/meta_state.dart';
 import 'meta/save_store.dart';
 import 'meta/settings_store.dart';
-import 'ui/barrage_colors.dart';
+import 'ui/barrage_theme.dart';
 import 'ui/defeat_overlay.dart';
-import 'ui/ui_kit.dart';
 import 'ui/main_menu.dart';
 import 'ui/match_hud.dart';
 import 'ui/pause_overlay.dart';
@@ -46,6 +45,7 @@ class _BackyardBarrageAppState extends State<BackyardBarrageApp> {
   late final FeelBus _feel = widget.feel ?? FeelBus();
   late final RemoveAdsController _removeAds =
       widget.removeAds ?? RemoveAdsController();
+  late final ThemeData _theme = BarrageTheme.light();
   MetaState? _running;
 
   @override
@@ -72,49 +72,53 @@ class _BackyardBarrageAppState extends State<BackyardBarrageApp> {
     return MaterialApp(
       title: 'Backyard Barrage',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme:
-            ColorScheme.fromSeed(
-              seedColor: BarrageColors.player,
-              brightness: Brightness.light,
-            ).copyWith(
-              primary: BarrageColors.player,
-              onPrimary: BarrageColors.onPrimary,
-              surface: BarrageColors.cream,
-              onSurface: BarrageColors.ink,
-            ),
-        scaffoldBackgroundColor: BarrageColors.cream,
-        textTheme: Typography.material2021().black.apply(
-          bodyColor: BarrageColors.ink,
-          displayColor: BarrageColors.ink,
-        ),
-        useMaterial3: true,
-      ),
-      home: UiKitScope(
-        settings: _feel.settingsListenable,
-        child: running == null
-            ? MainMenu(
-                saveStore: _store,
-                settingsStore: _settingsStore,
-                feel: _feel,
-                onPlay: (meta) => setState(() => _running = meta),
-                onAdPrivacy: widget.endAd.showPrivacyOptions,
-                removeAds: _removeAds,
-              )
-            : GameScreen(
-                meta: running,
-                saveStore: _store,
-                settingsStore: _settingsStore,
-                feel: _feel,
-                endAd: widget.endAd,
-                onAdPrivacy: widget.endAd.showPrivacyOptions,
-                removeAds: _removeAds,
-                adsRemoved: () => _removeAds.owned,
-                onExit: () {
-                  unawaited(_feel.enterMenu());
-                  setState(() => _running = null);
-                },
+      theme: _theme,
+      home: Builder(
+        builder: (context) {
+          final motion = context.motion;
+          final Widget screen = running == null
+              ? MainMenu(
+                  key: const ValueKey('menu'),
+                  saveStore: _store,
+                  settingsStore: _settingsStore,
+                  feel: _feel,
+                  onPlay: (meta) => setState(() => _running = meta),
+                  onAdPrivacy: widget.endAd.showPrivacyOptions,
+                  removeAds: _removeAds,
+                )
+              : GameScreen(
+                  key: ObjectKey(running),
+                  meta: running,
+                  saveStore: _store,
+                  settingsStore: _settingsStore,
+                  feel: _feel,
+                  endAd: widget.endAd,
+                  onAdPrivacy: widget.endAd.showPrivacyOptions,
+                  removeAds: _removeAds,
+                  adsRemoved: () => _removeAds.owned,
+                  onExit: () {
+                    unawaited(_feel.enterMenu());
+                    setState(() => _running = null);
+                  },
+                );
+          if (motion.reduced) return screen;
+          // Fade-through: the old screen fades out quickly, the new one
+          // fades and settles up from 96% scale.
+          return AnimatedSwitcher(
+            duration: motion.slow,
+            reverseDuration: motion.fast,
+            switchInCurve: motion.enter,
+            switchOutCurve: motion.exit,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween(begin: 0.96, end: 1.0).animate(animation),
+                child: child,
               ),
+            ),
+            child: screen,
+          );
+        },
       ),
     );
   }

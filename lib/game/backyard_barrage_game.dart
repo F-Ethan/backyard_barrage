@@ -179,7 +179,9 @@ class BackyardBarrageGame extends FlameGame {
   Vector2 _grabOffset = Vector2.zero();
   _Banner _pendingBanner = _Banner.none;
   double _bannerTime = 0;
-  OverlayBanner? _banner;
+
+  /// Center banner for the Flutter HUD (`lib/ui/match_banner.dart`).
+  final ValueNotifier<BannerSpec?> bannerListenable = ValueNotifier(null);
   KidComponent? _selected;
 
   /// Hit-stop: the yard freezes for this long after a hit lands.
@@ -617,20 +619,16 @@ class BackyardBarrageGame extends FlameGame {
     required double fontSize,
     required Color color,
   }) {
-    _clearBanner();
-    _banner = OverlayBanner(
+    bannerListenable.value = BannerSpec(
       label: label,
       subtitle: subtitle,
-      position: Vector2(worldWidth / 2, worldHeight / 2 - 30),
       fontSize: fontSize,
       color: color,
     );
-    world.add(_banner!);
   }
 
   void _clearBanner() {
-    _banner?.removeFromParent();
-    _banner = null;
+    bannerListenable.value = null;
   }
 
   /// Center title for the walk-on. Cleared when the crews reach their spots.

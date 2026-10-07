@@ -4,9 +4,10 @@ import '../game/backyard_barrage_game.dart';
 import '../meta/play_mode.dart';
 import '../seasons/season.dart';
 import 'barrage_colors.dart';
+import 'barrage_theme.dart';
 import 'coin_amount.dart';
 import 'draft_button.dart';
-import 'kit_panel.dart';
+import 'motion.dart';
 import 'season_toggle.dart';
 
 class DefeatOverlay extends StatefulWidget {
@@ -30,92 +31,114 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
     final game = widget.game;
     final meta = game.meta;
     final cleared = game.wave - 1;
-    final size = MediaQuery.sizeOf(context);
-    final width = (size.width - 32).clamp(320.0, 680.0).toDouble();
-    final height = (size.height - 24).clamp(240.0, 440.0).toDouble();
-    return Material(
-      color: BarrageColors.scrim,
-      child: SafeArea(
-        child: Center(
-          child: SizedBox(
-            width: width,
-            height: height,
-            child: KitPanel(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+    final tokens = context.tokens;
+    return ModalShell(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
+        child: SheetSurface(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TagPill(
+                  child: Text(
+                    meta.mode.label.toUpperCase(),
+                    style: BarrageType.overline.copyWith(
+                      color: tokens.primaryDeep,
+                    ),
+                  ),
+                ),
+                SizedBox(height: tokens.space.sm),
+                const Text('Crew down', style: BarrageType.title),
+                SizedBox(height: tokens.space.xs),
+                Text(
+                  meta.mode == PlayMode.arcade
+                      ? 'Skills reset. Unspent coins carry over.'
+                      : 'Skills stay. You restart at wave 1.',
+                  style: BarrageType.body,
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: tokens.space.md),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: tokens.space.sm,
+                  runSpacing: tokens.space.sm,
                   children: [
-                    Text(meta.mode.label, style: BarrageType.heading),
-                    const SizedBox(height: 2),
-                    const Text('Crew down', style: BarrageType.title),
-                    const SizedBox(height: 4),
-                    Text(
-                      meta.mode == PlayMode.arcade
-                          ? 'Skills reset. Unspent coins carry over.'
-                          : 'Skills stay. You restart at wave 1.',
-                      style: BarrageType.body,
-                      textAlign: TextAlign.center,
+                    _Stat(label: 'CLEARED', value: '$cleared'),
+                    _Stat(label: 'BEST', value: '${meta.bestWave}'),
+                    TagPill(child: CoinAmount(amount: meta.coins)),
+                  ],
+                ),
+                SizedBox(height: tokens.space.md),
+                SeasonToggle(season: meta.season, onChanged: _setSeason),
+                SizedBox(height: tokens.space.lg),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: tokens.space.md,
+                  runSpacing: tokens.space.sm,
+                  children: [
+                    DraftImageButton(
+                      key: const Key('retry'),
+                      label: 'Retry',
+                      leadingIcon: Icons.replay_rounded,
+                      onPressed: game.retryFromDefeat,
+                      width: 180,
+                      height: 56,
+                      fontSize: 18,
+                      feel: game.feel,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Waves cleared $cleared · Best ${meta.bestWave}',
-                      style: BarrageType.body,
-                    ),
-                    const SizedBox(height: 4),
-                    CoinAmount(amount: meta.coins),
-                    const SizedBox(height: 8),
-                    Center(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: const Color(0xE6FFF8F0),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: SeasonToggle(
-                          season: meta.season,
-                          onChanged: _setSeason,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
                     DraftImageButton(
                       key: const Key('open-skills'),
                       label: 'Skills',
                       secondary: true,
+                      leadingIcon: Icons.auto_awesome_rounded,
                       onPressed: game.openSkillTree,
-                      width: 180,
-                      height: 48,
+                      width: 150,
+                      height: 56,
                       feel: game.feel,
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        DraftImageButton(
-                          key: const Key('retry'),
-                          label: 'Retry',
-                          onPressed: game.retryFromDefeat,
-                          width: 180,
-                          height: 58,
-                          feel: game.feel,
-                        ),
-                        const SizedBox(width: 12),
-                        DraftImageButton(
-                          key: const Key('back-to-menu'),
-                          label: 'Menu',
-                          secondary: true,
-                          onPressed: game.exitToMenu,
-                          width: 160,
-                          height: 52,
-                          feel: game.feel,
-                        ),
-                      ],
+                    DraftImageButton(
+                      key: const Key('back-to-menu'),
+                      label: 'Menu',
+                      secondary: true,
+                      leadingIcon: Icons.home_rounded,
+                      onPressed: game.exitToMenu,
+                      width: 140,
+                      height: 56,
+                      feel: game.feel,
                     ),
                   ],
                 ),
-              ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return TagPill(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: BarrageType.overline),
+          SizedBox(width: tokens.space.sm),
+          Text(
+            value,
+            style: BarrageType.heading.copyWith(color: tokens.primaryDeep),
+          ),
+        ],
       ),
     );
   }

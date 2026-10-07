@@ -9,12 +9,11 @@ import 'package:backyard_barrage/feel/game_haptics.dart';
 import 'package:backyard_barrage/game/arena_grid.dart';
 import 'package:backyard_barrage/game/backyard_barrage_game.dart';
 import 'package:backyard_barrage/game/combat_rules.dart';
+import 'package:backyard_barrage/game/components/coin_pop.dart';
 import 'package:backyard_barrage/game/components/enemy_controller.dart';
 import 'package:backyard_barrage/game/components/fort_component.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
 import 'package:backyard_barrage/game/components/lob_projectile.dart';
-import 'package:backyard_barrage/game/components/coin_pop.dart';
-import 'package:backyard_barrage/game/components/overlay_banner.dart';
 import 'package:backyard_barrage/game/components/splash_particles.dart';
 import 'package:backyard_barrage/game/throw_physics.dart';
 import 'package:backyard_barrage/meta/difficulty.dart';
@@ -23,7 +22,7 @@ import 'package:backyard_barrage/meta/play_mode.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
 import 'package:backyard_barrage/meta/settings_store.dart';
 import 'package:backyard_barrage/seasons/season.dart';
-import 'package:backyard_barrage/ui/ui_kit.dart';
+import 'package:backyard_barrage/ui/barrage_theme.dart';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -106,16 +105,13 @@ void main() {
     await primeSprites(game);
     await tester.pumpWidget(
       MaterialApp(
-        home: UiKitScope(
-          settings: feel.settingsListenable,
-          child: GameScreen(
-            meta: meta,
-            saveStore: store,
-            settingsStore: settings,
-            feel: feel,
-            onExit: () {},
-            game: game,
-          ),
+        home: GameScreen(
+          meta: meta,
+          saveStore: store,
+          settingsStore: settings,
+          feel: feel,
+          onExit: () {},
+          game: game,
         ),
       ),
     );
@@ -400,16 +396,21 @@ void main() {
   ) async {
     final game = (await boot(tester, MetaState(), settle: false)).game;
     expect(game.phase, MatchPhase.entering);
+    expect(game.bannerListenable.value?.label, 'Wave 1');
+    await tester.pump();
+    // The banner is screen-space Flutter text now, not a world component.
     expect(
-      game.world.children.whereType<OverlayBanner>().single.label,
+      tester.widget<Text>(find.byKey(const Key('match-banner-title'))).data,
       'Wave 1',
     );
+    expect(game.world.children.whereType<TextComponent>(), isEmpty);
 
     game.finishEntrance();
     expect(game.phase, MatchPhase.fight);
-    // Removal is applied on the next tick.
     game.update(0.016);
-    expect(game.world.children.whereType<OverlayBanner>(), isEmpty);
+    expect(game.bannerListenable.value, isNull);
+    await tester.pump();
+    expect(find.byKey(const Key('match-banner-title')), findsNothing);
 
     knockOut(game.enemies);
     game.resolveKnockouts();
@@ -418,16 +419,12 @@ void main() {
     game.continueFromShop();
     expect(game.phase, MatchPhase.entering);
     expect(game.wave, 2);
-    // The new banner mounts on the next tick, after the clear banner drops.
     game.update(0.016);
-    expect(
-      game.world.children.whereType<OverlayBanner>().single.label,
-      'Wave 2',
-    );
+    expect(game.bannerListenable.value?.label, 'Wave 2');
 
     game.finishEntrance();
     game.update(0.016);
-    expect(game.world.children.whereType<OverlayBanner>(), isEmpty);
+    expect(game.bannerListenable.value, isNull);
   });
 
   testWidgets('easy and normal rivals keep the unscaled windup', (
@@ -845,9 +842,41 @@ void main() {
     expect(booted.playback.loops, contains('music/battle_loop_winter.wav'));
   });
 
-  testWidgets('right side charges; modern UI glows and classic keeps a bar', (
+  testWidgets('with motion on, the shop pops in and a purchase celebrates', (
     tester,
   ) async {
+    BarrageMotion.debugDisable = false;
+    addTearDown(() => BarrageMotion.debugDisable = true);
+    final game = (await boot(tester, MetaState(coins: 40))).game;
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    await tester.pump();
+    // KO! banner is up while the clear timer runs.
+    expect(game.bannerListenable.value?.label, 'KO!');
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('Next wave'), findsOneWidget);
+
+    final before = game.meta.coins;
+    await tester.tap(find.byKey(const Key('buy-throw')));
+    await tester.pump();
+    expect(game.meta.throwRank, 1);
+    expect(find.byKey(const Key('shop-coin-delta')), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('shop-sheet')),
+        matching: find.text('${game.meta.coins}'),
+      ),
+      findsOneWidget,
+    );
+    expect(game.meta.coins, lessThan(before));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('right side charges and the screen glows', (tester) async {
     final game = (await boot(tester, MetaState())).game;
     // The bell anchors below are the unscaled 3s hold. Hard keeps that hold.
     game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));
@@ -865,11 +894,7 @@ void main() {
     await tester.pump();
     expect(game.charge, closeTo(1 / 3, 0.04));
     expect(find.byKey(const Key('charge-glow')), findsOneWidget);
-
-    game.feel.apply(game.feel.settings.copyWith(modernUi: false));
-    await tester.pump();
-    expect(find.byKey(const Key('power-bar')), findsOneWidget);
-    expect(find.byKey(const Key('charge-glow')), findsNothing);
+    expect(find.byKey(const Key('power-bar')), findsNothing);
 
     game.update(0.9);
     expect(game.charge, closeTo(0.5, 0.06));

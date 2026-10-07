@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 
@@ -27,7 +29,8 @@ Future<SeasonKit> loadSeasonKit(FlameGame game, Season season) async {
   Future<KidPoseSprites> poses(bool player) async {
     final entries = await Future.wait([
       for (final pose in SeasonAssets.poseNames)
-        game.loadSprite(
+        _loadPose(
+          game,
           SeasonAssets.pose(player: player, season: season, pose: pose),
         ),
     ]);
@@ -47,6 +50,7 @@ Future<SeasonKit> loadSeasonKit(FlameGame game, Season season) async {
       turn15l: byName['turn_15l']!,
       turn15r: byName['turn_15r']!,
       turn30r: byName['turn_30r']!,
+      uprightKo: SeasonAssets.uprightKo(player: player, season: season),
     );
   }
 
@@ -63,4 +67,47 @@ Future<SeasonKit> loadSeasonKit(FlameGame game, Season season) async {
     playerPoses: await playerPoses,
     enemyPoses: await enemyPoses,
   );
+}
+
+Future<Sprite> _loadPose(FlameGame game, String path) async {
+  final crop = SeasonAssets.crop(path);
+  final srcPosition = crop == null ? null : Vector2(crop.$1, crop.$2);
+  final srcSize = crop == null ? null : Vector2.all(crop.$3);
+  if (!SeasonAssets.mirror(path)) {
+    return game.loadSprite(path, srcPosition: srcPosition, srcSize: srcSize);
+  }
+  final image = await game.images.load(path);
+  return MirroredSprite(image, srcPosition: srcPosition, srcSize: srcSize);
+}
+
+/// A sprite drawn flipped left-to-right inside its own destination box.
+class MirroredSprite extends Sprite {
+  MirroredSprite(super.image, {super.srcPosition, super.srcSize});
+
+  @override
+  void render(
+    Canvas canvas, {
+    Vector2? position,
+    Vector2? size,
+    Anchor anchor = Anchor.topLeft,
+    Paint? overridePaint,
+    double? bleed,
+  }) {
+    final drawSize = size ?? srcSize;
+    final left = (position?.x ?? 0) - anchor.x * drawSize.x;
+    final centerX = left + drawSize.x / 2;
+    canvas.save();
+    canvas.translate(centerX, 0);
+    canvas.scale(-1, 1);
+    canvas.translate(-centerX, 0);
+    super.render(
+      canvas,
+      position: position,
+      size: size,
+      anchor: anchor,
+      overridePaint: overridePaint,
+      bleed: bleed,
+    );
+    canvas.restore();
+  }
 }

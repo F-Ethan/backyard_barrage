@@ -46,9 +46,9 @@ All under `assets/images/ui/`. Shared language: ink `#2C3E50` ~4–6px outline, 
 
 ---
 
-## Character pose pack — polish pass 2026-10-01, mild turn yaws 2026-10-07
+## Character pose pack — polish pass 2026-10-01, HQ mild turn yaws 2026-10-07
 
-All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet `#9B59B6`). Outline `#2C3E50` ~3–4px. Winter = coat+beanie+pom; summer = tee (balloon projectile on charge/throw). Soft ground contact shadow + 1 soft body shade plane. Mild aim yaws are Studio drafts (`docs/TURN_YAWS.md`). The player-winter contact sheet is `assets/images/characters/turn_yaw_sheet_mild.png`.
+All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet `#9B59B6`). Outline `#2C3E50` ~3–4px. Winter = coat+beanie+pom; summer = tee (balloon projectile on charge/throw). Soft ground contact shadow + 1 soft body shade plane. Mild aim yaws are the Studio HQ drafts (`docs/TURN_YAWS.md`). The player-winter contact sheet is `assets/images/characters/turn_yaw_sheet_hq.png`. `turn_yaw_sheet_mild.png` stays as the older reference.
 
 ### Player (`assets/images/characters/player/`)
 
@@ -58,8 +58,8 @@ All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet
 | `player_idle_summer_draft.png` | **improved draft** | Tee variant; re-exported |
 | `player_walk_winter_draft.png` | **new draft** | Mid-stride, opposite arm/leg |
 | `player_walk_summer_draft.png` | **new draft** | Same arc, summer tee |
-| `player_charge_winter_draft.png` | **new draft** | Lean back, snowball + yellow charge glow |
-| `player_charge_summer_draft.png` | **new draft** | Lean back, water balloon + glow |
+| `player_charge_winter_draft.png` | **HQ draft** | Aim-sweep center. Lean back, snowball + yellow charge glow. Same HQ path as the turn yaws |
+| `player_charge_summer_draft.png` | **HQ draft** | Aim-sweep center. Lean back, water balloon + glow |
 | `player_throw_winter_draft.png` | **improved draft** | Follow-through forward; re-exported |
 | `player_throw_summer_draft.png` | **new draft** | Follow-through + balloon |
 | `player_hit_winter_draft.png` | **new draft** | Recoil, X-eye, impact stars |
@@ -68,14 +68,14 @@ All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet
 | `player_ko_summer_draft.png` | **new draft** | Slump + swirl + stars, tee |
 | `player_pickup_winter_draft.png` | **playtest draft** | Selected / held-up pose (Studio) |
 | `player_pickup_summer_draft.png` | **playtest draft** | Selected / held-up pose, tee |
-| `player_turn_30l_winter_draft.png` | **playtest draft** | Up-screen end of the aim sweep, ~30° screen-left (Studio) |
-| `player_turn_30l_summer_draft.png` | **playtest draft** | Same yaw, tee |
-| `player_turn_15l_winter_draft.png` | **playtest draft** | Milder screen-left, between 30l and the charge pose |
-| `player_turn_15l_summer_draft.png` | **playtest draft** | Same yaw, tee |
-| `player_turn_15r_winter_draft.png` | **playtest draft** | Milder screen-right, between the charge pose and 30r |
-| `player_turn_15r_summer_draft.png` | **playtest draft** | Same yaw, tee |
-| `player_turn_30r_winter_draft.png` | **playtest draft** | Down-screen end of the aim sweep, ~30° screen-right (Studio) |
-| `player_turn_30r_summer_draft.png` | **playtest draft** | Same yaw, tee |
+| `player_turn_30l_winter_draft.png` | **HQ playtest draft** | Up-screen end of the aim sweep, ~30° screen-left (Studio) |
+| `player_turn_30l_summer_draft.png` | **HQ playtest draft** | Same yaw, tee |
+| `player_turn_15l_winter_draft.png` | **HQ playtest draft** | Milder screen-left, between 30l and the charge pose |
+| `player_turn_15l_summer_draft.png` | **HQ playtest draft** | Same yaw, tee |
+| `player_turn_15r_winter_draft.png` | **HQ playtest draft** | Milder screen-right, between the charge pose and 30r |
+| `player_turn_15r_summer_draft.png` | **HQ playtest draft** | Same yaw, tee |
+| `player_turn_30r_winter_draft.png` | **HQ playtest draft** | Down-screen end of the aim sweep, ~30° screen-right (Studio) |
+| `player_turn_30r_summer_draft.png` | **HQ playtest draft** | Same yaw, tee |
 
 ### Enemy (`assets/images/characters/enemy/`)
 
@@ -85,8 +85,8 @@ All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet
 | `enemy_idle_summer_draft.png` | **new draft** | Violet tee |
 | `enemy_walk_winter_draft.png` | **new draft** | Mid-stride mirror |
 | `enemy_walk_summer_draft.png` | **new draft** | Mid-stride, summer |
-| `enemy_charge_winter_draft.png` | **new draft** | Lean back + snowball + glow |
-| `enemy_charge_summer_draft.png` | **new draft** | Lean back + balloon + glow |
+| `enemy_charge_winter_draft.png` | **HQ draft** | Aim-sweep center. Lean back + snowball + glow. Drawn facing left |
+| `enemy_charge_summer_draft.png` | **HQ draft** | Aim-sweep center. Lean back + balloon + glow |
 | `enemy_throw_winter_draft.png` | **improved draft** | Follow-through; re-exported |
 | `enemy_throw_summer_draft.png` | **new draft** | Follow-through + balloon |
 | `enemy_hit_winter_draft.png` | **new draft** | Recoil + stars |
@@ -95,14 +95,14 @@ All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet
 | `enemy_ko_summer_draft.png` | **new draft** | Slump + swirl, tee |
 | `enemy_pickup_winter_draft.png` | **playtest draft** | Held-up pose, loaded with the enemy sheet |
 | `enemy_pickup_summer_draft.png` | **playtest draft** | Held-up pose, tee |
-| `enemy_turn_30l_winter_draft.png` | **playtest draft** | Up-screen end. Drawn facing left; not a mirror of the player sheet |
-| `enemy_turn_30l_summer_draft.png` | **playtest draft** | Same yaw, tee |
-| `enemy_turn_15l_winter_draft.png` | **playtest draft** | Milder screen-left |
-| `enemy_turn_15l_summer_draft.png` | **playtest draft** | Same yaw, tee |
-| `enemy_turn_15r_winter_draft.png` | **playtest draft** | Milder screen-right |
-| `enemy_turn_15r_summer_draft.png` | **playtest draft** | Same yaw, tee |
-| `enemy_turn_30r_winter_draft.png` | **playtest draft** | Down-screen end. Drawn facing left; not mirrored |
-| `enemy_turn_30r_summer_draft.png` | **playtest draft** | Same yaw, tee |
+| `enemy_turn_30l_winter_draft.png` | **HQ playtest draft** | Up-screen end. Drawn facing left; not a mirror of the player sheet |
+| `enemy_turn_30l_summer_draft.png` | **HQ playtest draft** | Same yaw, tee |
+| `enemy_turn_15l_winter_draft.png` | **HQ playtest draft** | Milder screen-left |
+| `enemy_turn_15l_summer_draft.png` | **HQ playtest draft** | Same yaw, tee |
+| `enemy_turn_15r_winter_draft.png` | **HQ playtest draft** | Milder screen-right |
+| `enemy_turn_15r_summer_draft.png` | **HQ playtest draft** | Same yaw, tee |
+| `enemy_turn_30r_winter_draft.png` | **HQ playtest draft** | Down-screen end. Drawn facing left; not mirrored |
+| `enemy_turn_30r_summer_draft.png` | **HQ playtest draft** | Same yaw, tee |
 
 ---
 

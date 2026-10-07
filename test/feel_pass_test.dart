@@ -51,7 +51,6 @@ void main() {
     expect(loaded.sfxEnabled, isTrue);
     expect(loaded.musicEnabled, isTrue);
     expect(loaded.hapticsEnabled, isTrue);
-    expect(loaded.modernUi, isTrue);
     expect(loaded.difficulty, Difficulty.normal);
   });
 
@@ -205,55 +204,41 @@ void main() {
     expect(toggle.value, isFalse);
   });
 
-  testWidgets('modern UI is the default and the classic kit persists', (
+  testWidgets('a stale classic-kit save still loads and the toggle is gone', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      SettingsStore.storageKey:
+          '{"sfx":false,"music":true,"haptics":true,"modernUi":false}',
+    });
     final prefs = await SharedPreferences.getInstance();
     final store = SaveStore(preferences: prefs);
     final settings = SettingsStore(preferences: prefs);
-    FeelBus feel() => FeelBus(
-      audio: GameAudio(playback: RecordingPlayback()),
-      haptics: GameHaptics(pulse: RecordingPulse()),
-    );
+    final loaded = await settings.load();
+    expect(loaded.sfxEnabled, isFalse);
+    expect(loaded.toJson().containsKey('modernUi'), isFalse);
 
     await tester.pumpWidget(
       BackyardBarrageApp(
         saveStore: store,
         settingsStore: settings,
-        feel: feel(),
+        feel: FeelBus(
+          audio: GameAudio(playback: RecordingPlayback()),
+          haptics: GameHaptics(pulse: RecordingPulse()),
+        ),
       ),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(find.byKey(const Key('menu-settings')));
     await tester.pump();
-    expect(find.byKey(const Key('ui-kit-modern')), findsOneWidget);
-    expect(find.byKey(const Key('ui-style-toggle')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('ui-style-toggle')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 20));
-    expect(find.byKey(const Key('ui-kit-classic')), findsOneWidget);
-    expect((await settings.load()).modernUi, isFalse);
-
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpWidget(
-      BackyardBarrageApp(
-        saveStore: store,
-        settingsStore: settings,
-        feel: feel(),
-      ),
+    expect(find.byKey(const Key('settings-sheet')), findsOneWidget);
+    expect(find.byKey(const Key('ui-style-toggle')), findsNothing);
+    expect(find.text('Modern UI'), findsNothing);
+    expect(
+      tester.widget<BarrageToggle>(find.byKey(const Key('sfx-toggle'))).value,
+      isFalse,
     );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-    await tester.tap(find.byKey(const Key('menu-settings')));
-    await tester.pump();
-    expect(find.byKey(const Key('ui-kit-classic')), findsOneWidget);
-    final toggle = tester.widget<BarrageToggle>(
-      find.byKey(const Key('ui-style-toggle')),
-    );
-    expect(toggle.value, isFalse);
   });
 
   testWidgets('difficulty persists beside the other settings', (tester) async {
@@ -299,6 +284,6 @@ void main() {
     await tester.tap(find.byKey(const Key('menu-settings')));
     await tester.pump();
     expect((await settings.load()).difficulty, Difficulty.hard);
-    expect(find.byKey(const Key('ui-style-toggle')), findsOneWidget);
+    expect(find.byKey(const Key('ui-style-toggle')), findsNothing);
   });
 }

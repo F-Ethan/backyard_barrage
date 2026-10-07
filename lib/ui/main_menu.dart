@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../ads/remove_ads.dart';
@@ -10,11 +12,30 @@ import '../meta/save_store.dart';
 import '../meta/settings_store.dart';
 import '../seasons/season.dart';
 import 'barrage_colors.dart';
+import 'barrage_theme.dart';
 import 'draft_button.dart';
+import 'motion.dart';
 import 'season_home_backdrop.dart';
 import 'season_toggle.dart';
 import 'settings_panel.dart';
-import 'ui_kit.dart';
+
+/// Landscape size classes for the home screen.
+enum _MenuSize {
+  /// Small phone landscape (~640×360).
+  compact,
+
+  /// Typical phone landscape (~844×390 to ~932×430).
+  regular,
+
+  /// Tablets and desktop playtest windows.
+  wide;
+
+  static _MenuSize of(BoxConstraints box) {
+    if (box.maxHeight < 400 || box.maxWidth < 720) return compact;
+    if (box.maxWidth >= 1100 && box.maxHeight >= 600) return wide;
+    return regular;
+  }
+}
 
 class MainMenu extends StatefulWidget {
   const MainMenu({
@@ -96,168 +117,370 @@ class _MainMenuState extends State<MainMenu> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: SeasonHomeBackdrop(
-              key: Key('home-backdrop-${season.name}'),
-              season: season,
+            child: MotionSwitcher(
+              slide: Offset.zero,
+              child: SeasonHomeBackdrop(
+                key: Key('home-backdrop-${season.name}'),
+                season: season,
+              ),
             ),
           ),
           SafeArea(
             child: profile == null
                 ? const Center(child: CircularProgressIndicator())
-                : Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: SizedBox(
-                        width: 700,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Image.asset(
-                              UiKitScope.of(context).wordmark,
-                              height: 76,
-                              fit: BoxFit.contain,
-                            ),
-                            const SizedBox(height: 2),
-                            const Text(
-                              'Snowballs & water balloons',
-                              style: BarrageType.body,
-                            ),
-                            const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: _CampaignBest(
-                                wave: profile.campaign.bestWave,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                for (final mode in PlayMode.values) ...[
-                                  if (mode == PlayMode.campaign)
-                                    const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _ModeCard(
-                                      mode: mode,
-                                      wallet: profile.wallet(mode),
-                                      onTap: () => _play(mode),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xE6FFF8F0),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(left: 12),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          '${season.label} yard',
-                                          key: const Key('season-label'),
-                                          style: BarrageType.muted.copyWith(
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        SeasonToggle(
-                                          season: season,
-                                          onChanged: _setSeason,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                const Spacer(),
-                                DraftImageButton(
-                                  key: const Key('menu-settings'),
-                                  label: 'Settings',
-                                  secondary: true,
-                                  leadingKind: UiIconKind.settings,
-                                  width: 168,
-                                  height: 48,
-                                  feel: widget.feel,
-                                  onPressed: () =>
-                                      setState(() => _settingsOpen = true),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
+                : LayoutBuilder(
+                    builder: (context, box) => _HomeLayout(
+                      size: _MenuSize.of(box),
+                      profile: profile,
+                      feel: widget.feel,
+                      onSeason: _setSeason,
+                      onPlay: _play,
+                      onSettings: () => setState(() => _settingsOpen = true),
                     ),
                   ),
           ),
-          if (_settingsOpen)
-            SettingsOverlay(
-              settings: widget.feel.settings,
-              feel: widget.feel,
-              onChanged: _commitSettings,
-              onClose: () => setState(() => _settingsOpen = false),
-              onAdPrivacy: widget.onAdPrivacy,
-              removeAds: widget.removeAds,
+          Positioned.fill(
+            child: MotionSwitcher(
+              slide: Offset.zero,
+              child: _settingsOpen
+                  ? SettingsOverlay(
+                      key: const ValueKey('menu-settings-open'),
+                      settings: widget.feel.settings,
+                      feel: widget.feel,
+                      onChanged: _commitSettings,
+                      onClose: () => setState(() => _settingsOpen = false),
+                      onAdPrivacy: widget.onAdPrivacy,
+                      removeAds: widget.removeAds,
+                    )
+                  : const SizedBox.shrink(key: ValueKey('menu-settings-shut')),
             ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _CampaignBest extends StatelessWidget {
-  const _CampaignBest({required this.wave});
+class _HomeLayout extends StatelessWidget {
+  const _HomeLayout({
+    required this.size,
+    required this.profile,
+    required this.feel,
+    required this.onSeason,
+    required this.onPlay,
+    required this.onSettings,
+  });
 
-  final int wave;
+  final _MenuSize size;
+  final PlayerSave profile;
+  final FeelBus feel;
+  final ValueChanged<Season> onSeason;
+  final ValueChanged<PlayMode> onPlay;
+  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final compact = size == _MenuSize.compact;
+    final wide = size == _MenuSize.wide;
+    final gutter = compact ? tokens.space.md : tokens.space.xl;
+    final season = profile.season;
+    Widget rise(int index, Widget child) =>
+        child.enterRise(context, index: index);
+
+    final topBar = Row(
+      children: [
+        rise(
+          0,
+          _SeasonBar(season: season, onChanged: onSeason, compact: compact),
+        ),
+        const Spacer(),
+        rise(
+          1,
+          DraftImageButton(
+            key: const Key('menu-settings'),
+            label: 'Settings',
+            secondary: true,
+            leadingKind: UiIconKind.settings,
+            width: compact ? 136 : 160,
+            height: compact ? 44 : 50,
+            fontSize: compact ? 14 : 16,
+            feel: feel,
+            onPressed: onSettings,
+          ),
+        ),
+      ],
+    );
+
+    final brand = LayoutBuilder(
+      builder: (context, box) {
+        final wordSize = (box.maxHeight * 0.17).clamp(28.0, wide ? 76.0 : 60.0);
+        return SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: box.maxHeight),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                rise(2, Wordmark(fontSize: wordSize)),
+                SizedBox(height: tokens.space.sm),
+                rise(
+                  3,
+                  Text(
+                    'Snowballs & water balloons',
+                    style: BarrageType.heading.copyWith(
+                      fontSize: compact ? 15 : (wide ? 22 : 18),
+                      fontWeight: FontWeight.w500,
+                      color: tokens.ink.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ),
+                SizedBox(height: compact ? tokens.space.md : tokens.space.xl),
+                rise(
+                  4,
+                  _CampaignBest(
+                    wave: profile.campaign.bestWave,
+                    compact: compact,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    final modes = Column(
+      children: [
+        for (final mode in PlayMode.values) ...[
+          if (mode != PlayMode.values.first)
+            SizedBox(height: compact ? tokens.space.sm : tokens.space.md),
+          Expanded(
+            child: rise(
+              mode == PlayMode.values.first ? 3 : 5,
+              _ModeCard(
+                mode: mode,
+                wallet: profile.wallet(mode),
+                primary: mode == PlayMode.arcade,
+                compact: compact,
+                wide: wide,
+                onTap: () => onPlay(mode),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1180),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            gutter,
+            compact ? tokens.space.sm : tokens.space.lg,
+            gutter,
+            gutter,
+          ),
+          child: Column(
+            children: [
+              topBar,
+              SizedBox(height: compact ? tokens.space.sm : tokens.space.md),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(flex: 5, child: brand),
+                    SizedBox(
+                      width: compact ? tokens.space.md : tokens.space.xl,
+                    ),
+                    Expanded(
+                      flex: wide ? 5 : 6,
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight: wide ? 440 : double.infinity,
+                          ),
+                          child: modes,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Two-line title set in Fredoka, matching the v2 wordmark layout (ink
+/// "Backyard", blue "Barrage", blue underline with the season dots).
+class Wordmark extends StatelessWidget {
+  const Wordmark({super.key, this.fontSize = 52});
+
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final style = BarrageType.display.copyWith(
+      fontSize: fontSize,
+      height: 0.98,
+      shadows: const [
+        Shadow(color: Color(0x33FFFFFF), offset: Offset(0, 2), blurRadius: 0),
+      ],
+    );
+    return Semantics(
+      header: true,
+      label: 'Backyard Barrage',
+      excludeSemantics: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Backyard', style: style.copyWith(color: tokens.ink)),
+          Text('Barrage', style: style.copyWith(color: tokens.primary)),
+          SizedBox(height: fontSize * 0.12),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _Dot(color: BarrageColors.winterCool, size: fontSize * 0.16),
+              SizedBox(width: fontSize * 0.1),
+              Container(
+                width: fontSize * 2.4,
+                height: math.max(4, fontSize * 0.09),
+                decoration: BoxDecoration(
+                  color: tokens.primary,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              SizedBox(width: fontSize * 0.1),
+              _Dot(color: BarrageColors.summerMint, size: fontSize * 0.16),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  const _Dot({required this.color, required this.size});
+
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+  }
+}
+
+class _SeasonBar extends StatelessWidget {
+  const _SeasonBar({
+    required this.season,
+    required this.onChanged,
+    required this.compact,
+  });
+
+  final Season season;
+  final ValueChanged<Season> onChanged;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SeasonToggle(season: season, onChanged: onChanged, compact: compact),
+        SizedBox(width: tokens.space.sm),
+        TagPill(
+          child: Text(
+            '${season.label} yard',
+            key: const Key('season-label'),
+            style: BarrageType.body.copyWith(
+              fontSize: compact ? 13 : 14,
+              fontWeight: FontWeight.w600,
+              color: tokens.inkMuted,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CampaignBest extends StatelessWidget {
+  const _CampaignBest({required this.wave, required this.compact});
+
+  final int wave;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xE6FFF8F0),
-        borderRadius: BorderRadius.circular(18),
+        color: tokens.surface.withValues(alpha: 0.92),
+        borderRadius: tokens.radii.cardAll,
+        border: Border.all(color: tokens.hairline),
+        boxShadow: tokens.shadowSoft,
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 6, 18, 6),
+        padding: EdgeInsets.fromLTRB(
+          tokens.space.md,
+          tokens.space.sm,
+          tokens.space.lg + tokens.space.xs,
+          tokens.space.sm,
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 6,
-              height: 46,
+              width: compact ? 36 : 44,
+              height: compact ? 36 : 44,
               decoration: BoxDecoration(
-                color: BarrageColors.blueDeep,
-                borderRadius: BorderRadius.circular(4),
+                gradient: tokens.primaryGradient,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.emoji_events_rounded,
+                color: tokens.onPrimary,
+                size: compact ? 20 : 24,
               ),
             ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'CAMPAIGN BEST',
-                  style: BarrageType.muted.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.1,
+            SizedBox(width: tokens.space.md),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'CAMPAIGN BEST',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: BarrageType.overline,
                   ),
-                ),
-                Text(
-                  '$wave',
-                  key: const Key('campaign-best-wave'),
-                  style: const TextStyle(
-                    color: BarrageColors.blueDeep,
-                    fontSize: 40,
-                    fontWeight: FontWeight.w800,
-                    height: 1,
+                  Text(
+                    '$wave',
+                    key: const Key('campaign-best-wave'),
+                    style: BarrageType.display.copyWith(
+                      color: tokens.primaryDeep,
+                      fontSize: compact ? 30 : 38,
+                      height: 1,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
@@ -266,46 +489,150 @@ class _CampaignBest extends StatelessWidget {
   }
 }
 
+/// Big tappable play card for one [PlayMode]. Arcade is the blue primary;
+/// Campaign is the cream secondary with a blue Play pill.
 class _ModeCard extends StatelessWidget {
   const _ModeCard({
     required this.mode,
     required this.wallet,
+    required this.primary,
+    required this.compact,
+    required this.wide,
     required this.onTap,
   });
 
   final PlayMode mode;
   final MetaState wallet;
+  final bool primary;
+  final bool compact;
+  final bool wide;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: BarrageColors.cream,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-        side: const BorderSide(color: Color(0x241A2332)),
+    final tokens = context.tokens;
+    final ink = primary ? tokens.onPrimary : tokens.ink;
+    final soft = primary
+        ? tokens.onPrimary.withValues(alpha: 0.82)
+        : tokens.inkMuted;
+    final titleSize = compact ? 22.0 : (wide ? 34.0 : 26.0);
+    final icon = switch (mode) {
+      PlayMode.arcade => Icons.bolt_rounded,
+      PlayMode.campaign => Icons.flag_rounded,
+    };
+    final playPill = Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? tokens.space.md : tokens.space.lg,
+        vertical: compact ? tokens.space.sm : tokens.space.md,
       ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
+      decoration: BoxDecoration(
+        color: primary ? tokens.surface : null,
+        gradient: primary ? null : tokens.primaryGradient,
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: primary ? tokens.shadowSoft : tokens.shadowPrimary,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.play_arrow_rounded,
+            size: compact ? 22 : 28,
+            color: primary ? tokens.primaryDeep : tokens.onPrimary,
+          ),
+          const SizedBox(width: 2),
+          Text(
+            'Play',
+            style: BarrageType.button.copyWith(
+              fontSize: compact ? 16 : 20,
+              color: primary ? tokens.primaryDeep : tokens.onPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+    return Semantics(
+      button: true,
+      label: 'Play ${mode.label}',
+      child: PressScale(
         key: Key('play-${mode.name}'),
+        pressedScale: 0.97,
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: primary ? tokens.primaryGradient : null,
+            color: primary ? null : tokens.surface.withValues(alpha: 0.96),
+            borderRadius: tokens.radii.cardAll,
+            border: Border.all(
+              color: primary
+                  ? const Color(0x33FFFFFF)
+                  : tokens.primary.withValues(alpha: 0.25),
+              width: 1.5,
+            ),
+            boxShadow: primary ? tokens.shadowPrimary : tokens.shadowSoft,
+          ),
+          padding: EdgeInsets.fromLTRB(
+            compact ? tokens.space.md : tokens.space.xl,
+            compact ? tokens.space.sm : tokens.space.lg,
+            compact ? tokens.space.md : tokens.space.lg,
+            compact ? tokens.space.sm : tokens.space.lg,
+          ),
+          child: Row(
             children: [
-              Text(mode.label, style: BarrageType.heading),
-              const SizedBox(height: 4),
-              Text(
-                mode.blurb,
-                style: BarrageType.body.copyWith(fontSize: 13, height: 1.25),
+              Container(
+                width: compact ? 40 : 56,
+                height: compact ? 40 : 56,
+                decoration: BoxDecoration(
+                  color: primary ? const Color(0x2EFFFFFF) : tokens.ownedTint,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: compact ? 24 : 32,
+                  color: primary ? tokens.onPrimary : tokens.primary,
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                '${wallet.coins} coins · best wave ${wallet.bestWave}',
-                key: Key('${mode.name}-wallet'),
-                style: BarrageType.muted,
+              SizedBox(width: compact ? tokens.space.md : tokens.space.lg),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      mode.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: BarrageType.title.copyWith(
+                        fontSize: titleSize,
+                        color: ink,
+                        height: 1.05,
+                      ),
+                    ),
+                    SizedBox(height: tokens.space.xs),
+                    Text(
+                      mode.blurb,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: BarrageType.body.copyWith(
+                        fontSize: compact ? 13 : (wide ? 17 : 15),
+                        color: ink,
+                      ),
+                    ),
+                    SizedBox(height: tokens.space.xs),
+                    Text(
+                      '${wallet.coins} coins · best wave ${wallet.bestWave}',
+                      key: Key('${mode.name}-wallet'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: BarrageType.muted.copyWith(
+                        color: soft,
+                        fontSize: compact ? 12 : 14,
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              SizedBox(width: tokens.space.sm),
+              playPill,
             ],
           ),
         ),

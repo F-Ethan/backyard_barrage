@@ -2,10 +2,34 @@ import 'package:flutter/material.dart';
 
 import '../feel/feel_bus.dart';
 import 'barrage_colors.dart';
-import 'ui_kit.dart';
+import 'barrage_theme.dart';
+import 'motion.dart';
+import 'ui_assets.dart';
 
-/// Pill CTA. Art and label color follow the active [UiKit].
-class DraftImageButton extends StatefulWidget {
+/// Pause, settings, and close glyphs.
+enum UiIconKind { pause, settings, close }
+
+extension UiIconKindAssets on UiIconKind {
+  /// v2 circular icon sprite.
+  String get asset => switch (this) {
+    UiIconKind.pause => UiAssets.iconPause,
+    UiIconKind.settings => UiAssets.iconSettings,
+    UiIconKind.close => UiAssets.iconClose,
+  };
+
+  /// Tintable glyph for inline use (inside pills).
+  IconData get icon => switch (this) {
+    UiIconKind.pause => Icons.pause_rounded,
+    UiIconKind.settings => Icons.settings_rounded,
+    UiIconKind.close => Icons.close_rounded,
+  };
+}
+
+/// Stadium CTA from the v2 shape language: blue gradient primary or
+/// cream ghost secondary, soft shadow, springy press, `FeelBus.uiTap`.
+///
+/// The name predates the kit; the pill is drawn, not a stretched PNG.
+class DraftImageButton extends StatelessWidget {
   const DraftImageButton({
     super.key,
     required this.label,
@@ -17,6 +41,8 @@ class DraftImageButton extends StatefulWidget {
     this.feel,
     this.expand = false,
     this.leadingKind,
+    this.leadingIcon,
+    this.trailingIcon,
     this.fontSize = 16,
   });
 
@@ -29,89 +55,102 @@ class DraftImageButton extends StatefulWidget {
   final FeelBus? feel;
   final bool expand;
   final UiIconKind? leadingKind;
+  final IconData? leadingIcon;
+  final IconData? trailingIcon;
   final double fontSize;
 
-  @override
-  State<DraftImageButton> createState() => _DraftImageButtonState();
-}
-
-class _DraftImageButtonState extends State<DraftImageButton> {
-  bool _down = false;
-
-  bool get _canTap => widget.enabled && widget.onPressed != null;
-
-  void _setDown(bool value) {
-    if (_down == value) return;
-    setState(() => _down = value);
-  }
+  bool get _canTap => enabled && onPressed != null;
 
   @override
   Widget build(BuildContext context) {
-    final kit = UiKitScope.of(context);
-    final primary = !widget.secondary;
-    final pressedArt = primary && _down && _canTap && kit.modern;
-    final scale = _down && _canTap && !pressedArt ? 0.98 : 1.0;
-    final labelColor = kit.labelOn(primary);
-    final asset = pressedArt
-        ? kit.primaryPressed
-        : (primary ? kit.primary : kit.secondary);
-    final leading = widget.leadingKind;
-    final button = Opacity(
-      opacity: _canTap ? 1 : 0.45,
-      child: GestureDetector(
-        onTapDown: _canTap ? (_) => _setDown(true) : null,
-        onTapUp: _canTap ? (_) => _setDown(false) : null,
-        onTapCancel: _canTap ? () => _setDown(false) : null,
-        onTap: _canTap
-            ? () {
-                widget.feel?.uiTap();
-                widget.onPressed?.call();
-              }
-            : null,
-        child: Transform.scale(
-          scale: scale,
-          child: SizedBox(
-            width: widget.expand ? null : widget.width,
-            height: widget.expand ? null : widget.height,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Positioned.fill(child: Image.asset(asset, fit: BoxFit.fill)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (leading != null) ...[
-                        _KitGlyph(kind: leading, size: 26, color: labelColor),
-                        const SizedBox(width: 8),
-                      ],
-                      Flexible(
-                        child: Text(
-                          widget.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: BarrageType.button.copyWith(
-                            color: labelColor,
-                            fontSize: widget.fontSize,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+    final tokens = context.tokens;
+    final motion = context.motion;
+    final primary = !secondary;
+    final live = _canTap;
+    final labelColor = primary
+        ? (live ? tokens.onPrimary : tokens.inkMuted)
+        : (live ? tokens.ink : tokens.inkMuted);
+    final leading = leadingIcon ?? leadingKind?.icon;
+    final iconSize = (fontSize + 6).clamp(14.0, 30.0);
+    final decoration = BoxDecoration(
+      gradient: primary && live ? tokens.primaryGradient : null,
+      color: primary
+          ? (live ? null : tokens.lockedFill)
+          : tokens.surface.withValues(alpha: live ? 0.96 : 0.7),
+      borderRadius: BorderRadius.circular(999),
+      border: primary
+          ? null
+          : Border.all(
+              color: live
+                  ? tokens.primary.withValues(alpha: 0.45)
+                  : tokens.hairline,
+              width: 1.5,
+            ),
+      boxShadow: !live
+          ? null
+          : primary
+          ? tokens.shadowPrimary
+          : tokens.shadowSoft,
+    );
+    final content = Padding(
+      padding: EdgeInsets.symmetric(horizontal: tokens.space.lg),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (leading != null) ...[
+            Icon(leading, size: iconSize, color: labelColor),
+            SizedBox(width: tokens.space.sm),
+          ],
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: BarrageType.button.copyWith(
+                color: labelColor,
+                fontSize: fontSize,
+              ),
             ),
           ),
-        ),
+          if (trailingIcon != null) ...[
+            SizedBox(width: tokens.space.xs),
+            Icon(trailingIcon, size: iconSize, color: labelColor),
+          ],
+        ],
       ),
     );
-    if (!widget.expand) return button;
+    final pill = AnimatedContainer(
+      duration: motion.medium,
+      curve: motion.enter,
+      width: expand ? null : width,
+      height: expand ? null : height,
+      alignment: Alignment.center,
+      decoration: decoration,
+      child: content,
+    );
+    final button = Semantics(
+      button: true,
+      enabled: live,
+      label: label,
+      excludeSemantics: true,
+      child: PressScale(
+        enabled: live,
+        onTap: live
+            ? () {
+                feel?.uiTap();
+                onPressed?.call();
+              }
+            : null,
+        child: pill,
+      ),
+    );
+    if (!expand) return button;
     return SizedBox.expand(child: button);
   }
 }
 
-/// Circular icon. Modern kit uses the v2 sprite; classic draws an ink glyph.
+/// Round v2 icon sprite with a springy press.
 class KitIconButton extends StatelessWidget {
   const KitIconButton({
     super.key,
@@ -133,61 +172,63 @@ class KitIconButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: semanticLabel,
-      child: GestureDetector(
+      child: PressScale(
+        pressedScale: 0.88,
         onTap: () {
           feel?.uiTap();
           onPressed();
         },
-        child: _KitGlyph(kind: kind, size: size),
+        child: UiGlyph(kind: kind, size: size),
       ),
     );
   }
 }
 
+/// The v2 circular icon sprite at [size].
 class UiGlyph extends StatelessWidget {
-  const UiGlyph({
-    super.key,
-    required this.kind,
-    required this.size,
-    this.color,
-  });
+  const UiGlyph({super.key, required this.kind, required this.size});
 
   final UiIconKind kind;
   final double size;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) =>
-      _KitGlyph(kind: kind, size: size, color: color);
-}
-
-class _KitGlyph extends StatelessWidget {
-  const _KitGlyph({required this.kind, required this.size, this.color});
-
-  final UiIconKind kind;
-  final double size;
-  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    final kit = UiKitScope.of(context);
-    final asset = kit.iconAsset(kind);
-    if (asset != null) {
-      return Image.asset(asset, width: size, height: size);
-    }
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
+    return Image.asset(kind.asset, width: size, height: size);
+  }
+}
+
+/// Small pill label (season tag, "Owned", price chip).
+class TagPill extends StatelessWidget {
+  const TagPill({
+    super.key,
+    required this.child,
+    this.color,
+    this.borderColor,
+    this.padding,
+  });
+
+  final Widget child;
+  final Color? color;
+  final Color? borderColor;
+  final EdgeInsets? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: kit.cream,
-        shape: BoxShape.circle,
-        border: Border.all(color: kit.ink, width: 3),
+        color: color ?? tokens.surface.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor ?? tokens.hairline),
       ),
-      child: Icon(
-        kit.iconData(kind),
-        color: color ?? kit.ink,
-        size: size * 0.52,
+      child: Padding(
+        padding:
+            padding ??
+            EdgeInsets.symmetric(
+              horizontal: tokens.space.md,
+              vertical: tokens.space.xs + 2,
+            ),
+        child: child,
       ),
     );
   }

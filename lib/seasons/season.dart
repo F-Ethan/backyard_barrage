@@ -28,9 +28,10 @@ class SeasonAssets {
     'hit',
     'ko',
     'pickup',
-    'turn_back',
-    'turn_quarter',
-    'turn_front',
+    'turn_30l',
+    'turn_15l',
+    'turn_15r',
+    'turn_30r',
   ];
 
   static String background(Season season) => switch (season) {

@@ -40,7 +40,7 @@ Playful, cozy backyard, kid-safe. Big readable silhouettes for phone **landscape
 ## Characters
 - **Player kid:** Blue jacket (winter) / blue tee (summer); sandy hair `#FFC857`; freckles optional
 - **Enemy kids:** Violet hoodie / tee; darker hair; same pose sheet as player
-- Pose set: idle, walk, charge, throw, hit, KO
+- Pose set: idle, walk, charge, throw, hit, KO, plus mild aim yaws (`30l`, `15l`, `15r`, `30r`; see `docs/TURN_YAWS.md`)
 - Face toward camera-ish 3/4 view facing opponent (player faces right; enemy faces left)
 
 ### Pose arcs (polish pass — keep readable at phone landscape)

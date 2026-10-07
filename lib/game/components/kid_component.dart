@@ -19,9 +19,10 @@ class KidPoseSprites {
     required this.hit,
     required this.ko,
     required this.pickup,
-    required this.turnBack,
-    required this.turnQuarter,
-    required this.turnFront,
+    required this.turn30l,
+    required this.turn15l,
+    required this.turn15r,
+    required this.turn30r,
   });
 
   Sprite idle;
@@ -31,9 +32,10 @@ class KidPoseSprites {
   Sprite hit;
   Sprite ko;
   Sprite pickup;
-  Sprite turnBack;
-  Sprite turnQuarter;
-  Sprite turnFront;
+  Sprite turn30l;
+  Sprite turn15l;
+  Sprite turn15r;
+  Sprite turn30r;
 }
 
 /// Kid sprite with idle / walk / charge / throw / hit / KO poses.
@@ -52,9 +54,10 @@ class KidComponent extends SpriteComponent {
        hitSprite = poses.hit,
        koSprite = poses.ko,
        pickupSprite = poses.pickup,
-       turnBackSprite = poses.turnBack,
-       turnQuarterSprite = poses.turnQuarter,
-       turnFrontSprite = poses.turnFront,
+       turn30lSprite = poses.turn30l,
+       turn15lSprite = poses.turn15l,
+       turn15rSprite = poses.turn15r,
+       turn30rSprite = poses.turn30r,
        super(
          sprite: poses.idle,
          position: position,
@@ -72,9 +75,10 @@ class KidComponent extends SpriteComponent {
   Sprite hitSprite;
   Sprite koSprite;
   Sprite pickupSprite;
-  Sprite turnBackSprite;
-  Sprite turnQuarterSprite;
-  Sprite turnFrontSprite;
+  Sprite turn30lSprite;
+  Sprite turn15lSprite;
+  Sprite turn15rSprite;
+  Sprite turn30rSprite;
   final int maxHp;
   int hp;
 
@@ -149,7 +153,7 @@ class KidComponent extends SpriteComponent {
   ChargeYaw _chargeYaw = ChargeYaw.across;
 
   /// Yaw shown while this kid is in the charge pose. Across is the
-  /// side-profile charge sprite. The other three are the Studio turn poses.
+  /// side-profile charge sprite. The other four are the mild turn yaws.
   ChargeYaw get chargeYaw => _chargeYaw;
 
   void applyPoses(KidPoseSprites poses) {
@@ -160,9 +164,10 @@ class KidComponent extends SpriteComponent {
     hitSprite = poses.hit;
     koSprite = poses.ko;
     pickupSprite = poses.pickup;
-    turnBackSprite = poses.turnBack;
-    turnQuarterSprite = poses.turnQuarter;
-    turnFrontSprite = poses.turnFront;
+    turn30lSprite = poses.turn30l;
+    turn15lSprite = poses.turn15l;
+    turn15rSprite = poses.turn15r;
+    turn30rSprite = poses.turn30r;
     _refreshSprite();
   }
 
@@ -292,10 +297,11 @@ class KidComponent extends SpriteComponent {
     }
     if (_chargingPose) {
       sprite = switch (_chargeYaw) {
-        ChargeYaw.back => turnBackSprite,
+        ChargeYaw.yaw30l => turn30lSprite,
+        ChargeYaw.yaw15l => turn15lSprite,
         ChargeYaw.across => chargeSprite,
-        ChargeYaw.quarter => turnQuarterSprite,
-        ChargeYaw.front => turnFrontSprite,
+        ChargeYaw.yaw15r => turn15rSprite,
+        ChargeYaw.yaw30r => turn30rSprite,
       };
       return;
     }

@@ -101,10 +101,12 @@ class RowLob {
 
 /// Upright yaw while a charge sweeps along a row.
 ///
-/// [back] is the far end of the row. [across] is the existing side-profile
-/// charge pose. [quarter] is halfway toward the camera. [front] is chest
-/// and face toward the camera. Art is not mirrored.
-enum ChargeYaw { back, across, quarter, front }
+/// Order from the up-screen end of the row to the down-screen end:
+/// [yaw30l], [yaw15l], [across], [yaw15r], [yaw30r].
+/// [across] is the existing side-profile charge pose. The other four are
+/// mild screen-left / screen-right yaws. Art is not mirrored, and none of
+/// these poses face the camera or show the back of the coat.
+enum ChargeYaw { yaw30l, yaw15l, across, yaw15r, yaw30r }
 
 /// Shared throw / hit helpers (pure, unit-testable).
 class ThrowPhysics {
@@ -297,18 +299,19 @@ class ThrowPhysics {
 
   /// Which upright sprite the charge sweep should show.
   ///
-  /// [elevation] is screen-up radians from [swivelElevation]. The far end of
-  /// the row is +[maxAimRadians] (back of the coat). Straight across the yard
-  /// is 0 (the existing charge pose). The near end, chest toward the camera,
-  /// is -[maxAimRadians]. Those four looks split the sweep into equal bands.
-  /// The same bands apply to both sides. Turn art is not mirrored.
+  /// [elevation] is screen-up radians from [swivelElevation]. The up-screen
+  /// end of the row is +[maxAimRadians] (`30l`). Straight across the yard is
+  /// 0 (the existing charge pose). The down-screen end is -[maxAimRadians]
+  /// (`30r`). Five equal bands, same on both sides:
+  /// `30l → 15l → charge → 15r → 30r`. Turn art is not mirrored.
   static ChargeYaw chargeYaw(double elevation) {
     if (maxAimRadians <= 0) return ChargeYaw.across;
     final u = (elevation / maxAimRadians).clamp(-1.0, 1.0);
-    if (u >= 0.5) return ChargeYaw.back;
-    if (u >= 0) return ChargeYaw.across;
-    if (u >= -0.5) return ChargeYaw.quarter;
-    return ChargeYaw.front;
+    if (u >= 0.6) return ChargeYaw.yaw30l;
+    if (u >= 0.2) return ChargeYaw.yaw15l;
+    if (u >= -0.2) return ChargeYaw.across;
+    if (u >= -0.6) return ChargeYaw.yaw15r;
+    return ChargeYaw.yaw30r;
   }
 
   /// Forward aim at [elevation] radians. Positive elevation aims up the screen.

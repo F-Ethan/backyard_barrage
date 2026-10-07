@@ -43,9 +43,10 @@ Future<SeasonKit> loadSeasonKit(FlameGame game, Season season) async {
       hit: byName['hit']!,
       ko: byName['ko']!,
       pickup: byName['pickup']!,
-      turnBack: byName['turn_back']!,
-      turnQuarter: byName['turn_quarter']!,
-      turnFront: byName['turn_front']!,
+      turn30l: byName['turn_30l']!,
+      turn15l: byName['turn_15l']!,
+      turn15r: byName['turn_15r']!,
+      turn30r: byName['turn_30r']!,
     );
   }
 

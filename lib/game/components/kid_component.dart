@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flame/components.dart';
@@ -148,6 +149,20 @@ class KidComponent extends SpriteComponent {
   double get stunRemaining => _stunTimer;
 
   double _koAge = 0;
+
+  /// Render-only feel. None of these move [position] or the hit circle.
+  double _flashTimer = 0;
+  double _recoilTimer = 0;
+  double _recoilDir = 0;
+  double _throwPoseTotal = 0.28;
+  static const double flashSeconds = 0.09;
+  static const double recoilSeconds = 0.2;
+  static final Paint _flashPaint = Paint()
+    ..colorFilter = const ColorFilter.mode(
+      Color(0xD9FFFFFF),
+      BlendMode.srcATop,
+    );
+
   double _throwPoseTimer = 0;
   double _hitPoseTimer = 0;
   double _stunTimer = 0;
@@ -214,6 +229,7 @@ class KidComponent extends SpriteComponent {
     _walking = false;
     _hitPoseTimer = 0;
     _throwPoseTimer = duration;
+    _throwPoseTotal = duration <= 0 ? 0.28 : duration;
     _refreshSprite();
   }
 
@@ -253,7 +269,16 @@ class KidComponent extends SpriteComponent {
     _refreshSprite();
   }
 
+  /// A knock from a ball travelling along [direction] (+1 right, -1 left):
+  /// the body jolts that way and squashes, then springs back.
+  void recoil(double direction) {
+    if (isKo) return;
+    _recoilDir = direction.sign;
+    _recoilTimer = recoilSeconds;
+  }
+
   void _flash() {
+    _flashTimer = flashSeconds;
     add(
       SequenceEffect([
         OpacityEffect.to(0.35, EffectController(duration: 0.08)),
@@ -374,6 +399,8 @@ class KidComponent extends SpriteComponent {
       _throwPoseTimer -= dt;
       if (_throwPoseTimer <= 0) refresh = true;
     }
+    if (_flashTimer > 0) _flashTimer -= dt;
+    if (_recoilTimer > 0) _recoilTimer -= dt;
     if (isKo) {
       _koAge += dt;
       final t = (_koAge - koFadeDelay) / koFadeSeconds;
@@ -414,6 +441,34 @@ class KidComponent extends SpriteComponent {
   }
 
   void _renderBody(Canvas canvas) {
+    final moved = _applyFeelTransform(canvas);
+    _renderPosed(canvas);
+    if (moved) canvas.restore();
+  }
+
+  /// Jolt, squash, and throw lunge, pivoting at the feet. Returns true when
+  /// it saved the canvas.
+  bool _applyFeelTransform(Canvas canvas) {
+    if (isKo) return false;
+    final recoil = _recoilTimer > 0 ? _recoilTimer / recoilSeconds : 0.0;
+    final lunge = _throwPoseTimer > 0
+        ? math.sin(math.pi * (1 - _throwPoseTimer / _throwPoseTotal))
+        : 0.0;
+    if (recoil <= 0 && lunge <= 0) return false;
+    final forward = side == KidSide.player ? 1.0 : -1.0;
+    final feet = Offset(size.x / 2, size.y);
+    canvas.save();
+    canvas.translate(feet.dx + _recoilDir * 12 * recoil, feet.dy);
+    if (recoil > 0) {
+      final squash = 0.14 * recoil;
+      canvas.scale(1 + squash, 1 - squash);
+    }
+    if (lunge > 0) canvas.rotate(forward * 0.16 * lunge);
+    canvas.translate(-feet.dx, -feet.dy);
+    return true;
+  }
+
+  void _renderPosed(Canvas canvas) {
     if (selected && !isKo) {
       final glow = Paint()
         ..color = const Color(0x663D7CFF)
@@ -433,6 +488,9 @@ class KidComponent extends SpriteComponent {
       canvas.translate(0, down);
     }
     super.render(canvas);
+    if (_flashTimer > 0 && !isKo) {
+      sprite?.render(canvas, size: size, overridePaint: _flashPaint);
+    }
     if (isKo) {
       _drawKnockoutMark(canvas);
       canvas.restore();

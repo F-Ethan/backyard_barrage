@@ -13,7 +13,9 @@ import 'package:backyard_barrage/game/components/enemy_controller.dart';
 import 'package:backyard_barrage/game/components/fort_component.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
 import 'package:backyard_barrage/game/components/lob_projectile.dart';
+import 'package:backyard_barrage/game/components/coin_pop.dart';
 import 'package:backyard_barrage/game/components/overlay_banner.dart';
+import 'package:backyard_barrage/game/components/splash_particles.dart';
 import 'package:backyard_barrage/game/throw_physics.dart';
 import 'package:backyard_barrage/meta/difficulty.dart';
 import 'package:backyard_barrage/meta/meta_state.dart';
@@ -1068,6 +1070,70 @@ void main() {
       kid.position.y + window + ThrowPhysics.aimAssistPx + 10,
     );
     expect(game.assistedElevation(kid, 0, range), 0);
+  });
+
+  /// Throws a full-power flat lob at a rival parked on the line, running
+  /// the real game loop. Returns whether hit-stop was ever seen.
+  Future<bool> throwAtParkedRival(
+    WidgetTester tester,
+    BackyardBarrageGame game,
+  ) async {
+    freezeRivals(game);
+    final kid = game.players.first;
+    final rival = game.enemies.first;
+    rival.position = Vector2(900, kid.position.y);
+    rival.syncDepth();
+    game.pressMoveZone(kid.hitCenter);
+    game.releaseMoveZone();
+    game.pressChargeZone();
+    for (var i = 0; i < 400 && game.aimTarget == null; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(game.aimTarget, rival);
+    final hpBefore = rival.hp;
+    game.releaseChargeZone();
+    var sawStop = false;
+    for (var i = 0; i < 90 && rival.hp == hpBefore; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    sawStop = game.hitStopRemaining > 0;
+    expect(rival.hp, lessThan(hpBefore));
+    // Effects added on the hit frame mount on the next one.
+    await tester.pump(const Duration(milliseconds: 16));
+    return sawStop;
+  }
+
+  testWidgets('a landed hit freezes the yard briefly and sprays', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.reduceMotion = () => false;
+    final stopped = await throwAtParkedRival(tester, game);
+    expect(stopped, isTrue);
+    expect(game.world.children.whereType<SplashParticles>(), isNotEmpty);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(game.hitStopRemaining, lessThanOrEqualTo(0));
+    expect(game.camera.viewfinder.position, Vector2.zero());
+  });
+
+  testWidgets('reduce motion skips hit-stop and shake', (tester) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.reduceMotion = () => true;
+    final stopped = await throwAtParkedRival(tester, game);
+    expect(stopped, isFalse);
+    expect(game.camera.viewfinder.position, Vector2.zero());
+  });
+
+  testWidgets('a rival knockout floats the coin reward', (tester) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.reduceMotion = () => true;
+    for (final rival in game.enemies) {
+      rival.hp = 1;
+    }
+    await throwAtParkedRival(tester, game);
+    expect(game.enemies.first.isKo, isTrue);
+    final pop = game.world.children.whereType<CoinPop>().single;
+    expect(pop.amount, MetaState.coinsPerKnockout);
   });
 
   testWidgets('the charge sweep swaps upright yaw poses', (tester) async {

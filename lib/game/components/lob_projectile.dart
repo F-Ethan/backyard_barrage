@@ -209,6 +209,8 @@ class LobProjectile extends SpriteComponent {
       _hit.x += velocity.x * dt;
       _hit.y += velocity.y * dt;
     }
+    _trail.add(position.clone());
+    if (_trail.length > _trailLength) _trail.removeAt(0);
     _syncVisual();
     // Ground-track height, not the lofted picture. Over the hit box paints
     // behind the kid. Under it stays in front. Scale uses that same height.
@@ -338,9 +340,30 @@ class LobProjectile extends SpriteComponent {
 
   static final Paint _shadowPaint = Paint()..color = const Color(0x3D1A2332);
 
+  /// Recent drawn positions, newest last, for a soft motion trail.
+  final List<Vector2> _trail = [];
+  static const int _trailLength = 5;
+
+  static final Paint _trailPaint = Paint();
+
   @override
   void render(Canvas canvas) {
     if (groundTrack && !_spent) {
+      final sx0 = scale.x == 0 ? 1.0 : scale.x;
+      final sy0 = scale.y == 0 ? 1.0 : scale.y;
+      for (var i = 0; i < _trail.length; i++) {
+        final ghost = _trail[i];
+        final t = (i + 1) / (_trail.length + 1);
+        _trailPaint.color = const Color(0xFFFFFFFF).withValues(alpha: 0.28 * t);
+        canvas.drawCircle(
+          Offset(
+            (ghost.x - position.x) / sx0 + size.x / 2,
+            (ghost.y - position.y) / sy0 + size.y / 2,
+          ),
+          size.x * 0.32 * (0.5 + 0.5 * t),
+          _trailPaint,
+        );
+      }
       // Local space: anchor is the center, and the component is scaled.
       final sx = scale.x == 0 ? 1.0 : scale.x;
       final sy = scale.y == 0 ? 1.0 : scale.y;

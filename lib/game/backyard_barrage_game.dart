@@ -21,6 +21,7 @@ import '../seasons/season.dart';
 import '../seasons/season_kit.dart';
 import 'arena_grid.dart';
 import 'combat_rules.dart';
+import 'rival_type.dart';
 import 'components/charge_indicator.dart';
 import 'components/coin_pop.dart';
 import 'components/coin_carry.dart';
@@ -84,6 +85,11 @@ class BackyardBarrageGame extends FlameGame {
 
   final List<KidComponent> players = [];
   final List<KidComponent> enemies = [];
+  final Map<KidComponent, RivalType> _rivalTypes = {};
+
+  /// What kind of rival [kid] is. Player kids and unknowns read as ghosts.
+  RivalType rivalTypeOf(KidComponent kid) =>
+      _rivalTypes[kid] ?? RivalType.snowGhost;
 
   late FortComponent fort;
   late FortComponent enemyFort;
@@ -365,7 +371,7 @@ class BackyardBarrageGame extends FlameGame {
       kid.applyPoses(kit.playerPoses);
     }
     for (final kid in enemies) {
-      kid.applyPoses(kit.enemyPoses);
+      kid.applyPoses(kit.posesFor(rivalTypeOf(kid)));
     }
   }
 
@@ -407,9 +413,23 @@ class BackyardBarrageGame extends FlameGame {
     _ensureAllyBrains();
 
     final count = CombatRules.enemyCountForWave(wave);
+    final lineup = RivalRoster.forWave(
+      wave: wave,
+      count: count,
+      difficulty: feel.settings.difficulty,
+    );
     for (var i = 0; i < count; i++) {
-      final kid = _makeKid(KidSide.enemy, i);
-      final goal = ArenaGrid.slot(KidSide.enemy, i);
+      final type = lineup[i];
+      final rival = RivalProfile.of(type);
+      final kid = _makeRival(type, i);
+      final slot =
+          ArenaGrid.enemySlots[i.clamp(0, ArenaGrid.enemySlots.length - 1)];
+      // Slot rows are distinct, so a type's home column never stacks kids.
+      final goal = ArenaGrid.cellCenter(
+        KidSide.enemy,
+        rival.holdColumn ?? slot.$1,
+        slot.$2,
+      );
       kid.position = Vector2(worldWidth + _offstage + i * 36, goal.y);
       kid.setWalking(true);
       kid.syncDepth();
@@ -434,6 +454,7 @@ class BackyardBarrageGame extends FlameGame {
           onFire: _onEnemyFire,
           isFighting: () => phase == MatchPhase.fight,
           playerChargeSeconds: _baseChargeSeconds,
+          profile: rival,
         ),
       );
     }
@@ -492,11 +513,28 @@ class BackyardBarrageGame extends FlameGame {
     );
   }
 
+  KidComponent _makeRival(RivalType type, int slot) {
+    final kid = KidComponent(
+      side: KidSide.enemy,
+      poses: _kit.posesFor(type),
+      position: ArenaGrid.slot(KidSide.enemy, slot),
+      size: Vector2.all(ArenaGrid.kidSize),
+      maxHp: RivalProfile.of(type).hitsToKo(_tuning().enemyHitsToKo),
+    );
+    final profile = RivalProfile.of(type);
+    kid.glint = profile.glint;
+    final at = profile.glintAt;
+    if (at != null) kid.glintAt = Vector2(at.$1, at.$2);
+    _rivalTypes[kid] = type;
+    return kid;
+  }
+
   void _clearEnemies() {
     for (final enemy in List<KidComponent>.of(enemies)) {
       enemy.removeFromParent();
     }
     enemies.clear();
+    _rivalTypes.clear();
   }
 
   void _clearShots() {

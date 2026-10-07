@@ -6,6 +6,7 @@ import '../../meta/difficulty.dart';
 import '../arena_grid.dart';
 import '../combat_rules.dart';
 import '../enemy_ai.dart';
+import '../rival_type.dart';
 import '../throw_physics.dart';
 import 'kid_component.dart';
 
@@ -33,6 +34,7 @@ class EnemyController extends Component {
     this.currentWave,
     this.playerChargeSeconds,
     this.aimJitterScale,
+    this.profile = const RivalProfile(),
   }) : _cycle = initialDelay,
        _seenHp = host.hp;
 
@@ -65,6 +67,9 @@ class EnemyController extends Component {
   /// Multiplier on aim scatter. Teammate aim nodes pass a value under 1.
   final double Function()? aimJitterScale;
 
+  /// What kind of rival this is: pace, accuracy, and home column.
+  final RivalProfile profile;
+
   _AiPhase _phase = _AiPhase.wait;
   double _cycle;
   double _elapsed = 0;
@@ -76,7 +81,7 @@ class EnemyController extends Component {
   double get _telegraph {
     final player =
         playerChargeSeconds?.call() ?? CombatRules.playerChargeSeconds(0);
-    return tuning().botChargeSeconds(player);
+    return tuning().botChargeSeconds(player) * profile.windupScale;
   }
 
   /// Charge pose before a bot releases. Tests check Easy and Normal stay
@@ -133,7 +138,7 @@ class EnemyController extends Component {
       _phase = _AiPhase.wait;
       return;
     }
-    final speed = tuning().enemyStepSpeed;
+    final speed = tuning().enemyStepSpeed * profile.stepScale;
     final delta = target - host.position;
     final distance = delta.length;
     final step = speed * dt;
@@ -178,7 +183,8 @@ class EnemyController extends Component {
     final target = index == null ? null : players[index];
     final jitter =
         CombatRules.enemyAimJitterRadians(currentWave?.call() ?? wave) *
-        (aimJitterScale?.call() ?? 1);
+        (aimJitterScale?.call() ?? 1) *
+        profile.jitterScale;
     final scatter = EnemyAi.rangeScatter(rng, jitter);
     var fellShort = false;
     if (target != null) {
@@ -196,7 +202,7 @@ class EnemyController extends Component {
 
   void _beginCycle({required bool shotFellShort}) {
     final profile = tuning();
-    _cycle = EnemyAi.throwGap(rng, profile);
+    _cycle = EnemyAi.throwGap(rng, profile) * this.profile.gapScale;
     final hold = _telegraph;
     if (hold > _cycle) _cycle = hold;
     _elapsed = 0;
@@ -222,6 +228,8 @@ class EnemyController extends Component {
   }) {
     final profile = tuning();
     final cell = ArenaGrid.nearestCell(side, host.position);
+    final home = _towardHome(cell, retreat: retreat);
+    if (home != null) return home;
     return EnemyAi.planBotStep(
       column: cell.column,
       row: cell.row,
@@ -238,6 +246,24 @@ class EnemyController extends Component {
       occupied: _occupied(),
       approach: approachColumn,
     );
+  }
+
+  /// One column toward [RivalProfile.holdColumn] when this rival has one
+  /// and is off it. A retreat after a hit still goes first.
+  ({int column, int row})? _towardHome(
+    ArenaCell cell, {
+    required bool retreat,
+  }) {
+    final hold = profile.holdColumn;
+    if (hold == null || retreat || cell.column == hold) return null;
+    final next = (
+      column: cell.column + (hold > cell.column ? 1 : -1),
+      row: cell.row,
+    );
+    for (final spot in _occupied()) {
+      if (spot.column == next.column && spot.row == next.row) return null;
+    }
+    return next;
   }
 
   List<({int column, int row})> _occupied() {

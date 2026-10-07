@@ -33,6 +33,8 @@ flutter:
     - assets/images/characters/
     - assets/images/characters/enemy/
     - assets/images/characters/player/
+    - assets/images/characters/rivals/ghost/
+    - assets/images/characters/rivals/frostkid/
     - assets/images/forts/
     - assets/images/projectiles/
     - assets/images/props/

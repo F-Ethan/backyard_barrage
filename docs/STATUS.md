@@ -116,6 +116,17 @@ All under `assets/images/ui/`. Shared language: ink `#2C3E50` ~4–6px outline, 
 
 ---
 
+### Rivals (`assets/images/characters/rivals/`) — 2026-10-07
+
+Owner renders, 512² RGBA with the feet on y≈471, facing screen-left. Wired with a square crop `(20.5, 0, 471)` and a draw scale (ghost 1.12, frost kid 1.18).
+
+| Folder | Frames |
+| --- | --- |
+| `ghost/` (snow ghost, standard rival) | `aim_00`, `aim_15a`, `aim_15b`, `aim_30a`, `aim_30b`, `idle`, `windup` (v1, rescaled), `throw`, `hit`, `ko` |
+| `frostkid/` (long range) | same set plus `windup` |
+
+Both rivals charge on `windup` (snowball raised); the `aim_*` frames are a smoother sculpt and are not drawn. `ghost/ghost_windup_draft.png` is the v1 `characters/enemy/ghost/ghost_windup_512.png` rescaled ×0.961 onto the v2 feet line. The rusher type uses the 2D enemy drafts until its art lands.
+
 ## Non-character MVP (world / forts / VFX)
 
 | Path | Status |

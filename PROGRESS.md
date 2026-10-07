@@ -1,6 +1,6 @@
 # Backyard Barrage progress
 
-Flutter + Flame landscape arena game (winter snowballs / summer water balloons), publisher GameLogic / Ethan. Version `0.1.0+9`. This file tracks leftovers so agents do not drop them.
+Flutter + Flame landscape arena game (winter snowballs / summer water balloons), publisher GameLogic / Ethan. Version `0.1.0+10`. This file tracks leftovers so agents do not drop them.
 
 ## Shipped
 
@@ -26,6 +26,9 @@ Playable MVP loop on the gameplay branch:
 
 Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you notice something you are not fixing in the current PR. Remove or rewrite a row when it is actually fixed.
 
+- **Player-winter 3D aim does not share the 2D foot crop.** The 1024 frames keep Studio's framing (kid about 77% of the square, boots about 12% above the bottom). Idle, walk, throw, and pickup are still the 512 drafts that fill the frame and sit on the bottom-center anchor. During a winter charge the player kid draws smaller and slightly off the ground, then the throw pose snaps back to the 2D sheet. Not recropped in this pass.
+- **3D hero still is not the aim-strip face.** `player_charge_winter_3d_v1.png` stays out of the yaw strip until Art regenerates the turns to that face. The in-game 0° frame is `player_charge_winter_3d_from_sheet.png`.
+- **3D aim pack is player winter only.** Summer turns, enemy turns, throw, team faces, and the app icon are still the previous art. `docs/HANDOFF_3D_TURNS.md` also notes possible 1–2 px soft-edge fringing where the 15R and 30R panels met.
 - **HQ turn-yaw regenerator is not in the repo.** `docs/TURN_YAWS.md` names `scripts/generate_turn_yaws.py` as the writer of the 16 turn drafts, the 4 HQ charge drafts, and `turn_yaw_sheet_hq.png`. Studio delivered those binaries. `scripts/generate_poses_polish.py` still paints `charge` and would overwrite the HQ charge drafts if re-run. The pose scripts do not redraw the yaws.
 - **Enemy fort has no HUD meter.** The enemy fort uses the stage-1 art and shows damage on the sprite. Hearts, coins, and the player fort bar are the screen-space meters.
 - **Old flightVisualY hump is still unused.** Live snowballs draw `loftAt` on the ground track (a 64px climb and drop). `flightVisualY` / `_visualHump` still peaks around 40–120px, but current lobs set `groundTrack` and do not draw that path.

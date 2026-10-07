@@ -3,7 +3,7 @@
 **Updated:** 2026-10-07  
 **Pack:** MVP draft + character pose polish + **UI kit pass** + mild turn yaws
 
-**Game wiring:** The arena loads both seasons (backgrounds, idle/walk/charge/throw/hit/KO/turn poses, snowball vs water balloon, snow vs splash) and fort stages 1–3. The charge sweep swaps five upright poses from the up-screen end of the row to the down-screen end: turn-30l, turn-15l, the charge pose, turn-15r, turn-30r. See `docs/TURN_YAWS.md`. Flutter menus, shop, pause, settings, and the screen-space HUD use **`assets/images/ui_modern/`** (see `docs/UI_MODERN.md`). The legacy wood/comic kit under `assets/images/ui/` is kept, including the locked app icon; those draft buttons, chips, and frames are no longer on the live screens.  
+**Game wiring:** The arena loads both seasons (backgrounds, idle/walk/charge/throw/hit/KO/turn poses, snowball vs water balloon, snow vs splash) and fort stages 1–3. The charge sweep swaps five upright poses from the up-screen end of the row to the down-screen end: turn-30l, turn-15l, the charge pose, turn-15r, turn-30r. Player winter uses the 3D aim pack (`docs/TURN_YAWS.md`, `docs/HANDOFF_3D_TURNS.md`); summer and enemy stay on the 2D HQ drafts. Flutter menus, shop, pause, settings, and the screen-space HUD use **`assets/images/ui_modern/`** (see `docs/UI_MODERN.md`). The legacy wood/comic kit under `assets/images/ui/` is kept, including the locked app icon; those draft buttons, chips, and frames are no longer on the live screens.  
 **Style source:** `docs/STYLE.md` (followed)  
 **Generators:**
 - `scripts/generate_mvp_drafts.py` — world/forts/VFX/UI basics + shared character import
@@ -48,7 +48,7 @@ All under `assets/images/ui/`. Shared language: ink `#2C3E50` ~4–6px outline, 
 
 ## Character pose pack — polish pass 2026-10-01, HQ mild turn yaws 2026-10-07
 
-All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet `#9B59B6`). Outline `#2C3E50` ~3–4px. Winter = coat+beanie+pom; summer = tee (balloon projectile on charge/throw). Soft ground contact shadow + 1 soft body shade plane. Mild aim yaws are the Studio HQ drafts (`docs/TURN_YAWS.md`). The player-winter contact sheet is `assets/images/characters/turn_yaw_sheet_hq.png`. `turn_yaw_sheet_mild.png` stays as the older reference.
+2D pose drafts are 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet `#9B59B6`). Outline `#2C3E50` ~3–4px. Winter = coat+beanie+pom; summer = tee (balloon projectile on charge/throw). Soft ground contact shadow + 1 soft body shade plane. Mild aim yaws for summer and for the enemy are the Studio HQ drafts (`docs/TURN_YAWS.md`). Player winter aim uses the 1024×1024 3D pack instead: `player_turn_{30l,15l,15r,30r}_winter_3d_v1.png` plus `player_charge_winter_3d_from_sheet.png` as the sweep center. `player_charge_winter_3d_v1.png` is the hero still and is not in the strip. Sheet: `assets/images/characters/turn_yaw_sheet_3d_winter.png`. The older player-winter 2D contact sheet `turn_yaw_sheet_hq.png` and `turn_yaw_sheet_mild.png` stay as reference.
 
 ### Player (`assets/images/characters/player/`)
 
@@ -58,7 +58,9 @@ All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet
 | `player_idle_summer_draft.png` | **improved draft** | Tee variant; re-exported |
 | `player_walk_winter_draft.png` | **new draft** | Mid-stride, opposite arm/leg |
 | `player_walk_summer_draft.png` | **new draft** | Same arc, summer tee |
-| `player_charge_winter_draft.png` | **HQ draft** | Aim-sweep center. Lean back, snowball + yellow charge glow. Same HQ path as the turn yaws |
+| `player_charge_winter_draft.png` | **HQ draft** | Kept on disk. Player-winter aim center is now `player_charge_winter_3d_from_sheet.png` |
+| `player_charge_winter_3d_from_sheet.png` | **3D aim center** | 1024×1024. 0° frame in the player-winter sweep. White backdrop keyed out |
+| `player_charge_winter_3d_v1.png` | **hero still** | 1024×1024 approved single. Not used in the aim sweep |
 | `player_charge_summer_draft.png` | **HQ draft** | Aim-sweep center. Lean back, water balloon + glow |
 | `player_throw_winter_draft.png` | **improved draft** | Follow-through forward; re-exported |
 | `player_throw_summer_draft.png` | **new draft** | Follow-through + balloon |
@@ -68,13 +70,17 @@ All 512×512 RGBA. Player faces RIGHT (blue `#3D7CFF`); enemy faces LEFT (violet
 | `player_ko_summer_draft.png` | **new draft** | Slump + swirl + stars, tee |
 | `player_pickup_winter_draft.png` | **playtest draft** | Selected / held-up pose (Studio) |
 | `player_pickup_summer_draft.png` | **playtest draft** | Selected / held-up pose, tee |
-| `player_turn_30l_winter_draft.png` | **HQ playtest draft** | Up-screen end of the aim sweep, ~30° screen-left (Studio) |
+| `player_turn_30l_winter_draft.png` | **HQ playtest draft** | Kept on disk. Player-winter sweep uses `player_turn_30l_winter_3d_v1.png` |
+| `player_turn_30l_winter_3d_v1.png` | **3D aim** | 1024×1024. Up-screen end of the player-winter sweep |
 | `player_turn_30l_summer_draft.png` | **HQ playtest draft** | Same yaw, tee |
-| `player_turn_15l_winter_draft.png` | **HQ playtest draft** | Milder screen-left, between 30l and the charge pose |
+| `player_turn_15l_winter_draft.png` | **HQ playtest draft** | Kept on disk. Player-winter sweep uses `player_turn_15l_winter_3d_v1.png` |
+| `player_turn_15l_winter_3d_v1.png` | **3D aim** | 1024×1024. Between 30l and the sheet charge |
 | `player_turn_15l_summer_draft.png` | **HQ playtest draft** | Same yaw, tee |
-| `player_turn_15r_winter_draft.png` | **HQ playtest draft** | Milder screen-right, between the charge pose and 30r |
+| `player_turn_15r_winter_draft.png` | **HQ playtest draft** | Kept on disk. Player-winter sweep uses `player_turn_15r_winter_3d_v1.png` |
+| `player_turn_15r_winter_3d_v1.png` | **3D aim** | 1024×1024. Between the sheet charge and 30r |
 | `player_turn_15r_summer_draft.png` | **HQ playtest draft** | Same yaw, tee |
-| `player_turn_30r_winter_draft.png` | **HQ playtest draft** | Down-screen end of the aim sweep, ~30° screen-right (Studio) |
+| `player_turn_30r_winter_draft.png` | **HQ playtest draft** | Kept on disk. Player-winter sweep uses `player_turn_30r_winter_3d_v1.png` |
+| `player_turn_30r_winter_3d_v1.png` | **3D aim** | 1024×1024. Down-screen end of the player-winter sweep |
 | `player_turn_30r_summer_draft.png` | **HQ playtest draft** | Same yaw, tee |
 
 ### Enemy (`assets/images/characters/enemy/`)

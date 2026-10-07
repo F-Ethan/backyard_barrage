@@ -1,6 +1,18 @@
 # Turn / yaw poses (mild set)
 
-**Status:** Ethan-approved direction — mild yaws only (no front/back). Regenerator: `scripts/generate_turn_yaws.py`.
+**Status:** Ethan-approved direction — mild yaws only (no front/back). Regenerator for the 2D HQ drafts: `scripts/generate_turn_yaws.py`.
+
+**Player winter aim (3D pack):** the in-game sweep for the player in winter uses the Ethan-approved 3D frames, still `30l → 15l → charge → 15r → 30r`. The 0° frame is `player_charge_winter_3d_from_sheet.png` so the face matches the turn frames. The hero still `player_charge_winter_3d_v1.png` is in the repo and is not part of the strip. Summer, enemy, and the throw pose stay on the 2D drafts. Handoff: [`HANDOFF_3D_TURNS.md`](HANDOFF_3D_TURNS.md). Contact sheet: `assets/images/characters/turn_yaw_sheet_3d_winter.png`.
+
+| Yaw | In-game file |
+|-----|----------------|
+| `30l` | `characters/player/player_turn_30l_winter_3d_v1.png` |
+| `15l` | `characters/player/player_turn_15l_winter_3d_v1.png` |
+| charge (0°) | `characters/player/player_charge_winter_3d_from_sheet.png` |
+| `15r` | `characters/player/player_turn_15r_winter_3d_v1.png` |
+| `30r` | `characters/player/player_turn_30r_winter_3d_v1.png` |
+
+Studio delivered 1024×1024 RGB on white. Kids draw at a fixed world size, so the game keeps the 1024s (no 512 downscale). The five aim frames in the repo have the edge-connected white backdrop keyed to alpha so they composite; interior whites (pom, snowball, trim) stay. The hero still and the contact sheet are the original files. The 2D player-winter turn and charge drafts stay on disk unused by the player-winter sweep. Summer and enemy still load their own 2D drafts.
 
 **HQ regen (Ethan):** higher-quality kid so aim-sweep turn direction is unmistakable at phone scale — softer 1–2 plane shading (coat/skin/hair), clearer iris+highlight eye / brow / freckles, distinct near vs far shoulder / chest planes, hands reading as holding the projectile with projectile tracking yaw, hat/hair silhouette that turns with yaw. Default charge drafts regenerated from the same HQ path so the sweep center matches the turn set. Contact sheet: `turn_yaw_sheet_hq.png`.
 

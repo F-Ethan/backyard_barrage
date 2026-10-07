@@ -3,7 +3,8 @@ import 'difficulty.dart';
 import 'play_mode.dart';
 import 'skill_tree.dart';
 
-/// One mode's skill tree, coins, and best wave on each difficulty.
+/// One wallet: the skill tree, coins, and best wave for one mode on one
+/// difficulty. Each mode × difficulty pair has its own ([PlayerSave]).
 ///
 /// Crew size, fort stage, and throw rank are the team, fort, and throw
 /// chains. Season is shared by both modes and stored here so a match can
@@ -17,17 +18,11 @@ class MetaState {
     int throwRank = 0,
     Set<String>? skills,
     Season season = Season.winter,
-    Map<Difficulty, int>? bestWaves,
-    int bestWave = 0,
+    this.bestWave = 0,
+    this.score = 0,
     this.mode = PlayMode.arcade,
+    this.difficulty = Difficulty.normal,
   }) : _season = season.orPlayable {
-    if (bestWaves != null) {
-      replaceBestWaves(bestWaves);
-    } else if (bestWave > 0) {
-      // Records from before bests were split by difficulty count as Normal,
-      // the default setting.
-      _bestWaves[Difficulty.normal] = bestWave;
-    }
     if (skills != null) {
       _skills.addAll(_closed(skills));
     } else {
@@ -63,18 +58,21 @@ class MetaState {
   set season(Season value) => _season = value.orPlayable;
   Season _season;
 
-  final Map<Difficulty, int> _bestWaves = {};
+  /// The difficulty this wallet belongs to.
+  Difficulty difficulty;
 
-  /// Highest wave cleared on [difficulty] in this mode. 0 when none.
-  int bestWaveFor(Difficulty difficulty) => _bestWaves[difficulty] ?? 0;
+  /// Highest wave cleared in this mode on [difficulty]. 0 when none.
+  int bestWave;
 
-  Map<Difficulty, int> get bestWaves => Map.unmodifiable(_bestWaves);
+  /// Lifetime points. Every coin earned also adds a point, but points are
+  /// never spent and never reset. Arcade shows this as its score.
+  int score;
 
-  void replaceBestWaves(Map<Difficulty, int> next) {
-    _bestWaves.clear();
-    for (final entry in next.entries) {
-      if (entry.value > 0) _bestWaves[entry.key] = entry.value;
-    }
+  /// Pay [amount] coins and the matching points.
+  void earn(int amount) {
+    if (amount <= 0) return;
+    coins += amount;
+    score += amount;
   }
 
   final Set<String> _skills = {};
@@ -219,8 +217,8 @@ class MetaState {
     return buy(next.id);
   }
 
-  void noteWaveCleared(int wave, {required Difficulty difficulty}) {
-    if (wave > bestWaveFor(difficulty)) _bestWaves[difficulty] = wave;
+  void noteWaveCleared(int wave) {
+    if (wave > bestWave) bestWave = wave;
   }
 
   /// Arcade drops every skill. Campaign keeps bought nodes.
@@ -254,9 +252,9 @@ class MetaState {
     'throwRank': throwRank,
     'skills': _skills.toList()..sort(),
     'season': season.name,
-    'bestWaves': {
-      for (final entry in _bestWaves.entries) entry.key.name: entry.value,
-    },
+    'bestWave': bestWave,
+    'score': score,
+    'difficulty': difficulty.name,
     'mode': mode.name,
   };
 
@@ -283,20 +281,34 @@ class MetaState {
       coins: _clampInt(_asInt(json['coins']), 0, 999999),
       skills: skills,
       season: Season.tryParse(json['season'] as String?) ?? Season.winter,
-      bestWaves: _readBestWaves(json['bestWaves']),
       bestWave: _clampInt(_asInt(json['bestWave']), 0, 9999),
+      score: _clampInt(_asInt(json['score']), 0, 999999999),
+      difficulty: _readDifficulty(json['difficulty']),
       mode: PlayMode.tryParse(json['mode'] as String?) ?? PlayMode.arcade,
     );
   }
 
-  /// Null when the save predates per-difficulty bests.
-  static Map<Difficulty, int>? _readBestWaves(Object? raw) {
-    if (raw is! Map) return null;
-    return {
-      for (final mode in Difficulty.values)
-        if (raw[mode.name] != null)
-          mode: _clampInt(_asInt(raw[mode.name]), 0, 9999),
-    };
+  static Difficulty _readDifficulty(Object? raw) {
+    for (final mode in Difficulty.values) {
+      if (mode.name == raw) return mode;
+    }
+    return Difficulty.normal;
+  }
+
+  /// Best waves from a save written before wallets split by difficulty.
+  /// A `bestWaves` map (per difficulty) wins; a lone `bestWave` counts as
+  /// Normal, the default setting.
+  static Map<Difficulty, int> legacyBestWaves(Map<String, dynamic> json) {
+    final raw = json['bestWaves'];
+    if (raw is Map) {
+      return {
+        for (final mode in Difficulty.values)
+          if (raw[mode.name] != null)
+            mode: _clampInt(_asInt(raw[mode.name]), 0, 9999),
+      };
+    }
+    final single = _clampInt(_asInt(json['bestWave']), 0, 9999);
+    return {if (single > 0) Difficulty.normal: single};
   }
 
   int _ownedPrefix(SkillBranch branch) {

@@ -465,6 +465,9 @@ void main() {
       game.meta.coins,
       MetaState.coinsForWave(1) + MetaState.coinsPerKnockout,
     );
+    // Every coin earned in the fight also lands on the lifetime score.
+    expect(game.meta.score, game.meta.coins);
+    expect(game.meta.bestWave, 1);
 
     game.update(0.7);
     game.update(0.6);
@@ -539,7 +542,7 @@ void main() {
     expect(game.meta.crewSize, 1);
     expect(game.meta.fortStage, 1);
     expect(game.meta.throwRank, 0);
-    expect(game.meta.bestWaveFor(Difficulty.normal), 3);
+    expect(game.meta.bestWave, 3);
     expect(game.meta.season, Season.winter);
     expect(game.wave, 1);
 
@@ -605,7 +608,7 @@ void main() {
     expect(game.meta.crewSize, 2);
     expect(game.meta.fortStage, 2);
     expect(game.meta.throwRank, 1);
-    expect(game.meta.bestWaveFor(Difficulty.normal), 5);
+    expect(game.meta.bestWave, 5);
     expect(game.wave, 4);
 
     game.update(0.7);
@@ -628,14 +631,17 @@ void main() {
     final profile = await SaveStore(
       preferences: await SharedPreferences.getInstance(),
     ).load();
-    expect(profile.arcade.coins, 77);
-    expect(profile.arcade.bestWaveFor(Difficulty.normal), 3);
-    expect(profile.arcade.owns('fort-2'), isFalse);
-    expect(profile.campaign.coins, 40);
-    expect(profile.campaign.bestWaveFor(Difficulty.normal), 5);
-    expect(profile.campaign.crewSize, 2);
-    expect(profile.campaign.fortStage, 2);
-    expect(profile.campaign.throwRank, 1);
+    expect(profile.wallet(PlayMode.arcade, Difficulty.normal).coins, 77);
+    expect(profile.wallet(PlayMode.arcade, Difficulty.normal).bestWave, 3);
+    expect(
+      profile.wallet(PlayMode.arcade, Difficulty.normal).owns('fort-2'),
+      isFalse,
+    );
+    expect(profile.wallet(PlayMode.campaign, Difficulty.normal).coins, 40);
+    expect(profile.wallet(PlayMode.campaign, Difficulty.normal).bestWave, 5);
+    expect(profile.wallet(PlayMode.campaign, Difficulty.normal).crewSize, 2);
+    expect(profile.wallet(PlayMode.campaign, Difficulty.normal).fortStage, 2);
+    expect(profile.wallet(PlayMode.campaign, Difficulty.normal).throwRank, 1);
     expect(profile.season, Season.winter);
   });
 

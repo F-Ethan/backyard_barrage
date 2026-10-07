@@ -14,6 +14,7 @@ import '../meta/settings_store.dart';
 import '../seasons/season.dart';
 import 'barrage_colors.dart';
 import 'barrage_theme.dart';
+import 'coin_amount.dart';
 import 'difficulty_picker.dart';
 import 'draft_button.dart';
 import 'motion.dart';
@@ -90,7 +91,7 @@ class _MainMenuState extends State<MainMenu> {
   Future<void> _play(PlayMode mode) async {
     final profile = _profile;
     if (profile == null) return;
-    final slot = profile.wallet(mode);
+    final slot = profile.wallet(mode, widget.feel.settings.difficulty);
     slot.mode = mode;
     slot.season = profile.season;
     profile.mode = mode;
@@ -245,7 +246,10 @@ class _HomeLayout extends StatelessWidget {
                 rise(
                   4,
                   _CampaignBest(
-                    wallet: profile.campaign,
+                    bests: {
+                      for (final d in Difficulty.values)
+                        d: profile.wallet(PlayMode.arcade, d).bestWave,
+                    },
                     difficulty: difficulty,
                     compact: compact,
                   ),
@@ -267,8 +271,7 @@ class _HomeLayout extends StatelessWidget {
               mode == PlayMode.values.first ? 3 : 5,
               _ModeCard(
                 mode: mode,
-                wallet: profile.wallet(mode),
-                difficulty: difficulty,
+                wallet: profile.wallet(mode, difficulty),
                 primary: mode == PlayMode.arcade,
                 compact: compact,
                 wide: wide,
@@ -439,12 +442,13 @@ class _DifficultyBar extends StatelessWidget {
 /// have a cleared wave.
 class _CampaignBest extends StatelessWidget {
   const _CampaignBest({
-    required this.wallet,
+    required this.bests,
     required this.difficulty,
     required this.compact,
   });
 
-  final MetaState wallet;
+  /// Campaign best wave on each difficulty, one wallet each.
+  final Map<Difficulty, int> bests;
   final Difficulty difficulty;
   final bool compact;
 
@@ -453,7 +457,7 @@ class _CampaignBest extends StatelessWidget {
     final tokens = context.tokens;
     final shown = [
       for (final mode in Difficulty.values)
-        if (mode == difficulty || wallet.bestWaveFor(mode) > 0) mode,
+        if (mode == difficulty || (bests[mode] ?? 0) > 0) mode,
     ];
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -506,7 +510,7 @@ class _CampaignBest extends StatelessWidget {
                           SizedBox(width: tokens.space.md),
                         _BestEntry(
                           mode: mode,
-                          wave: wallet.bestWaveFor(mode),
+                          wave: bests[mode] ?? 0,
                           current: mode == difficulty,
                           compact: compact,
                         ),
@@ -591,7 +595,6 @@ class _ModeCard extends StatelessWidget {
   const _ModeCard({
     required this.mode,
     required this.wallet,
-    required this.difficulty,
     required this.primary,
     required this.compact,
     required this.wide,
@@ -600,7 +603,6 @@ class _ModeCard extends StatelessWidget {
 
   final PlayMode mode;
   final MetaState wallet;
-  final Difficulty difficulty;
   final bool primary;
   final bool compact;
   final bool wide;
@@ -615,8 +617,9 @@ class _ModeCard extends StatelessWidget {
         : tokens.inkMuted;
     final titleSize = compact ? 22.0 : (wide ? 34.0 : 26.0);
     final icon = switch (mode) {
-      PlayMode.arcade => Icons.bolt_rounded,
-      PlayMode.campaign => Icons.flag_rounded,
+      // Icons follow the shown names: Campaign is the flag, Arcade the bolt.
+      PlayMode.arcade => Icons.flag_rounded,
+      PlayMode.campaign => Icons.bolt_rounded,
     };
     final playPill = Container(
       padding: EdgeInsets.symmetric(
@@ -716,17 +719,36 @@ class _ModeCard extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: tokens.space.xs),
-                    Text(
-                      // The lit difficulty pill says which mode this is.
-                      '${wallet.coins} coins · best wave '
-                      '${wallet.bestWaveFor(difficulty)}',
-                      key: Key('${mode.name}-wallet'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: BarrageType.muted.copyWith(
-                        color: soft,
-                        fontSize: compact ? 12 : 14,
-                      ),
+                    // This mode's own wallet on the picked difficulty.
+                    Row(
+                      children: [
+                        TagPill(
+                          key: Key('${mode.name}-coins'),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: tokens.space.sm,
+                            vertical: 1,
+                          ),
+                          child: CoinAmount(
+                            amount: wallet.coins,
+                            fontSize: compact ? 12 : 14,
+                          ),
+                        ),
+                        SizedBox(width: tokens.space.sm),
+                        Flexible(
+                          child: Text(
+                            mode.showsScore
+                                ? 'Score ${wallet.score}'
+                                : 'Best wave ${wallet.bestWave}',
+                            key: Key('${mode.name}-wallet'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: BarrageType.muted.copyWith(
+                              color: soft,
+                              fontSize: compact ? 12 : 14,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

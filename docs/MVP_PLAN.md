@@ -39,11 +39,11 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 ## 3. Core gameplay (MVP)
 
 ### 3.1 Match loop
-1. Pick Arcade or Campaign, and a season (Winter / Summer) — or default last played  
+1. Pick Campaign or Arcade, and a season (Winter / Summer) — or default last played  
 2. Enter backyard arena (landscape)  
 3. Control one kid; hold to charge, release on the swivel to throw  
 4. KO all enemies → win round → earn currency → upgrade shop → next wave  
-5. Lose all kids → Arcade wipes skills (coins stay) or Campaign keeps skills → summary + retry at wave 1  
+5. Lose all kids → Campaign wipes skills (coins stay) or Arcade keeps skills → summary + retry at wave 1  
 
 ### 3.2 Combat rules
 | Rule | MVP value |
@@ -67,9 +67,10 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 - Left two-thirds: drag and the selected kid follows the finger inside their half. They are not snapped to a cell. A tap on a living kid selects them and keeps their feet until the finger moves. A tap on open ground sends them to that spot. The yard's columns and rows still place forts, rivals, and throw lanes.
 - Kids you are not controlling throw and step like Easy rivals.
 - Each side stays on its own half. The middle band is neutral. The yard grid still places rivals and forts. It does not lock the player's feet or the snowball's hit row.
-- Arcade loss: wave progress and every skill node (crew, fort, throw, and the rest of the tree) go back to a new game. Unspent coins stay in the Arcade wallet. Retry starts at wave 1.
-- Campaign loss: skills and coins stay. Retry starts at wave 1, not the wave you lost. Campaign coins are a separate wallet.
-- Season is shared. Best wave is kept per mode and per difficulty. The home screen shows the Campaign best for the picked difficulty large and highlighted, with any other difficulty that has a cleared wave beside it, small and grey. Mode cards and the defeat screen show the best for the picked difficulty.
+- Campaign loss: wave progress and every skill node (crew, fort, throw, and the rest of the tree) go back to a new game. Unspent coins stay in the Campaign wallet. Retry starts at wave 1. Campaign is ranked by highest wave.
+- Arcade loss: skills and coins stay. Retry starts at wave 1, not the wave you lost. Arcade is ranked by a lifetime **score**: every coin earned also adds a point, and points are never spent or reset.
+- Every mode × difficulty pair has its own wallet (coins, skills, best wave, score): six in all. Nothing earned in one carries to another, so Easy progress never reaches Normal or Hard, and Campaign never touches Arcade. Code names are swapped from the shown names (`PlayMode.arcade` shows as Campaign) because saves store them.
+- Season is shared. The home screen shows the Campaign best for the picked difficulty large and highlighted, with any other difficulty that has a cleared wave beside it, small and grey. Each mode card shows that mode's coins for the picked difficulty, then Best wave (Campaign) or Score (Arcade). The defeat screen shows the same headline number.
 - Difficulty is picked only on the home screen (Easy / Normal / Hard pills, top left, with a one-line summary on larger screens). Settings and Pause do not offer it, so a run stays on one difficulty.
 - Lock orientation: landscape left/right only  
 
@@ -122,11 +123,11 @@ While summer is on, the player **chooses** season with a small toggle on the hom
 ## 4. Screens & UX flow
 
 1. **Splash / title** — Backyard Barrage  
-2. **Main menu** — Arcade and Campaign, the difficulty pills, Settings. The yard behind the menu follows the season. Highest Campaign wave is shown large.  
+2. **Main menu** — Campaign and Arcade, the difficulty pills, Settings. The yard behind the menu follows the season. Highest Campaign wave is shown large.  
 3. **Arena HUD** — kid HP pips, fort bar, charge bar, pause  
 4. **Wave clear** — coins earned, Continue  
 5. **Skill tree** — buy the next node in a branch, Continue to next wave  
-6. **Defeat summary** — a short coin beat for the unspent amount, then waves cleared, coins carried over, Skills / Retry / Menu. Arcade has wiped skills. Campaign still has them. Retry is wave 1 either way.  
+6. **Defeat summary** — a short coin beat for the unspent amount, then waves cleared, coins carried over, Skills / Retry / Menu. Campaign has wiped skills. Arcade still has them. Retry is wave 1 either way.  
 7. **Settings** — SFX/music, haptics, credits  
 
 Accessibility: large hit targets; consider OpenDyslexic-friendly UI font option later.

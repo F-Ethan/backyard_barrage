@@ -547,8 +547,8 @@ class BackyardBarrageGame extends FlameGame {
     _endActiveThrow();
     _clearShots();
     lastReward = MetaState.coinsForWave(wave);
-    meta.coins += lastReward;
-    meta.noteWaveCleared(wave, difficulty: feel.settings.difficulty);
+    meta.earn(lastReward);
+    meta.noteWaveCleared(wave);
     unawaited(persist());
     feel.waveCleared();
     _showBanner('KO!', fontSize: 56, color: const Color(0xFFFFE66D));
@@ -756,7 +756,7 @@ class BackyardBarrageGame extends FlameGame {
       paid += MetaState.coinsPerKnockout;
     }
     if (paid == 0) return;
-    meta.coins += paid;
+    meta.earn(paid);
     killCoinsThisWave += paid;
   }
 
@@ -1244,6 +1244,7 @@ class BackyardBarrageGame extends FlameGame {
     // its own. Power only moves the landing mark along it.
     chargeHud.aimEnd = along(edge);
     chargeHud.trackEnd = along(math.min(range, edge));
+    chargeHud.range = range;
     chargeHud.target = preview == AimPreview.full
         ? _aimTarget?.hitCenter
         : null;

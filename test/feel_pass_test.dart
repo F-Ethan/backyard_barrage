@@ -1,3 +1,4 @@
+import 'package:backyard_barrage/meta/play_mode.dart';
 import 'package:backyard_barrage/app.dart';
 import 'package:backyard_barrage/audio/game_audio.dart';
 import 'package:backyard_barrage/feel/feel_bus.dart';
@@ -24,8 +25,8 @@ void main() {
     final settingsStore = SettingsStore(preferences: prefs);
 
     final profile = await metaStore.load();
-    profile.arcade.coins = 9;
-    await metaStore.save(profile.arcade);
+    profile.wallet(PlayMode.arcade, Difficulty.normal).coins = 9;
+    await metaStore.save(profile.wallet(PlayMode.arcade, Difficulty.normal));
     await settingsStore.save(
       const GameSettings(
         sfxEnabled: false,
@@ -40,7 +41,12 @@ void main() {
     expect(loaded.musicEnabled, isFalse);
     expect(loaded.hapticsEnabled, isFalse);
     expect(await SaveStore(preferences: prefs).load(), isNotNull);
-    expect((await SaveStore(preferences: prefs).load()).arcade.coins, 9);
+    expect(
+      (await SaveStore(
+        preferences: prefs,
+      ).load()).wallet(PlayMode.arcade, Difficulty.normal).coins,
+      9,
+    );
     expect(SettingsStore.storageKey, isNot(SaveStore.storageKey));
   });
 

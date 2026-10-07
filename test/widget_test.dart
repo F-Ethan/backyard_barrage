@@ -38,11 +38,12 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     final store = SaveStore(preferences: prefs);
     final profile = await store.load();
-    profile.arcade.coins = 3;
-    profile.arcade.replaceBestWaves({Difficulty.normal: 2});
-    profile.campaign.coins = 11;
-    profile.campaign.replaceBestWaves({Difficulty.normal: 6});
-    profile.campaign.mode = PlayMode.campaign;
+    profile.wallet(PlayMode.arcade, Difficulty.normal).coins = 3;
+    profile.wallet(PlayMode.arcade, Difficulty.normal).bestWave = 2;
+    profile.wallet(PlayMode.campaign, Difficulty.normal).coins = 11;
+    profile.wallet(PlayMode.campaign, Difficulty.normal).bestWave = 6;
+    profile.wallet(PlayMode.campaign, Difficulty.normal).mode =
+        PlayMode.campaign;
     await store.saveProfile(profile);
 
     await tester.pumpWidget(BackyardBarrageApp(saveStore: store));
@@ -50,9 +51,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.byKey(const Key('campaign-best-wave')), findsOneWidget);
-    expect(find.text('6'), findsOneWidget);
-    expect(find.text('3 coins · best wave 2'), findsOneWidget);
-    expect(find.text('11 coins · best wave 6'), findsOneWidget);
+    // Each card shows its own coins, and its own headline number.
+    Finder coinsOn(String mode) => find.descendant(
+      of: find.byKey(Key('$mode-coins')),
+      matching: find.byType(Text),
+    );
+    expect(tester.widget<Text>(coinsOn('arcade')).data, '3');
+    expect(tester.widget<Text>(coinsOn('campaign')).data, '11');
+    expect(find.text('Best wave 2'), findsOneWidget);
+    expect(find.text('Score 0'), findsOneWidget);
+    expect(find.text('Campaign'), findsOneWidget);
+    expect(find.text('Arcade'), findsOneWidget);
   });
 
   testWidgets('campaign bests show per difficulty with the picked one lit', (
@@ -62,10 +71,10 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     final store = SaveStore(preferences: prefs);
     final profile = await store.load();
-    profile.campaign.replaceBestWaves({
-      Difficulty.easy: 9,
-      Difficulty.normal: 4,
-    });
+    // Campaign is the skills-wipe mode (code name `arcade`).
+    profile.wallet(PlayMode.arcade, Difficulty.easy).bestWave = 9;
+    profile.wallet(PlayMode.arcade, Difficulty.normal).bestWave = 4;
+    profile.wallet(PlayMode.campaign, Difficulty.easy).earn(25);
     await store.saveProfile(profile);
 
     await tester.pumpWidget(BackyardBarrageApp(saveStore: store));
@@ -79,12 +88,15 @@ void main() {
     expect(big().data, '4');
     expect(find.byKey(const Key('campaign-best-easy')), findsOneWidget);
     expect(find.byKey(const Key('campaign-best-hard')), findsNothing);
+    expect(find.text('Score 0'), findsOneWidget);
 
+    // Easy has its own wallets: Campaign best 9, Arcade score 25.
     await tester.tap(find.byKey(const Key('difficulty-easy')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     expect(big().data, '9');
-    expect(find.text('0 coins · best wave 0'), findsOneWidget);
+    expect(find.text('Best wave 9'), findsOneWidget);
+    expect(find.text('Score 25'), findsOneWidget);
 
     // Picking a mode with no clears still shows it, at 0.
     await tester.tap(find.byKey(const Key('difficulty-hard')));

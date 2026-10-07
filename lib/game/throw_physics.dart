@@ -24,11 +24,12 @@ class RowLob {
     this.groundTrack = false,
     this.travelSpeed = 0,
     this.originY = 0,
+    double? trackY,
     this.landingY = 0,
     this.apexY = 0,
     this.apexFraction = 0.5,
     this.settleFraction = 0.72,
-  });
+  }) : _trackY = trackY;
 
   final Vector2 velocity;
   final int throwerRow;
@@ -50,6 +51,11 @@ class RowLob {
   final bool groundTrack;
   final double travelSpeed;
   final double originY;
+
+  /// Body height where the ground track starts. The hand ([originY]) sits
+  /// a little above it; the drawn ball eases from the hand onto the track.
+  double get trackY => _trackY ?? originY;
+  final double? _trackY;
   final double landingY;
   final double apexY;
 
@@ -61,7 +67,7 @@ class RowLob {
   double yAt(double u) {
     if (groundTrack) {
       final uu = u.clamp(0.0, 1.0);
-      return originY + (landingY - originY) * uu;
+      return trackY + (landingY - trackY) * uu;
     }
     if (!scripted) return originY;
     return ThrowPhysics.playerArcY(
@@ -104,8 +110,11 @@ class RowLob {
 /// Order from the up-screen end of the row to the down-screen end:
 /// [yaw30l], [yaw15l], [across], [yaw15r], [yaw30r].
 /// [across] is the existing side-profile charge pose. The other four are
-/// mild screen-left / screen-right yaws. Art is not mirrored, and none of
-/// these poses face the camera or show the back of the coat.
+/// mild screen-left / screen-right yaws. None of these poses face the
+/// camera or show the back of the coat. Player winter draws the 3D frames
+/// that point screen-left (`30l`, `15l`, and the sheet charge) mirrored so
+/// the kid still faces +x toward the rivals. Enemy sprites are never
+/// mirrored from player art.
 enum ChargeYaw { yaw30l, yaw15l, across, yaw15r, yaw30r }
 
 /// Shared throw / hit helpers (pure, unit-testable).
@@ -156,9 +165,10 @@ class ThrowPhysics {
   /// ball can pass the sprite without a touch.
   static const double kidHitScale = 0.16;
 
-  /// Depth slop, as a fraction of one row. A ground track outside this
-  /// window passes in front of or behind the kid.
-  static const double depthWindowFraction = 0.4;
+  /// Depth slop, as a fraction of one row, on each side of the kid. Half a
+  /// row each way covers the whole yard with no dead band between rows, and
+  /// a kid one full row off the track still sees it pass in front or behind.
+  static const double depthWindowFraction = 0.5;
 
   /// Rival ground-track pace. Faster than the player's lob.
   static const double enemyTravelSpeed = 1400;
@@ -179,21 +189,27 @@ class ThrowPhysics {
   static const double playerApexFraction = 0.22;
   static const double playerSettleFraction = 0.42;
 
-  /// Player stick cone, measured from horizontal. A full stick is ±20°.
+  /// Depth the ball drifts per pixel forward at the end of the sweep.
+  ///
+  /// The swept angle is the ground track itself: the aim arrow, the dotted
+  /// preview, and the hit path are one line. From mid-yard, a full sweep at
+  /// the rivals' distance (about 700px) covers ±140px, the whole enemy half.
+  static const double maxAimSlope = 0.2;
+
+  /// Sweep cone, measured from horizontal (about ±11.3°). Matches
+  /// [maxAimSlope] so the drawn arrow and the track never disagree.
   ///
   /// Rival shots do not use this cone. Their scatter stays on the
   /// difficulty profile (`CombatRules.enemyAimJitterRadians`).
-  static const double maxAimRadians = 20 * math.pi / 180;
+  static final double maxAimRadians = math.atan(maxAimSlope);
 
-  /// Rows a stick used to commit when the cone was ±45°.
-  /// [committedRow] still scales by [aimRowScaleRadians], so the tighter
-  /// ±20° cone reaches about 20/45 of these and a steep throw swings fewer lanes.
-  static const double aimRowsAtTap = 1.2;
-  static const double aimRowsAtFull = 3.5;
+  /// Sweep speed while the aim line is on a rival. The sweep lingers there
+  /// so a release on target is a fair timing window, not a frame.
+  static const double aimFriction = 0.35;
 
-  /// Full-scale reference for lane swing. Elevation is divided by this,
-  /// not by [maxAimRadians], so shrinking the cone shrinks the row reach.
-  static const double aimRowScaleRadians = math.pi / 4;
+  /// A release that misses a rival by no more than this many pixels of
+  /// depth (beyond the contact window) is nudged onto them.
+  static const double aimAssistPx = 14;
 
   /// One grid step takes this long at the hard walk cap. Ten times the old
   /// 120ms cadence, so a column is about 1.2 seconds. A row is a shorter
@@ -248,11 +264,6 @@ class ThrowPhysics {
     return tapRange + (fullRange - tapRange) * t;
   }
 
-  static double _chargePower(double charge) {
-    final c = charge.clamp(minThrowCharge, 1.0);
-    return ((c - minThrowCharge) / (1 - minThrowCharge)).clamp(0.0, 1.0);
-  }
-
   static bool inThrowLane(int throwerRow, int targetRow) {
     return (targetRow - throwerRow).abs() <= laneRows;
   }
@@ -290,20 +301,14 @@ class ThrowPhysics {
     return Vector2(forward * math.cos(elevation), -math.sin(elevation));
   }
 
-  /// Elevation while charging. One full cycle of [swivelPeriod] swings from
-  /// straight, to the top of the cone, back through straight, to the bottom.
-  static double swivelElevation(double heldSeconds) {
-    if (swivelPeriod <= 0) return 0;
-    return math.sin(2 * math.pi * heldSeconds / swivelPeriod) * maxAimRadians;
-  }
-
   /// Which upright sprite the charge sweep should show.
   ///
-  /// [elevation] is screen-up radians from [swivelElevation]. The up-screen
+  /// [elevation] is screen-up radians from the charge sweep. The up-screen
   /// end of the row is +[maxAimRadians] (`30l`). Straight across the yard is
   /// 0 (the existing charge pose). The down-screen end is -[maxAimRadians]
   /// (`30r`). Five equal bands, same on both sides:
-  /// `30l → 15l → charge → 15r → 30r`. Turn art is not mirrored.
+  /// `30l → 15l → charge → 15r → 30r`. Player winter mirrors the
+  /// screen-left frames so the kid faces +x. Enemy art is not mirrored.
   static ChargeYaw chargeYaw(double elevation) {
     if (maxAimRadians <= 0) return ChargeYaw.across;
     final u = (elevation / maxAimRadians).clamp(-1.0, 1.0);
@@ -375,6 +380,29 @@ class ThrowPhysics {
     return circlesOverlap(ground, shotRadius, kidCenter, kidRadius);
   }
 
+  /// [snowballContacts] anywhere on the ground segment [from]→[to] the ball
+  /// covered this frame. A fast shot or a long frame cannot step over a kid.
+  static bool snowballSweepContacts({
+    required Vector2 from,
+    required Vector2 to,
+    required double shotRadius,
+    required Vector2 kidCenter,
+    required double kidRadius,
+  }) {
+    final seg = to - from;
+    final len2 = seg.length2;
+    var t = 0.0;
+    if (len2 > 1e-9) {
+      t = ((kidCenter - from).dot(seg) / len2).clamp(0.0, 1.0);
+    }
+    return snowballContacts(
+      ground: from + seg * t,
+      shotRadius: shotRadius,
+      kidCenter: kidCenter,
+      kidRadius: kidRadius,
+    );
+  }
+
   /// Radians above horizontal after [clampAimDirection]. Positive is up.
   static double aimElevation(
     Vector2 aimDirection, {
@@ -384,24 +412,56 @@ class ThrowPhysics {
     return math.atan2(-aim.y, aim.x.abs());
   }
 
-  /// Row the player commits to. Steeper aim climbs more rows than a flat
-  /// throw at the same charge. More charge reaches more rows at the same angle.
-  static int committedRow({
-    required int throwerRow,
+  /// Depth of a straight ground track [forward] pixels from its start.
+  /// Positive [elevation] climbs up the screen (toward the back of the yard).
+  static double trackYAt({
+    required double startY,
     required double elevation,
-    required double charge,
+    required double forward,
   }) {
-    final row = throwerRow.clamp(0, ArenaGrid.rows - 1);
-    final power = _chargePower(charge);
-    final reach = aimRowsAtTap + (aimRowsAtFull - aimRowsAtTap) * power;
-    final aim01 = (elevation / aimRowScaleRadians).clamp(-1.0, 1.0);
-    final delta = -aim01 * reach;
-    var landing = (row + delta).round();
-    if (landing < 0) landing = 0;
-    if (landing >= ArenaGrid.rows) landing = ArenaGrid.rows - 1;
-    return landing;
+    final clamped = elevation.clamp(-maxAimRadians, maxAimRadians);
+    return startY - math.tan(clamped) * forward;
   }
 
+  /// Ground-track depth band: the back and front lanes of the yard.
+  static double clampTrackY(double y) =>
+      y.clamp(ArenaGrid.laneY(0), ArenaGrid.laneY(ArenaGrid.rows - 1));
+
+  /// How far a straight track at [elevation] misses [target] in depth,
+  /// in pixels. Null when [target] is behind the thrower or out of [range].
+  static double? trackMiss({
+    required Vector2 start,
+    required double elevation,
+    required double range,
+    required bool facingRight,
+    required Vector2 target,
+    double reachSlop = 0,
+  }) {
+    final forward = (target.x - start.x) * (facingRight ? 1 : -1);
+    if (forward <= 0 || forward > range + reachSlop) return null;
+    final y = clampTrackY(
+      trackYAt(startY: start.y, elevation: elevation, forward: forward),
+    );
+    return target.y - y;
+  }
+
+  /// Elevation whose track passes through [target]. Clamped to the cone.
+  static double elevationToward({
+    required Vector2 start,
+    required Vector2 target,
+    required bool facingRight,
+  }) {
+    final forward = (target.x - start.x) * (facingRight ? 1 : -1);
+    if (forward <= 1) return 0;
+    final e = math.atan((start.y - target.y) / forward);
+    return e.clamp(-maxAimRadians, maxAimRadians);
+  }
+
+  /// Player lob along the swept line.
+  ///
+  /// The ground track starts at the thrower's body height ([trackY], their
+  /// hit center) and runs straight at the swept [aimDirection]. Charge sets
+  /// how far it goes. [originY] is the hand, where the sprite leaves from.
   static RowLob planPlayerLob({
     required int throwerRow,
     required int throwerColumn,
@@ -410,17 +470,17 @@ class ThrowPhysics {
     required bool facingRight,
     double speedScale = 1,
     required double originY,
+    double? trackY,
   }) {
     final row = throwerRow.clamp(0, ArenaGrid.rows - 1);
+    final startY = trackY ?? originY;
     final elevation = aimElevation(aimDirection, facingRight: facingRight);
-    final landing = committedRow(
-      throwerRow: row,
-      elevation: elevation,
-      charge: charge,
-    );
-    final landingY = ArenaGrid.laneY(landing);
-    final apexY = math.min(originY, landingY) - playerLoft;
     final range = rangeForCharge(charge);
+    final landingY = clampTrackY(
+      trackYAt(startY: startY, elevation: elevation, forward: range),
+    );
+    final landing = ArenaGrid.rowForLaneY(landingY);
+    final apexY = math.min(originY, landingY) - playerLoft;
     final scale = speedScale.clamp(0.2, 3.0);
     final speed = playerTravelSpeed * scale;
     final facing = facingRight ? 1.0 : -1.0;
@@ -437,6 +497,7 @@ class ThrowPhysics {
       groundTrack: true,
       travelSpeed: speed,
       originY: originY,
+      trackY: startY,
       landingY: landingY,
       apexY: apexY,
       apexFraction: groundApexFraction,
@@ -444,7 +505,6 @@ class ThrowPhysics {
     );
   }
 
-  /// Height of a scripted player lob. [u] is distance traveled / range.
   static double playerArcY({
     required double originY,
     required double apexY,
@@ -697,6 +757,10 @@ class ThrowPhysics {
     return enemyLobRange(distance: span, rangeScale: rangeScale) >= span - 8;
   }
 
+  /// Bot lob. With [trackY] and [targetY] (body heights), the track is the
+  /// straight line through the target, so a long throw still passes through
+  /// them and a short one falls short in front. Without them it lands on
+  /// [targetRow]'s lane.
   static RowLob planEnemyLob({
     required int throwerRow,
     required int throwerColumn,
@@ -705,14 +769,20 @@ class ThrowPhysics {
     required double rangeScale,
     required bool facingRight,
     required double originY,
+    double? trackY,
+    double? targetY,
   }) {
     final row = throwerRow.clamp(0, ArenaGrid.rows - 1);
-    var landing = targetRow;
-    if (landing < 0) landing = 0;
-    if (landing >= ArenaGrid.rows) landing = ArenaGrid.rows - 1;
     final range = enemyLobRange(distance: distance, rangeScale: rangeScale);
     final facing = facingRight ? 1.0 : -1.0;
-    final landingY = ArenaGrid.laneY(landing);
+    final double landingY;
+    if (trackY != null && targetY != null && distance.abs() > 1) {
+      final slope = (targetY - trackY) / distance.abs();
+      landingY = clampTrackY(trackY + slope * range);
+    } else {
+      landingY = ArenaGrid.laneY(targetRow.clamp(0, ArenaGrid.rows - 1));
+    }
+    final landing = ArenaGrid.rowForLaneY(landingY);
     final loft = loftAt(0.5, range);
     return RowLob(
       velocity: Vector2(facing * enemyTravelSpeed, 0),
@@ -726,6 +796,7 @@ class ThrowPhysics {
       groundTrack: true,
       travelSpeed: enemyTravelSpeed,
       originY: originY,
+      trackY: trackY ?? originY,
       landingY: landingY,
       apexY: landingY,
       apexFraction: groundApexFraction,

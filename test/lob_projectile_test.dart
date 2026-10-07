@@ -444,4 +444,47 @@ void main() {
     expect(under.priority, greaterThan(kid.priority));
     expect(under.priority, ArenaGrid.depthOrder(under.hitPosition.y));
   });
+
+  test(
+    'a steep up-screen throw flies its range instead of landing in hand',
+    () {
+      // Front-row thrower aiming at the back: the track starts below the
+      // landing row's floor line. That must not count as hitting the ground.
+      final trackY = ArenaGrid.laneY(6);
+      final lob = ThrowPhysics.planPlayerLob(
+        throwerRow: 6,
+        throwerColumn: 1,
+        aimDirection: ThrowPhysics.aimForElevation(
+          ThrowPhysics.maxAimRadians,
+          facingRight: true,
+        ),
+        charge: 1,
+        facingRight: true,
+        originY: trackY - 15,
+        trackY: trackY,
+      );
+      expect(trackY, greaterThan(ThrowPhysics.impactGroundY(lob.landingRow)));
+      var grounded = false;
+      final shot = LobProjectile(
+        sprite: sprite,
+        position: Vector2(300, trackY - 15),
+        velocity: lob.velocity.clone(),
+        targets: const [],
+        onHit: (_, _) {},
+        onGround: (_) => grounded = true,
+        groundTrack: true,
+        travelSpeed: lob.travelSpeed,
+        flightRange: lob.range,
+        landingRow: lob.landingRow,
+        landingY: lob.landingY,
+        trackY: lob.trackY,
+      );
+      for (var i = 0; i < 30; i++) {
+        shot.update(1 / 60);
+      }
+      expect(grounded, isFalse);
+      expect(shot.hitPosition.x, greaterThan(700));
+      expect(shot.hitPosition.y, lessThan(trackY));
+    },
+  );
 }

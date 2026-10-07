@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flame/components.dart';
 
 import '../arena_grid.dart';
@@ -45,12 +47,14 @@ class LobProjectile extends SpriteComponent {
     this.settleFraction = 0.42,
     this.landingY = 0,
     this.apexY = 0,
+    double? trackY,
     double? launchVy,
   }) : launchVy = launchVy ?? velocity.y,
        originX = position.x,
-       originY = position.y,
+       originY = trackY ?? position.y,
+       handLift = (trackY ?? position.y) - position.y,
        facing = velocity.x < 0 ? -1.0 : 1.0,
-       _hit = position.clone(),
+       _hit = Vector2(position.x, trackY ?? position.y),
        _scriptRow = landingRow,
        super(
          sprite: sprite,
@@ -82,7 +86,13 @@ class LobProjectile extends SpriteComponent {
   final double landingDrop;
   final double launchVy;
   final double originX;
+
+  /// Start of the hit path (the thrower's body height on a ground track).
   final double originY;
+
+  /// How far the hand sits above [originY]. The drawn ball leaves the hand
+  /// and eases onto the track by the landing.
+  final double handLift;
 
   /// +1 toward the enemy half, -1 toward the player half.
   final double facing;
@@ -109,6 +119,7 @@ class LobProjectile extends SpriteComponent {
   Vector2 get hitPosition => _hit;
 
   final Vector2 _hit;
+  final Vector2 _prevHit = Vector2.zero();
   int _scriptRow;
   double _traveled = 0;
   double _age = 0;
@@ -117,6 +128,9 @@ class LobProjectile extends SpriteComponent {
 
   /// Set when this shot strikes a fort, before [onFortHit].
   FortComponent? struckFort;
+
+  /// Set when this shot strikes a kid, before [onHit].
+  KidComponent? struckKid;
 
   /// True when the strike should chip the fort. Blocks without damage leave
   /// this false (a player lob into their own fort on Normal / Easy).
@@ -185,6 +199,7 @@ class LobProjectile extends SpriteComponent {
       return;
     }
 
+    _prevHit.setFrom(_hit);
     if (groundTrack) {
       _stepGround(dt);
     } else if (scripted) {
@@ -212,8 +227,9 @@ class LobProjectile extends SpriteComponent {
     for (final target in List<KidComponent>.of(targets)) {
       if (identical(target, owner) || target.isKo) continue;
       if (groundTrack) {
-        if (!ThrowPhysics.snowballContacts(
-          ground: _hit,
+        if (!ThrowPhysics.snowballSweepContacts(
+          from: _prevHit,
+          to: _hit,
           shotRadius: radius,
           kidCenter: target.hitCenter,
           kidRadius: target.hitRadius,
@@ -248,17 +264,27 @@ class LobProjectile extends SpriteComponent {
       }
       final shelter = _shelterFor(target);
       if (shelter != null && !_clearedForts.contains(shelter) && !atArcPeak) {
-        _stopOnFort(shelter, damage: owner?.side != shelter.side);
+        // Splash on the wall the kid is hiding behind, not on the kid.
+        final wall = shelter.hitRect;
+        _stopOnFort(
+          shelter,
+          damage: owner?.side != shelter.side,
+          at: Vector2(position.x.clamp(wall.left, wall.right), wall.center.dy),
+        );
         return;
       }
       _spent = true;
-      position.setFrom(_hit);
+      // The splash goes where the ball is drawn. The hit path sits below it.
+      struckKid = target;
       onHit(this, target);
       removeFromParent();
       return;
     }
 
-    if (_hit.y >= _groundY) {
+    // A ground track runs at body height and lands only after its range
+    // (via the fall). Its start can sit below the landing row's floor on an
+    // up-screen throw, so the floor check would end it in the hand.
+    if (!groundTrack && _hit.y >= _groundY) {
       _land();
       return;
     }
@@ -274,14 +300,16 @@ class LobProjectile extends SpriteComponent {
   void _syncVisual() {
     if (groundTrack && !_falling) {
       final u = flightRange <= 1 ? 1.0 : (_traveled / flightRange);
+      final uu = u.clamp(0.0, 1.0);
       position.setValues(
         _hit.x,
         ThrowPhysics.drawnLobY(
-          originY: originY,
-          landingY: landingY,
-          u: u,
-          range: flightRange,
-        ),
+              originY: originY,
+              landingY: landingY,
+              u: u,
+              range: flightRange,
+            ) -
+            handLift * (1 - uu),
       );
       return;
     }
@@ -302,6 +330,35 @@ class LobProjectile extends SpriteComponent {
         settleFraction: settleFraction,
       ),
     );
+  }
+
+  /// Where the ball's shadow sits on the yard floor: under the hit path,
+  /// at foot level. This is the honest depth of the shot.
+  Vector2 get shadowPosition => Vector2(_hit.x, _hit.y + ArenaGrid.bodyLift);
+
+  static final Paint _shadowPaint = Paint()..color = const Color(0x3D1A2332);
+
+  @override
+  void render(Canvas canvas) {
+    if (groundTrack && !_spent) {
+      // Local space: anchor is the center, and the component is scaled.
+      final sx = scale.x == 0 ? 1.0 : scale.x;
+      final sy = scale.y == 0 ? 1.0 : scale.y;
+      final floor = shadowPosition;
+      final local = Offset(
+        (floor.x - position.x) / sx + size.x / 2,
+        (floor.y - position.y) / sy + size.y / 2,
+      );
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: local,
+          width: size.x * 0.8,
+          height: size.x * 0.3,
+        ),
+        _shadowPaint,
+      );
+    }
+    super.render(canvas);
   }
 
   bool _shouldStartFall() {
@@ -459,11 +516,11 @@ class LobProjectile extends SpriteComponent {
     return true;
   }
 
-  void _stopOnFort(FortComponent cover, {required bool damage}) {
+  void _stopOnFort(FortComponent cover, {required bool damage, Vector2? at}) {
     _spent = true;
     struckFort = cover;
     fortDamage = damage;
-    position.setFrom(_hit);
+    position.setFrom(at ?? _hit);
     onFortHit?.call(this);
     removeFromParent();
   }

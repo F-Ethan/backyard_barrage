@@ -34,7 +34,8 @@ Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you n
 - **Enemy fort has no HUD meter.** The enemy fort uses the stage-1 art and shows damage on the sprite. Hearts, coins, and the player fort bar are the screen-space meters.
 - **Old flightVisualY hump is still unused.** Live snowballs draw `loftAt` on the ground track (a 64px climb and drop). `flightVisualY` / `_visualHump` still peaks around 40–120px, but current lobs set `groundTrack` and do not draw that path.
 - **KO, wave-clear, and wave-intro banners still scale with the yard.** The short center banner is drawn in the 1280×720 world, so it shrinks with the letterbox. Hearts, coins, fort, wave, hint, and Pause are screen-space.
-- **Swivel aim is an arrow, not a mark on the yard.** The charge arrow shows the live angle. The depth the ball will travel is not painted on the yard.
+- **Rivals are a little more accurate.** They now aim at a kid's real depth instead of the nearest lane, and the hit window covers a full row. Standing between two rows no longer gives free misses (about one in five long rival throws used to pass through). Retune `DifficultyTuning` if Normal now feels hard.
+- **Aim friction and assist are first-pass numbers.** `ThrowPhysics.aimFriction` (0.35), `aimAssistPx` (14), and `maxAimSlope` (0.2) need on-device playtest.
 - **Rivals still step on the yard grid.** The player drags freely inside their half. Rival lane steps, fort cover columns, and throw-lane rows still use the 4×8 cells.
 - **Locked app icon master still has navy side bars.** `assets/images/ui/app_icon_1024.png` (SHA-256 `86621c0890c82418a4260b93b956927495c01653ae08034704f5e377d992ff1f`) is unchanged on purpose. Launchers use `app_icon_1024_fill.png`. Do not overwrite the locked master.
 - **Classic power bar is drawn, not a wood PNG.** The wood kit has no power-bar sprite, so the classic meter is an ink/cream/charge-yellow bar.

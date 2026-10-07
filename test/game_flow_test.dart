@@ -961,6 +961,115 @@ void main() {
     expect(kid.angle, closeTo(0, 0.001));
   });
 
+  /// Rivals hold still so aim tests can place them.
+  void freezeRivals(BackyardBarrageGame game) {
+    for (final enemy in game.enemies) {
+      for (final brain in enemy.children.whereType<EnemyController>()) {
+        brain.removeFromParent();
+      }
+    }
+    game.update(0);
+  }
+
+  testWidgets('the sweep lingers while the line is on a rival', (tester) async {
+    final game = (await boot(tester, MetaState())).game;
+    freezeRivals(game);
+    final kid = game.players.first;
+    final rival = game.enemies.first;
+    const step = 0.1;
+    final free = math.sin(2 * math.pi * step / ThrowPhysics.swivelPeriod);
+
+    // Off the line: the sweep moves at full speed.
+    rival.position = Vector2(1000, kid.position.y + ArenaGrid.rowStep * 3);
+    game.pressMoveZone(kid.hitCenter);
+    game.releaseMoveZone();
+    game.pressChargeZone();
+    game.update(step);
+    final open = ThrowPhysics.aimElevation(
+      game.chargeHud.aimDir,
+      facingRight: true,
+    );
+    expect(open, closeTo(free * ThrowPhysics.maxAimRadians, 1e-6));
+    game.releaseChargeZone();
+    for (final shot in game.world.children.whereType<LobProjectile>()) {
+      shot.removeFromParent();
+    }
+    game.update(0);
+
+    // Dead on the flat line: the sweep slows by the friction factor.
+    rival.position = Vector2(1000, kid.position.y);
+    game.pressChargeZone();
+    game.update(step);
+    final sticky = ThrowPhysics.aimElevation(
+      game.chargeHud.aimDir,
+      facingRight: true,
+    );
+    expect(sticky.abs(), lessThan(open.abs() * 0.5));
+    expect(sticky, greaterThan(0));
+  });
+
+  testWidgets('the preview locks a rival only when the throw reaches them', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    freezeRivals(game);
+    final kid = game.players.first;
+    final rival = game.enemies.first;
+    rival.position = Vector2(1000, kid.position.y);
+    game.pressMoveZone(kid.hitCenter);
+    game.releaseMoveZone();
+
+    game.pressChargeZone();
+    game.update(0.01);
+    expect(game.aimTarget, isNull, reason: 'a tap falls short');
+    expect(game.chargeHud.target, isNull);
+    game.releaseChargeZone();
+    for (final shot in game.world.children.whereType<LobProjectile>()) {
+      shot.removeFromParent();
+    }
+
+    final reach = (rival.hitCenter.x - kid.throwOrigin.x) + 10;
+    expect(
+      ThrowPhysics.rangeForCharge(1),
+      greaterThan(reach),
+      reason: 'full power reaches the rival',
+    );
+    expect(
+      game.assistedElevation(kid, 0, ThrowPhysics.rangeForCharge(1)),
+      closeTo(0, 1e-9),
+      reason: 'already on target, no nudge',
+    );
+  });
+
+  testWidgets('a near miss is nudged onto the rival, a clear miss is not', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    freezeRivals(game);
+    final kid = game.players.first;
+    final rival = game.enemies.first;
+    final window = ArenaGrid.rowStep * ThrowPhysics.depthWindowFraction;
+    final range = ThrowPhysics.rangeForCharge(1);
+    final start = Vector2(kid.throwOrigin.x, kid.hitCenter.y);
+
+    rival.position = Vector2(1000, kid.position.y + window + 8);
+    final nudged = game.assistedElevation(kid, 0, range);
+    final miss = ThrowPhysics.trackMiss(
+      start: start,
+      elevation: nudged,
+      range: range,
+      facingRight: true,
+      target: rival.hitCenter,
+    );
+    expect(miss!.abs(), lessThan(0.01));
+
+    rival.position = Vector2(
+      1000,
+      kid.position.y + window + ThrowPhysics.aimAssistPx + 10,
+    );
+    expect(game.assistedElevation(kid, 0, range), 0);
+  });
+
   testWidgets('the charge sweep swaps upright yaw poses', (tester) async {
     final game = (await boot(tester, MetaState())).game;
     final kid = game.players.first;

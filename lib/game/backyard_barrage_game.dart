@@ -164,6 +164,10 @@ class BackyardBarrageGame extends FlameGame {
   double _charge = 0;
   double _chargeHeld = 0;
   double _swivel = 0;
+
+  /// Sweep position in radians. Advances slower while the line is on a rival.
+  double _sweepPhase = 0;
+  KidComponent? _aimTarget;
   Vector2 _aimDir = Vector2(1, 0);
   Vector2? _moveTarget;
 
@@ -180,6 +184,10 @@ class BackyardBarrageGame extends FlameGame {
   bool get isCharging => _charging;
 
   KidComponent? get selectedKid => _selected;
+
+  /// The rival the current charge would hit if released now. Null when the
+  /// line misses or falls short.
+  KidComponent? get aimTarget => _aimTarget;
 
   @override
   Color backgroundColor() => meta.season == Season.summer
@@ -758,6 +766,8 @@ class BackyardBarrageGame extends FlameGame {
       rangeScale: rangeScale,
       facingRight: false,
       originY: enemy.throwOrigin.y,
+      trackY: enemy.hitCenter.y,
+      targetY: target?.hitCenter.y,
     );
     _spawnShot(owner: enemy, lob: lob, targets: players);
   }
@@ -782,6 +792,8 @@ class BackyardBarrageGame extends FlameGame {
       rangeScale: rangeScale,
       facingRight: true,
       originY: ally.throwOrigin.y,
+      trackY: ally.hitCenter.y,
+      targetY: target?.hitCenter.y,
     );
     _spawnShot(owner: ally, lob: lob, targets: enemies);
   }
@@ -893,6 +905,8 @@ class BackyardBarrageGame extends FlameGame {
     _chargeHeld = 0;
     _charge = ThrowPhysics.minThrowCharge;
     _swivel = 0;
+    _sweepPhase = 0;
+    _aimTarget = null;
     _moveTarget = null;
     _grabOffset = Vector2.zero();
     _moveHolding = false;
@@ -920,14 +934,21 @@ class BackyardBarrageGame extends FlameGame {
       return;
     }
     final cell = ArenaGrid.nearestCell(KidSide.player, kid.position);
+    final elevation = _assistedElevation(
+      kid,
+      ThrowPhysics.aimElevation(_aimDir, facingRight: true),
+      ThrowPhysics.rangeForCharge(charge),
+    );
+    _aimTarget = null;
     final lob = ThrowPhysics.planPlayerLob(
       throwerRow: cell.row,
       throwerColumn: cell.column,
-      aimDirection: _aimDir,
+      aimDirection: ThrowPhysics.aimForElevation(elevation, facingRight: true),
       charge: charge,
       facingRight: true,
       speedScale: CombatRules.projectileSpeedScale(meta.throwRank),
       originY: kid.throwOrigin.y,
+      trackY: kid.hitCenter.y,
     );
     kid.showThrowPose();
     feel.playerReleased();
@@ -971,6 +992,7 @@ class BackyardBarrageGame extends FlameGame {
         settleFraction: lob.settleFraction,
         landingY: lob.landingY,
         apexY: lob.apexY,
+        trackY: lob.trackY,
         onHit: _onKidHit,
         onFortHit: _onFortHit,
         onGround: _onGroundMiss,
@@ -979,7 +1001,7 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   void _onKidHit(LobProjectile shot, KidComponent target) {
-    _burst(shot.position);
+    _burst(shot.position, depthY: target.hitCenter.y);
     if (phase != MatchPhase.fight || target.isKo) return;
     final selectedHit = identical(target, _selected);
     applySnowballHit(shot: shot, target: target);
@@ -1026,8 +1048,73 @@ class BackyardBarrageGame extends FlameGame {
     feel.impact(meta.season);
   }
 
-  void _burst(Vector2 at) {
-    world.add(ImpactBurst(sprite: _kit.impact, position: at.clone()));
+  void _burst(Vector2 at, {double? depthY}) {
+    world.add(
+      ImpactBurst(sprite: _kit.impact, position: at.clone(), depthY: depthY),
+    );
+  }
+
+  /// Where the selected kid's track starts: in front of the hand, at body
+  /// height.
+  Vector2 _trackStart(KidComponent kid) =>
+      Vector2(kid.throwOrigin.x, kid.hitCenter.y);
+
+  /// The nearest rival the line at [elevation] would hit within [range],
+  /// and the smallest depth miss to any reachable rival.
+  ({KidComponent? hit, KidComponent? near, double nearMiss}) _scanAim(
+    KidComponent kid,
+    double elevation,
+    double range,
+  ) {
+    final start = _trackStart(kid);
+    final window = ArenaGrid.rowStep * ThrowPhysics.depthWindowFraction;
+    KidComponent? hit;
+    var hitForward = double.infinity;
+    KidComponent? near;
+    var nearMiss = double.infinity;
+    for (final rival in enemies) {
+      if (rival.isKo) continue;
+      final miss = ThrowPhysics.trackMiss(
+        start: start,
+        elevation: elevation,
+        range: range,
+        facingRight: true,
+        target: rival.hitCenter,
+        reachSlop: rival.hitRadius,
+      );
+      if (miss == null) continue;
+      final forward = rival.hitCenter.x - start.x;
+      if (miss.abs() <= window && forward < hitForward) {
+        hit = rival;
+        hitForward = forward;
+      }
+      if (miss.abs() < nearMiss) {
+        nearMiss = miss.abs();
+        near = rival;
+      }
+    }
+    return (hit: hit, near: near, nearMiss: nearMiss);
+  }
+
+  @visibleForTesting
+  double assistedElevation(KidComponent kid, double elevation, double range) =>
+      _assistedElevation(kid, elevation, range);
+
+  /// Release assist: a line that just misses a reachable rival is nudged
+  /// onto them. A clear miss stays a miss.
+  double _assistedElevation(KidComponent kid, double elevation, double range) {
+    final scan = _scanAim(kid, elevation, range);
+    if (scan.hit != null) return elevation;
+    final near = scan.near;
+    final window = ArenaGrid.rowStep * ThrowPhysics.depthWindowFraction;
+    if (near == null || scan.nearMiss > window + ThrowPhysics.aimAssistPx) {
+      return elevation;
+    }
+    return ThrowPhysics.elevationToward(
+      start: _trackStart(kid),
+      target: near.hitCenter,
+      facingRight: true,
+    );
   }
 
   void debugPointerDown(Vector2 point) => _onPointerDown(point);
@@ -1049,6 +1136,22 @@ class BackyardBarrageGame extends FlameGame {
     chargeHud.charge = _charge;
     chargeHud.aimDir = _aimDir;
     chargeHud.anchorWorld = kid.throwOrigin;
+    final start = _trackStart(kid);
+    final range = ThrowPhysics.rangeForCharge(_charge);
+    final elevation = ThrowPhysics.aimElevation(_aimDir, facingRight: true);
+    final far = math.min(range, ThrowPhysics.yardFarEdge - start.x);
+    chargeHud.trackStart = start;
+    chargeHud.trackEnd = Vector2(
+      start.x + far,
+      ThrowPhysics.clampTrackY(
+        ThrowPhysics.trackYAt(
+          startY: start.y,
+          elevation: elevation,
+          forward: far,
+        ),
+      ),
+    );
+    chargeHud.target = _aimTarget?.hitCenter;
   }
 
   void _publishCharge() {
@@ -1144,6 +1247,8 @@ class BackyardBarrageGame extends FlameGame {
     _charge = 0;
     _chargeHeld = 0;
     _swivel = 0;
+    _sweepPhase = 0;
+    _aimTarget = null;
     _moveTarget = null;
     _grabOffset = Vector2.zero();
     chargeHud.visibleCharge = false;
@@ -1226,8 +1331,22 @@ class BackyardBarrageGame extends FlameGame {
           _chargeHeld,
           _playerChargeSeconds(),
         );
-        _swivel = ThrowPhysics.swivelElevation(_chargeHeld);
+        // The sweep lingers while the line crosses a rival (in reach or
+        // not), so a release on target is a fair window.
+        final onLine = _scanAim(kid, _swivel, double.infinity).hit != null;
+        _sweepPhase +=
+            dt *
+            2 *
+            math.pi /
+            ThrowPhysics.swivelPeriod *
+            (onLine ? ThrowPhysics.aimFriction : 1);
+        _swivel = math.sin(_sweepPhase) * ThrowPhysics.maxAimRadians;
         _aimDir = ThrowPhysics.aimForElevation(_swivel, facingRight: true);
+        _aimTarget = _scanAim(
+          kid,
+          _swivel,
+          ThrowPhysics.rangeForCharge(_charge),
+        ).hit;
         kid.showChargeYaw(ThrowPhysics.chargeYaw(_swivel));
         _syncChargeHud();
         _publishCharge();

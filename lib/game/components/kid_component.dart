@@ -182,7 +182,10 @@ class KidComponent extends SpriteComponent {
     showChargeYaw(ChargeYaw.across);
   }
 
-  /// Upright charge pose for this sweep angle. Sprites are not mirrored.
+  /// Upright charge pose for this sweep angle.
+  ///
+  /// Player winter mirrors `30l`, `15l`, and the sheet charge so the kid
+  /// faces +x toward the rivals. Enemy sprites are never mirrored.
   void showChargeYaw(ChargeYaw yaw) {
     if (isKo) return;
     _chargingPose = true;

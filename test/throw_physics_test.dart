@@ -140,80 +140,197 @@ void main() {
       expect(tapEnd, lessThan(ArenaGrid.enemyLeft));
     });
 
-    test(
-      'a steep tap climbs more rows than a flat throw at the same power',
-      () {
-        final from = ArenaGrid.throwOrigin(
-          KidSide.player,
-          ArenaGrid.cellCenter(KidSide.player, 1, 4),
-          Vector2.all(152),
+    test('the swept angle is the ground track, and charge sets how far', () {
+      final trackY = ArenaGrid.laneY(4);
+      RowLob throwAt(Vector2 aim, double charge) {
+        return ThrowPhysics.planPlayerLob(
+          throwerRow: 4,
+          throwerColumn: 1,
+          aimDirection: aim,
+          charge: charge,
+          facingRight: true,
+          originY: trackY - 15,
+          trackY: trackY,
         );
-        RowLob throwAt(Vector2 aim, double charge) {
-          return ThrowPhysics.planPlayerLob(
-            throwerRow: 4,
-            throwerColumn: 1,
-            aimDirection: aim,
-            charge: charge,
-            facingRight: true,
-            originY: from.y,
-          );
-        }
+      }
 
-        final flat = throwAt(Vector2(1, 0), ThrowPhysics.minThrowCharge);
-        final steep = throwAt(Vector2(0, -1), ThrowPhysics.minThrowCharge);
-        final fullFlat = throwAt(Vector2(1, 0), 1);
-        final fullSteep = throwAt(Vector2(0, -1), 1);
-        expect(flat.landingRow, 4);
-        expect(fullFlat.landingRow, 4);
-        expect(steep.landingRow, lessThan(flat.landingRow));
-        expect(fullSteep.landingRow, lessThan(steep.landingRow));
-        expect(steep.velocity.x, closeTo(flat.velocity.x, 0.01));
-        expect(steep.range, closeTo(flat.range, 0.01));
-        expect(steep.rowAt(1), steep.landingRow);
-        expect(
-          ThrowPhysics.playerCanHit(
-            landingRow: steep.landingRow,
-            shotRow: steep.rowAt(1),
-            targetRow: steep.landingRow,
-          ),
-          isTrue,
-        );
-        expect(
-          ThrowPhysics.playerCanHit(
-            landingRow: steep.landingRow,
-            shotRow: steep.rowAt(1),
-            targetRow: steep.landingRow + 1,
-          ),
-          isFalse,
-        );
+      final flat = throwAt(Vector2(1, 0), ThrowPhysics.minThrowCharge);
+      final steep = throwAt(Vector2(0, -1), ThrowPhysics.minThrowCharge);
+      final fullFlat = throwAt(Vector2(1, 0), 1);
+      final fullSteep = throwAt(Vector2(0, -1), 1);
+      expect(flat.landingRow, 4);
+      expect(fullFlat.landingRow, 4);
+      expect(flat.landingY, closeTo(trackY, 0.01));
+      expect(steep.landingRow, lessThan(flat.landingRow));
+      expect(fullSteep.landingY, lessThan(steep.landingY));
+      expect(steep.velocity.x, closeTo(flat.velocity.x, 0.01));
+      expect(steep.range, closeTo(flat.range, 0.01));
+      expect(steep.trackY, closeTo(trackY, 0.01));
 
-        expect(
-          ThrowPhysics.aimElevation(Vector2(0, -1), facingRight: true),
-          closeTo(ThrowPhysics.maxAimRadians, 0.001),
-        );
-        expect(
-          ThrowPhysics.aimElevation(Vector2(0, 1), facingRight: true),
-          closeTo(-ThrowPhysics.maxAimRadians, 0.001),
-        );
-        expect(
-          ThrowPhysics.aimElevation(Vector2(1, 0), facingRight: true).abs(),
-          lessThan(0.001),
-        );
-        expect(
-          ThrowPhysics.aimElevation(Vector2(0.2, -1), facingRight: true),
-          lessThanOrEqualTo(ThrowPhysics.maxAimRadians + 0.001),
-        );
-        expect(ThrowPhysics.maxAimRadians, closeTo(20 * math.pi / 180, 1e-9));
-        final aim01 =
-            ThrowPhysics.maxAimRadians / ThrowPhysics.aimRowScaleRadians;
-        expect(aim01, lessThan(0.5));
-        expect(
-          (4 - fullSteep.landingRow).abs(),
-          lessThanOrEqualTo((ThrowPhysics.aimRowsAtFull * aim01).ceil()),
-        );
-        expect((4 - fullSteep.landingRow).abs(), lessThan(3));
-      },
-    );
+      // Depth is continuous: the track drifts tan(elevation) per pixel and
+      // is not rounded to a lane.
+      final aim = ThrowPhysics.maxAimRadians * 0.37;
+      final partial = throwAt(
+        ThrowPhysics.aimForElevation(aim, facingRight: true),
+        ThrowPhysics.minThrowCharge,
+      );
+      expect(
+        partial.landingY,
+        closeTo(trackY - math.tan(aim) * partial.range, 0.01),
+      );
+      expect(
+        ThrowPhysics.trackYAt(startY: 500, elevation: aim, forward: 300),
+        closeTo(500 - math.tan(aim) * 300, 1e-9),
+      );
+
+      expect(
+        ThrowPhysics.aimElevation(Vector2(0, -1), facingRight: true),
+        closeTo(ThrowPhysics.maxAimRadians, 0.001),
+      );
+      expect(
+        ThrowPhysics.aimElevation(Vector2(0, 1), facingRight: true),
+        closeTo(-ThrowPhysics.maxAimRadians, 0.001),
+      );
+      expect(
+        ThrowPhysics.aimElevation(Vector2(1, 0), facingRight: true).abs(),
+        lessThan(0.001),
+      );
+      expect(
+        math.tan(ThrowPhysics.maxAimRadians),
+        closeTo(ThrowPhysics.maxAimSlope, 1e-9),
+      );
+    });
+
+    test('a full sweep covers the rival half from mid-yard', () {
+      final start = Vector2(300, ArenaGrid.laneY(4));
+      const forward = 700.0;
+      final up = ThrowPhysics.trackYAt(
+        startY: start.y,
+        elevation: ThrowPhysics.maxAimRadians,
+        forward: forward,
+      );
+      final down = ThrowPhysics.trackYAt(
+        startY: start.y,
+        elevation: -ThrowPhysics.maxAimRadians,
+        forward: forward,
+      );
+      expect(up, lessThanOrEqualTo(ArenaGrid.laneY(0) + ArenaGrid.rowStep));
+      expect(
+        down,
+        greaterThanOrEqualTo(
+          ArenaGrid.laneY(ArenaGrid.rows - 1) - ArenaGrid.rowStep,
+        ),
+      );
+    });
+
+    test('trackMiss and elevationToward agree on a rival', () {
+      final start = Vector2(300, ArenaGrid.laneY(4));
+      final rival = Vector2(1000, ArenaGrid.laneY(2) + 7);
+      final e = ThrowPhysics.elevationToward(
+        start: start,
+        target: rival,
+        facingRight: true,
+      );
+      final miss = ThrowPhysics.trackMiss(
+        start: start,
+        elevation: e,
+        range: 2000,
+        facingRight: true,
+        target: rival,
+      );
+      expect(miss, isNotNull);
+      expect(miss!.abs(), lessThan(0.01));
+      expect(
+        ThrowPhysics.trackMiss(
+          start: start,
+          elevation: e,
+          range: 500,
+          facingRight: true,
+          target: rival,
+        ),
+        isNull,
+        reason: 'out of reach',
+      );
+      expect(
+        ThrowPhysics.trackMiss(
+          start: start,
+          elevation: e,
+          range: 2000,
+          facingRight: false,
+          target: rival,
+        ),
+        isNull,
+        reason: 'behind the thrower',
+      );
+    });
+
+    test('a fast ball cannot step over a kid in one frame', () {
+      final kid = Vector2(600, 500);
+      const r = 22.0;
+      const kidR = 24.0;
+      // Two samples 200px apart straddle the kid. Neither touches alone.
+      final before = Vector2(490, 500);
+      final after = Vector2(690, 500);
+      expect(
+        ThrowPhysics.snowballContacts(
+          ground: before,
+          shotRadius: r,
+          kidCenter: kid,
+          kidRadius: kidR,
+        ),
+        isFalse,
+      );
+      expect(
+        ThrowPhysics.snowballContacts(
+          ground: after,
+          shotRadius: r,
+          kidCenter: kid,
+          kidRadius: kidR,
+        ),
+        isFalse,
+      );
+      expect(
+        ThrowPhysics.snowballSweepContacts(
+          from: before,
+          to: after,
+          shotRadius: r,
+          kidCenter: kid,
+          kidRadius: kidR,
+        ),
+        isTrue,
+      );
+      // A whole row off still passes in front.
+      expect(
+        ThrowPhysics.snowballSweepContacts(
+          from: before + Vector2(0, ArenaGrid.rowStep),
+          to: after + Vector2(0, ArenaGrid.rowStep),
+          shotRadius: r,
+          kidCenter: kid,
+          kidRadius: kidR,
+        ),
+        isFalse,
+      );
+    });
+
+    test('a rival lob runs through the target, so a long throw still hits', () {
+      final trackY = ArenaGrid.laneY(3);
+      final targetY = ArenaGrid.laneY(5) + 9;
+      const distance = 600.0;
+      final lob = ThrowPhysics.planEnemyLob(
+        throwerRow: 3,
+        throwerColumn: 1,
+        targetRow: 5,
+        distance: distance,
+        rangeScale: 1.3,
+        facingRight: false,
+        originY: trackY - 15,
+        trackY: trackY,
+        targetY: targetY,
+      );
+      expect(lob.range, greaterThan(distance));
+      final u = distance / lob.range;
+      expect(lob.yAt(u), closeTo(targetY, 0.01));
+    });
 
     test('a player lob keeps its pace and slides to the aimed depth', () {
       final from = ArenaGrid.throwOrigin(
@@ -619,22 +736,9 @@ void main() {
     });
 
     test(
-      'charge swivel swings the cone and release timing picks the depth',
+      'charge yaw follows the cone and release elevation picks the depth',
       () {
         expect(ThrowPhysics.swivelPeriod, closeTo(3.6, 0.001));
-        expect(ThrowPhysics.swivelElevation(0), closeTo(0, 0.001));
-        expect(
-          ThrowPhysics.swivelElevation(ThrowPhysics.swivelPeriod / 4),
-          closeTo(ThrowPhysics.maxAimRadians, 0.001),
-        );
-        expect(
-          ThrowPhysics.swivelElevation(ThrowPhysics.swivelPeriod / 2),
-          closeTo(0, 0.001),
-        );
-        expect(
-          ThrowPhysics.swivelElevation(ThrowPhysics.swivelPeriod * 0.75),
-          closeTo(-ThrowPhysics.maxAimRadians, 0.001),
-        );
         expect(
           ThrowPhysics.chargeYaw(ThrowPhysics.maxAimRadians),
           ChargeYaw.yaw30l,

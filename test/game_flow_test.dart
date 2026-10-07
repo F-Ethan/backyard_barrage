@@ -22,6 +22,7 @@ import 'package:backyard_barrage/meta/play_mode.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
 import 'package:backyard_barrage/meta/settings_store.dart';
 import 'package:backyard_barrage/meta/skill_tree.dart';
+import 'package:backyard_barrage/seasons/arena.dart';
 import 'package:backyard_barrage/seasons/season.dart';
 import 'package:backyard_barrage/ui/barrage_theme.dart';
 import 'package:flame/components.dart';
@@ -56,6 +57,7 @@ void main() {
         'forts/fort_stage_${stage}_damaged_draft.png',
       ],
       'forts/fort_collapsed_draft.png',
+      for (final arena in Arena.values) arena.background,
       'vfx/charge_glow_draft.png',
       'ui/heart_draft.png',
       'ui/heart_empty_draft.png',
@@ -517,6 +519,49 @@ void main() {
         expect(spots[i].distanceTo(spots[j]), greaterThan(20));
       }
     }
+  });
+
+  test('arena pick covers every map and can skip the current one', () {
+    final rng = math.Random(4);
+    final seen = {for (var i = 0; i < 40; i++) Arena.pick(rng)};
+    expect(seen, Arena.values.toSet());
+    for (var i = 0; i < 20; i++) {
+      expect(Arena.pick(rng, except: Arena.park), isNot(Arena.park));
+    }
+    for (final arena in Arena.values) {
+      expect(arena.background, startsWith('world/arena_'));
+    }
+  });
+
+  testWidgets('a run plays on its arena and a retry moves to another', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    final first = game.arena;
+    expect(game.backgroundColor(), first.sky);
+
+    knockOut(game.players);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(1.5);
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('retry')));
+    await tester.pump();
+    expect(game.arena, isNot(first));
+    expect(game.backgroundColor(), game.arena.sky);
+
+    // The map holds from wave to wave inside a run.
+    final kept = game.arena;
+    game.finishEntrance();
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+    await tester.tap(find.text('Next wave'));
+    await tester.pump();
+    expect(game.wave, 2);
+    expect(game.arena, kept);
   });
 
   testWidgets('a wiped crew can retry at full HP', (tester) async {

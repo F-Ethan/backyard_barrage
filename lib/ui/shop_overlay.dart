@@ -247,8 +247,10 @@ class _Header extends StatelessWidget {
             style: BarrageType.title.copyWith(fontSize: compact ? 22 : 26),
           ),
         ),
-        SeasonToggle(season: season, onChanged: onSeason, compact: true),
-        SizedBox(width: tokens.space.sm),
+        if (Season.choosable) ...[
+          SeasonToggle(season: season, onChanged: onSeason, compact: true),
+          SizedBox(width: tokens.space.sm),
+        ],
         if (reward != null) ...[
           TagPill(
             color: tokens.ownedTint,

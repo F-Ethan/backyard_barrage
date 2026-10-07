@@ -1,4 +1,5 @@
 import '../seasons/season.dart';
+import 'difficulty.dart';
 import 'meta_state.dart';
 import 'play_mode.dart';
 
@@ -8,16 +9,20 @@ import 'play_mode.dart';
 /// empty so those coins and skills are not lost and do not leak across.
 class PlayerSave {
   PlayerSave({
-    this.season = Season.winter,
+    Season season = Season.winter,
     this.mode = PlayMode.arcade,
     MetaState? arcade,
     MetaState? campaign,
-  }) : arcade = arcade ?? MetaState(mode: PlayMode.arcade, season: season),
+  }) : _season = season.orPlayable,
+       arcade = arcade ?? MetaState(mode: PlayMode.arcade, season: season),
        campaign =
            campaign ?? MetaState(mode: PlayMode.campaign, season: season);
 
-  /// Skin for the yard and the home screen. Both modes use it.
-  Season season;
+  /// Skin for the yard and the home screen. Both modes use it. A season
+  /// that is switched off ([Season.playable]) reads back as a playable one.
+  Season get season => _season;
+  set season(Season value) => _season = value.orPlayable;
+  Season _season;
 
   /// Last mode the player started. Home still offers both.
   PlayMode mode;
@@ -30,15 +35,15 @@ class PlayerSave {
 
   MetaState get active => wallet(mode);
 
-  /// Copy one mode's coins, skills, and best wave. The other wallet stays.
+  /// Copy one mode's coins, skills, and bests. The other wallet stays.
   void apply(WalletSnap snap) {
-    season = snap.season;
+    season = snap.season.orPlayable;
     mode = snap.mode;
     final slot = wallet(snap.mode);
     slot
       ..coins = snap.coins
-      ..bestWave = snap.bestWave
-      ..season = snap.season
+      ..replaceBestWaves(snap.bestWaves)
+      ..season = season
       ..mode = snap.mode
       ..replaceSkills(snap.skills);
     arcade.season = season;
@@ -95,7 +100,7 @@ class WalletSnap {
     required this.mode,
     required this.season,
     required this.coins,
-    required this.bestWave,
+    required this.bestWaves,
     required this.skills,
   });
 
@@ -104,7 +109,7 @@ class WalletSnap {
       mode: state.mode,
       season: state.season,
       coins: state.coins,
-      bestWave: state.bestWave,
+      bestWaves: Map<Difficulty, int>.from(state.bestWaves),
       skills: Set<String>.from(state.skills),
     );
   }
@@ -112,6 +117,6 @@ class WalletSnap {
   final PlayMode mode;
   final Season season;
   final int coins;
-  final int bestWave;
+  final Map<Difficulty, int> bestWaves;
   final Set<String> skills;
 }

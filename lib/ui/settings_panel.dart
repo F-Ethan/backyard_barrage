@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../ads/remove_ads.dart';
 import '../feel/feel_bus.dart';
-import '../meta/difficulty.dart';
 import '../meta/game_settings.dart';
 import 'barrage_colors.dart';
 import 'barrage_theme.dart';
@@ -116,14 +115,8 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                             _set(_settings.copyWith(hapticsEnabled: value)),
                       ),
                       SizedBox(height: tokens.space.sm),
-                      _DifficultyPicker(
-                        value: _settings.difficulty,
-                        onChanged: (value) =>
-                            _set(_settings.copyWith(difficulty: value)),
-                      ),
-                      SizedBox(height: tokens.space.sm),
                       const Text(
-                        'Sound, music, and haptics for this device. Easy charges twice as fast and cuts your stun in half. Normal charges 1.5× and shortens that stun to three quarters. Hard keeps the full charge and stun, throws more often, and can chip your own fort.',
+                        'Sound, music, and haptics for this device. Difficulty is picked on the home screen.',
                         textAlign: TextAlign.center,
                         style: BarrageType.muted,
                       ),
@@ -283,95 +276,6 @@ class BarrageToggle extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DifficultyPicker extends StatelessWidget {
-  const _DifficultyPicker({required this.value, required this.onChanged});
-
-  final Difficulty value;
-  final ValueChanged<Difficulty> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Difficulty', style: BarrageType.body),
-        SizedBox(height: tokens.space.sm),
-        Row(
-          children: [
-            for (final mode in Difficulty.values)
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: tokens.space.xs),
-                  child: _DifficultyChip(
-                    key: Key('difficulty-${mode.name}'),
-                    label: switch (mode) {
-                      Difficulty.easy => 'Easy',
-                      Difficulty.normal => 'Normal',
-                      Difficulty.hard => 'Hard',
-                    },
-                    selected: value == mode,
-                    onTap: () => onChanged(mode),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _DifficultyChip extends StatelessWidget {
-  const _DifficultyChip({
-    super.key,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final motion = context.motion;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: label,
-      child: PressScale(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: motion.medium,
-          curve: motion.enter,
-          height: 42,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            gradient: selected ? tokens.primaryGradient : null,
-            color: selected ? null : tokens.surface,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: selected ? const Color(0x00000000) : tokens.hairline,
-              width: 1.5,
-            ),
-            boxShadow: selected ? tokens.shadowPrimary : null,
-          ),
-          child: Text(
-            label,
-            style: BarrageType.button.copyWith(
-              color: selected ? tokens.onPrimary : tokens.ink,
-              fontSize: 15,
             ),
           ),
         ),

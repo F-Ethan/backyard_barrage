@@ -539,8 +539,8 @@ void main() {
     expect(game.meta.crewSize, 1);
     expect(game.meta.fortStage, 1);
     expect(game.meta.throwRank, 0);
-    expect(game.meta.bestWave, 3);
-    expect(game.meta.season, Season.summer);
+    expect(game.meta.bestWaveFor(Difficulty.normal), 3);
+    expect(game.meta.season, Season.winter);
     expect(game.wave, 1);
 
     expect(game.carriedCoins, 40);
@@ -559,8 +559,8 @@ void main() {
       find.text('Skills reset. Unspent coins carry over.'),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('season-summer')), findsOneWidget);
-    expect(find.byKey(const ValueKey('chip-summer-true')), findsNothing);
+    // Summer is switched off, so defeat offers no season choice.
+    expect(find.byKey(const Key('season-summer')), findsNothing);
 
     await tester.tap(find.byKey(const Key('retry')));
     await tester.pump();
@@ -605,7 +605,7 @@ void main() {
     expect(game.meta.crewSize, 2);
     expect(game.meta.fortStage, 2);
     expect(game.meta.throwRank, 1);
-    expect(game.meta.bestWave, 5);
+    expect(game.meta.bestWaveFor(Difficulty.normal), 5);
     expect(game.wave, 4);
 
     game.update(0.7);
@@ -629,14 +629,14 @@ void main() {
       preferences: await SharedPreferences.getInstance(),
     ).load();
     expect(profile.arcade.coins, 77);
-    expect(profile.arcade.bestWave, 3);
+    expect(profile.arcade.bestWaveFor(Difficulty.normal), 3);
     expect(profile.arcade.owns('fort-2'), isFalse);
     expect(profile.campaign.coins, 40);
-    expect(profile.campaign.bestWave, 5);
+    expect(profile.campaign.bestWaveFor(Difficulty.normal), 5);
     expect(profile.campaign.crewSize, 2);
     expect(profile.campaign.fortStage, 2);
     expect(profile.campaign.throwRank, 1);
-    expect(profile.season, Season.summer);
+    expect(profile.season, Season.winter);
   });
 
   testWidgets('coins spent on the defeat skill tree start the next run', (
@@ -744,8 +744,8 @@ void main() {
     for (final node in SkillTree.chain(SkillBranch.throwSpeed).take(2)) {
       expect(find.text(node.title), findsOneWidget, reason: node.title);
     }
-    expect(find.byKey(const Key('season-winter')), findsOneWidget);
-    expect(find.byKey(const ValueKey('chip-winter-true')), findsNothing);
+    // Summer is switched off, so the shop offers no season choice.
+    expect(find.byKey(const Key('season-winter')), findsNothing);
     await tester.tap(find.byKey(const Key('skill-group-crew')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('skill-branch-team')));

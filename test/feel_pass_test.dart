@@ -241,7 +241,9 @@ void main() {
     );
   });
 
-  testWidgets('difficulty persists beside the other settings', (tester) async {
+  testWidgets('difficulty is picked on the home screen and persists', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final store = SaveStore(preferences: prefs);
@@ -260,8 +262,7 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
-    await tester.tap(find.byKey(const Key('menu-settings')));
-    await tester.pump();
+    // On home, without opening Settings.
     expect(find.byKey(const Key('difficulty-normal')), findsOneWidget);
     expect(find.byKey(const Key('difficulty-easy')), findsOneWidget);
     expect(find.byKey(const Key('difficulty-hard')), findsOneWidget);
@@ -270,6 +271,11 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
     expect((await settings.load()).difficulty, Difficulty.hard);
+
+    // The settings sheet does not add a second picker.
+    await tester.tap(find.byKey(const Key('menu-settings')));
+    await tester.pump();
+    expect(find.byKey(const Key('difficulty-hard')), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(
@@ -281,8 +287,6 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
-    await tester.tap(find.byKey(const Key('menu-settings')));
-    await tester.pump();
     expect((await settings.load()).difficulty, Difficulty.hard);
     expect(find.byKey(const Key('ui-style-toggle')), findsNothing);
   });

@@ -2,7 +2,7 @@
 
 **Status:** Name locked (working title)  
 **Platforms:** iOS + Android (Flutter), landscape-only  
-**Seasons in MVP:** Winter (snowballs) + Summer (water balloons)  
+**Seasons in MVP:** Winter (snowballs) + Summer (water balloons). **Summer is switched off** (`Season.playable`) until its art matches the 3D winter pack; the game ships winter-only until then.  
 **Out of MVP:** Real-time multiplayer, spring/fall, web client, river map  
 
 ---
@@ -69,7 +69,8 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 - Each side stays on its own half. The middle band is neutral. The yard grid still places rivals and forts. It does not lock the player's feet or the snowball's hit row.
 - Arcade loss: wave progress and every skill node (crew, fort, throw, and the rest of the tree) go back to a new game. Unspent coins stay in the Arcade wallet. Retry starts at wave 1.
 - Campaign loss: skills and coins stay. Retry starts at wave 1, not the wave you lost. Campaign coins are a separate wallet.
-- Season is shared. Best wave is kept per mode. The home screen shows the highest Campaign wave.
+- Season is shared. Best wave is kept per mode and per difficulty. The home screen shows the Campaign best for the picked difficulty large and highlighted, with any other difficulty that has a cleared wave beside it, small and grey. Mode cards and the defeat screen show the best for the picked difficulty.
+- Difficulty is picked only on the home screen (Easy / Normal / Hard pills, top left, with a one-line summary on larger screens). Settings and Pause do not offer it, so a run stays on one difficulty.
 - Lock orientation: landscape left/right only  
 
 ### 3.4 AI (simple)
@@ -106,7 +107,7 @@ Same rules; swap:
 - Arena tint / props (snow vs grass)  
 - Kid outerwear (coat vs tee)  
 
-Player **chooses** season with a small text toggle on the home screen, the shop, and the defeat screen. No real-world lock in MVP. The home backdrop follows the season.
+While summer is on, the player **chooses** season with a small toggle on the home screen, the shop, and the defeat screen; with only winter playable, those toggles are hidden. No real-world lock in MVP. The home backdrop follows the season.
 
 ### 3.7 Explicitly deferred
 - Spring / fall seasons  
@@ -121,7 +122,7 @@ Player **chooses** season with a small text toggle on the home screen, the shop,
 ## 4. Screens & UX flow
 
 1. **Splash / title** — Backyard Barrage  
-2. **Main menu** — Arcade and Campaign, a quiet season control, Settings. The yard behind the menu follows the season. Highest Campaign wave is shown large.  
+2. **Main menu** — Arcade and Campaign, the difficulty pills, Settings. The yard behind the menu follows the season. Highest Campaign wave is shown large.  
 3. **Arena HUD** — kid HP pips, fort bar, charge bar, pause  
 4. **Wave clear** — coins earned, Continue  
 5. **Skill tree** — buy the next node in a branch, Continue to next wave  

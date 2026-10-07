@@ -83,6 +83,10 @@ All under `assets/images/ui/`. Shared language: ink `#2C3E50` ~4–6px outline, 
 | `player_turn_30r_winter_3d_v1.png` | **3D aim** | 1024×1024. Down-screen end of the player-winter sweep |
 | `player_turn_30r_summer_draft.png` | **HQ playtest draft** | Same yaw, tee |
 
+### Ethan 3D kid (raw, not wired)
+
+`assets/images/characters/player/ethan3d/` — approved aim wind-up (profile to 3/4 front) and run stills for Ethan's own 3D kid. Full frames are 1024×1024 transparent PNGs with feet at about y=941, plus 512 previews and review contact sheets. Not in `pubspec.yaml` and not loaded. Idle and throw are not included. See the folder README.
+
 ### Enemy (`assets/images/characters/enemy/`)
 
 | File | Status | Notes |

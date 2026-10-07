@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flame/camera.dart';
 import 'package:flame/components.dart';
@@ -21,6 +22,7 @@ import '../seasons/season_kit.dart';
 import 'arena_grid.dart';
 import 'combat_rules.dart';
 import 'components/charge_indicator.dart';
+import 'components/coin_pop.dart';
 import 'components/coin_carry.dart';
 import 'components/enemy_controller.dart';
 import 'components/fort_component.dart';
@@ -28,6 +30,7 @@ import 'components/impact_burst.dart';
 import 'components/kid_component.dart';
 import 'components/lob_projectile.dart';
 import 'components/overlay_banner.dart';
+import 'components/splash_particles.dart';
 import 'throw_physics.dart';
 
 enum MatchPhase { entering, fight, clearing, defeat, shop, paused }
@@ -178,6 +181,26 @@ class BackyardBarrageGame extends FlameGame {
   double _bannerTime = 0;
   OverlayBanner? _banner;
   KidComponent? _selected;
+
+  /// Hit-stop: the yard freezes for this long after a hit lands.
+  double _hitStop = 0;
+  double _shakeTime = 0;
+  double _shakeTotal = 0;
+  double _shakeMagnitude = 0;
+
+  /// Hit-stop and screen shake lengths. KO lands a little heavier.
+  static const double hitStopSeconds = 0.06;
+  static const double koStopSeconds = 0.11;
+  static const double hitShakePx = 5;
+  static const double koShakePx = 9;
+  static const double shakeSeconds = 0.18;
+
+  /// OS "reduce motion" turns off hit-stop and shake. Tests can override.
+  @visibleForTesting
+  bool Function() reduceMotion = () {
+    final a11y = PlatformDispatcher.instance.accessibilityFeatures;
+    return a11y.disableAnimations || a11y.reduceMotion;
+  };
 
   double get charge => _charge;
 
@@ -1006,6 +1029,16 @@ class BackyardBarrageGame extends FlameGame {
     final selectedHit = identical(target, _selected);
     applySnowballHit(shot: shot, target: target);
     feel.kidHit(knockedOut: target.isKo, season: meta.season);
+    target.recoil(shot.facing);
+    _punch(knockedOut: target.isKo);
+    if (target.isKo && target.side == KidSide.enemy) {
+      world.add(
+        CoinPop(
+          amount: MetaState.coinsPerKnockout,
+          position: target.hitCenter - Vector2(0, 92),
+        ),
+      );
+    }
     if (selectedHit) {
       _endActiveThrow();
       if (target.isKo || target.isStunned) {
@@ -1036,7 +1069,7 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   void _onFortHit(LobProjectile shot) {
-    _burst(shot.position);
+    _burst(shot.position, power: 0.75);
     feel.impact(meta.season);
     if (phase != MatchPhase.fight) return;
     final cover = shot.struckFort;
@@ -1044,13 +1077,65 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   void _onGroundMiss(LobProjectile shot) {
-    _burst(shot.position);
+    _burst(shot.position, power: 0.6);
     feel.impact(meta.season);
   }
 
-  void _burst(Vector2 at, {double? depthY}) {
+  void _burst(Vector2 at, {double? depthY, double power = 1}) {
     world.add(
       ImpactBurst(sprite: _kit.impact, position: at.clone(), depthY: depthY),
+    );
+    world.add(
+      SplashParticles(
+        position: at.clone(),
+        season: meta.season,
+        rng: _rng,
+        depthY: depthY,
+        count: (12 * power).round(),
+        power: power,
+      ),
+    );
+  }
+
+  /// Hit-stop and a short shake. Skipped under OS reduce-motion.
+  void _punch({required bool knockedOut}) {
+    if (reduceMotion()) return;
+    _hitStop = math.max(_hitStop, knockedOut ? koStopSeconds : hitStopSeconds);
+    _shakeMagnitude = math.max(
+      _shakeTime > 0 ? _shakeMagnitude : 0,
+      knockedOut ? koShakePx : hitShakePx,
+    );
+    _shakeTime = shakeSeconds;
+    _shakeTotal = shakeSeconds;
+  }
+
+  @visibleForTesting
+  double get hitStopRemaining => _hitStop;
+
+  @override
+  void updateTree(double dt) {
+    _tickShake(dt);
+    if (_hitStop > 0 && !paused) {
+      _hitStop -= dt;
+      // Lifecycle still runs; nothing in the yard moves.
+      super.updateTree(0);
+      return;
+    }
+    super.updateTree(dt);
+  }
+
+  void _tickShake(double dt) {
+    final view = camera.viewfinder;
+    if (_shakeTime <= 0) {
+      if (!view.position.isZero()) view.position = Vector2.zero();
+      return;
+    }
+    _shakeTime -= dt;
+    final fall = (_shakeTime / _shakeTotal).clamp(0.0, 1.0);
+    final m = _shakeMagnitude * fall;
+    view.position = Vector2(
+      (_rng.nextDouble() * 2 - 1) * m,
+      (_rng.nextDouble() * 2 - 1) * m,
     );
   }
 

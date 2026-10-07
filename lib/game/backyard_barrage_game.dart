@@ -16,6 +16,7 @@ import '../meta/game_settings.dart';
 import '../meta/meta_state.dart';
 import '../meta/save_store.dart';
 import '../meta/settings_store.dart';
+import '../seasons/arena.dart';
 import '../seasons/season.dart';
 import '../seasons/season_kit.dart';
 import 'arena_grid.dart';
@@ -89,6 +90,11 @@ class BackyardBarrageGame extends FlameGame {
   late ChargeIndicator chargeHud;
   late SeasonKit _kit;
   late SpriteComponent _bg;
+  final Map<Arena, Sprite> _arenaArt = {};
+  Arena _arena = Arena.backyard;
+
+  /// The map this run is played on. Rolled when a run starts.
+  Arena get arena => _arena;
 
   MatchPhase _phase = MatchPhase.fight;
   final ValueNotifier<MatchPhase> phaseListenable = ValueNotifier(
@@ -218,9 +224,29 @@ class BackyardBarrageGame extends FlameGame {
   KidComponent? get aimTarget => _aimTarget;
 
   @override
-  Color backgroundColor() => meta.season == Season.summer
-      ? const Color(0xFF87CEEB)
-      : const Color(0xFFA8D4F0);
+  Color backgroundColor() =>
+      meta.season == Season.summer ? const Color(0xFF87CEEB) : _arena.sky;
+
+  /// Winter plays on the run's [arena]. Summer keeps its own yard art.
+  Sprite _backdrop(SeasonKit kit) {
+    if (kit.season == Season.winter) {
+      final art = _arenaArt[_arena];
+      if (art != null) return art;
+    }
+    return kit.background;
+  }
+
+  @visibleForTesting
+  void debugUseArena(Arena arena) {
+    _arena = arena;
+    if (isLoaded) _bg.sprite = _backdrop(_kit);
+  }
+
+  /// A new map for a new run, different from the last one when possible.
+  void _rollArena({bool avoidCurrent = false}) {
+    _arena = Arena.pick(_rng, except: avoidCurrent ? _arena : null);
+    if (isLoaded) _bg.sprite = _backdrop(_kit);
+  }
 
   @override
   Future<void> onLoad() async {
@@ -250,9 +276,13 @@ class BackyardBarrageGame extends FlameGame {
 
     final glow = await loadSprite('vfx/charge_glow_draft.png');
     _coinSprite = await loadSprite('ui/coin_draft.png');
+    for (final arena in Arena.values) {
+      _arenaArt[arena] = await loadSprite(arena.background);
+    }
+    _arena = Arena.pick(_rng);
 
     _bg = SpriteComponent(
-      sprite: _kit.background,
+      sprite: _backdrop(_kit),
       size: Vector2(worldWidth, worldHeight),
       position: Vector2.zero(),
       priority: 0,
@@ -330,7 +360,7 @@ class BackyardBarrageGame extends FlameGame {
 
   void _applyKit(SeasonKit kit) {
     _kit = kit;
-    _bg.sprite = kit.background;
+    _bg.sprite = _backdrop(kit);
     for (final kid in players) {
       kid.applyPoses(kit.playerPoses);
     }
@@ -512,6 +542,7 @@ class BackyardBarrageGame extends FlameGame {
     if (overlays.isActive('defeat')) overlays.remove('defeat');
     if (paused) resumeEngine();
     wave = 1;
+    _rollArena(avoidCurrent: true);
     startWave();
   }
 

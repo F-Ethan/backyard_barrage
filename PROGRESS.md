@@ -26,6 +26,7 @@ Playable MVP loop on the gameplay branch:
 
 Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you notice something you are not fixing in the current PR. Remove or rewrite a row when it is actually fixed.
 
+- **Arena river is scenery only.** Both winter maps (`world/arena_backyard_draft.png`, `world/arena_park_draft.png`, 16:9 centre crops of the owner's 2796×1290 art) have a river in the neutral band. Balls fly over it and nothing interacts with it. `world/backyard_bg_winter_draft.png` is no longer drawn in winter.
 - **Summer is switched off.** `Season.playable` is winter-only until summer art matches the 3D winter pack. Saves on summer load as winter. Summer assets, `SeasonToggle`, and the summer kit load in the game are kept so adding `Season.summer` back to `Season.playable` restores the toggles. The store one-liner and README still mention water balloons.
 - **Old saves land on Normal.** Before wallets split by difficulty, each mode had one wallet; its coins and skills move to Normal and Easy/Hard start fresh. A lone old best wave (no difficulty recorded) counts as Normal. Old saves have no score, so Arcade scores start at 0.
 - **Mode code names are swapped from the shown names.** `PlayMode.arcade` shows as Campaign and `PlayMode.campaign` as Arcade, because saves store the code names. Rename with a save migration if it causes confusion.

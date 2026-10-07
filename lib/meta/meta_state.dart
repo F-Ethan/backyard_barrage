@@ -1,8 +1,9 @@
 import '../seasons/season.dart';
+import 'difficulty.dart';
 import 'play_mode.dart';
 import 'skill_tree.dart';
 
-/// One mode's skill tree, coins, and best wave.
+/// One mode's skill tree, coins, and best wave on each difficulty.
 ///
 /// Crew size, fort stage, and throw rank are the team, fort, and throw
 /// chains. Season is shared by both modes and stored here so a match can
@@ -15,10 +16,18 @@ class MetaState {
     int fortStage = 1,
     int throwRank = 0,
     Set<String>? skills,
-    this.season = Season.winter,
-    this.bestWave = 0,
+    Season season = Season.winter,
+    Map<Difficulty, int>? bestWaves,
+    int bestWave = 0,
     this.mode = PlayMode.arcade,
-  }) {
+  }) : _season = season.orPlayable {
+    if (bestWaves != null) {
+      replaceBestWaves(bestWaves);
+    } else if (bestWave > 0) {
+      // Records from before bests were split by difficulty count as Normal,
+      // the default setting.
+      _bestWaves[Difficulty.normal] = bestWave;
+    }
     if (skills != null) {
       _skills.addAll(_closed(skills));
     } else {
@@ -47,9 +56,26 @@ class MetaState {
   static const List<double> _blastScales = [1, 1.2, 1.45, 1.75, 2.05];
 
   int coins;
-  Season season;
-  int bestWave;
   PlayMode mode;
+
+  /// Never a switched-off season ([Season.playable]).
+  Season get season => _season;
+  set season(Season value) => _season = value.orPlayable;
+  Season _season;
+
+  final Map<Difficulty, int> _bestWaves = {};
+
+  /// Highest wave cleared on [difficulty] in this mode. 0 when none.
+  int bestWaveFor(Difficulty difficulty) => _bestWaves[difficulty] ?? 0;
+
+  Map<Difficulty, int> get bestWaves => Map.unmodifiable(_bestWaves);
+
+  void replaceBestWaves(Map<Difficulty, int> next) {
+    _bestWaves.clear();
+    for (final entry in next.entries) {
+      if (entry.value > 0) _bestWaves[entry.key] = entry.value;
+    }
+  }
 
   final Set<String> _skills = {};
 
@@ -193,8 +219,8 @@ class MetaState {
     return buy(next.id);
   }
 
-  void noteWaveCleared(int wave) {
-    if (wave > bestWave) bestWave = wave;
+  void noteWaveCleared(int wave, {required Difficulty difficulty}) {
+    if (wave > bestWaveFor(difficulty)) _bestWaves[difficulty] = wave;
   }
 
   /// Arcade drops every skill. Campaign keeps bought nodes.
@@ -228,7 +254,9 @@ class MetaState {
     'throwRank': throwRank,
     'skills': _skills.toList()..sort(),
     'season': season.name,
-    'bestWave': bestWave,
+    'bestWaves': {
+      for (final entry in _bestWaves.entries) entry.key.name: entry.value,
+    },
     'mode': mode.name,
   };
 
@@ -255,9 +283,20 @@ class MetaState {
       coins: _clampInt(_asInt(json['coins']), 0, 999999),
       skills: skills,
       season: Season.tryParse(json['season'] as String?) ?? Season.winter,
+      bestWaves: _readBestWaves(json['bestWaves']),
       bestWave: _clampInt(_asInt(json['bestWave']), 0, 9999),
       mode: PlayMode.tryParse(json['mode'] as String?) ?? PlayMode.arcade,
     );
+  }
+
+  /// Null when the save predates per-difficulty bests.
+  static Map<Difficulty, int>? _readBestWaves(Object? raw) {
+    if (raw is! Map) return null;
+    return {
+      for (final mode in Difficulty.values)
+        if (raw[mode.name] != null)
+          mode: _clampInt(_asInt(raw[mode.name]), 0, 9999),
+    };
   }
 
   int _ownedPrefix(SkillBranch branch) {

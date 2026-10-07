@@ -6,6 +6,20 @@ enum Difficulty {
   normal,
   hard;
 
+  String get label => switch (this) {
+    Difficulty.easy => 'Easy',
+    Difficulty.normal => 'Normal',
+    Difficulty.hard => 'Hard',
+  };
+
+  /// One line for the home screen under the picker.
+  String get summary => switch (this) {
+    Difficulty.easy => 'Fast charge, short stuns, full aim guide.',
+    Difficulty.normal => 'Quicker charge, aim path without the target ring.',
+    Difficulty.hard =>
+      'Full charge and stuns, no aim guide, rivals throw more.',
+  };
+
   /// How much of the throw preview this mode draws while charging.
   AimPreview get aimPreview => switch (this) {
     Difficulty.easy => AimPreview.full,

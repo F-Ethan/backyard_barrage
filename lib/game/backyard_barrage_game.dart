@@ -320,7 +320,7 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   Future<void> setSeason(Season season) async {
-    if (meta.season == season) return;
+    if (meta.season == season || !Season.playable.contains(season)) return;
     meta.season = season;
     final kit = _kits[season];
     if (kit != null && isLoaded) _applyKit(kit);
@@ -548,7 +548,7 @@ class BackyardBarrageGame extends FlameGame {
     _clearShots();
     lastReward = MetaState.coinsForWave(wave);
     meta.coins += lastReward;
-    meta.noteWaveCleared(wave);
+    meta.noteWaveCleared(wave, difficulty: feel.settings.difficulty);
     unawaited(persist());
     feel.waveCleared();
     _showBanner('KO!', fontSize: 56, color: const Color(0xFFFFE66D));

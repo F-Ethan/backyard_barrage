@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../ads/remove_ads.dart';
 import '../feel/feel_bus.dart';
+import '../meta/difficulty.dart';
 import '../meta/game_settings.dart';
 import '../meta/meta_state.dart';
 import '../meta/play_mode.dart';
@@ -13,10 +14,10 @@ import '../meta/settings_store.dart';
 import '../seasons/season.dart';
 import 'barrage_colors.dart';
 import 'barrage_theme.dart';
+import 'difficulty_picker.dart';
 import 'draft_button.dart';
 import 'motion.dart';
 import 'season_home_backdrop.dart';
-import 'season_toggle.dart';
 import 'settings_panel.dart';
 
 /// Landscape size classes for the home screen.
@@ -78,16 +79,12 @@ class _MainMenuState extends State<MainMenu> {
     await widget.feel.enterMenu();
   }
 
-  Future<void> _setSeason(Season season) async {
-    final profile = _profile;
-    if (profile == null || profile.season == season) return;
+  /// Difficulty is picked here and nowhere else, so a run keeps one mode
+  /// and its best wave counts for that mode.
+  Future<void> _setDifficulty(Difficulty next) async {
+    if (widget.feel.settings.difficulty == next) return;
     widget.feel.uiTap();
-    setState(() {
-      profile.season = season;
-      profile.arcade.season = season;
-      profile.campaign.season = season;
-    });
-    await widget.saveStore.saveProfile(profile);
+    await _commitSettings(widget.feel.settings.copyWith(difficulty: next));
   }
 
   Future<void> _play(PlayMode mode) async {
@@ -133,7 +130,8 @@ class _MainMenuState extends State<MainMenu> {
                       size: _MenuSize.of(box),
                       profile: profile,
                       feel: widget.feel,
-                      onSeason: _setSeason,
+                      difficulty: widget.feel.settings.difficulty,
+                      onDifficulty: _setDifficulty,
                       onPlay: _play,
                       onSettings: () => setState(() => _settingsOpen = true),
                     ),
@@ -166,7 +164,8 @@ class _HomeLayout extends StatelessWidget {
     required this.size,
     required this.profile,
     required this.feel,
-    required this.onSeason,
+    required this.difficulty,
+    required this.onDifficulty,
     required this.onPlay,
     required this.onSettings,
   });
@@ -174,7 +173,8 @@ class _HomeLayout extends StatelessWidget {
   final _MenuSize size;
   final PlayerSave profile;
   final FeelBus feel;
-  final ValueChanged<Season> onSeason;
+  final Difficulty difficulty;
+  final ValueChanged<Difficulty> onDifficulty;
   final ValueChanged<PlayMode> onPlay;
   final VoidCallback onSettings;
 
@@ -184,7 +184,6 @@ class _HomeLayout extends StatelessWidget {
     final compact = size == _MenuSize.compact;
     final wide = size == _MenuSize.wide;
     final gutter = compact ? tokens.space.md : tokens.space.xl;
-    final season = profile.season;
     Widget rise(int index, Widget child) =>
         child.enterRise(context, index: index);
 
@@ -192,7 +191,11 @@ class _HomeLayout extends StatelessWidget {
       children: [
         rise(
           0,
-          _SeasonBar(season: season, onChanged: onSeason, compact: compact),
+          _DifficultyBar(
+            value: difficulty,
+            onChanged: onDifficulty,
+            compact: compact,
+          ),
         ),
         const Spacer(),
         rise(
@@ -228,7 +231,9 @@ class _HomeLayout extends StatelessWidget {
                 rise(
                   3,
                   Text(
-                    'Snowballs & water balloons',
+                    Season.choosable
+                        ? 'Snowballs & water balloons'
+                        : 'Backyard snowball fights',
                     style: BarrageType.heading.copyWith(
                       fontSize: compact ? 15 : (wide ? 22 : 18),
                       fontWeight: FontWeight.w500,
@@ -240,7 +245,8 @@ class _HomeLayout extends StatelessWidget {
                 rise(
                   4,
                   _CampaignBest(
-                    wave: profile.campaign.bestWave,
+                    wallet: profile.campaign,
+                    difficulty: difficulty,
                     compact: compact,
                   ),
                 ),
@@ -262,6 +268,7 @@ class _HomeLayout extends StatelessWidget {
               _ModeCard(
                 mode: mode,
                 wallet: profile.wallet(mode),
+                difficulty: difficulty,
                 primary: mode == PlayMode.arcade,
                 compact: compact,
                 wide: wide,
@@ -384,15 +391,17 @@ class _Dot extends StatelessWidget {
   }
 }
 
-class _SeasonBar extends StatelessWidget {
-  const _SeasonBar({
-    required this.season,
+/// Difficulty pills, plus a one-line summary of the picked mode when there
+/// is room. The summary also tells the player what changed on a switch.
+class _DifficultyBar extends StatelessWidget {
+  const _DifficultyBar({
+    required this.value,
     required this.onChanged,
     required this.compact,
   });
 
-  final Season season;
-  final ValueChanged<Season> onChanged;
+  final Difficulty value;
+  final ValueChanged<Difficulty> onChanged;
   final bool compact;
 
   @override
@@ -401,33 +410,51 @@ class _SeasonBar extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SeasonToggle(season: season, onChanged: onChanged, compact: compact),
-        SizedBox(width: tokens.space.sm),
-        TagPill(
-          child: Text(
-            '${season.label} yard',
-            key: const Key('season-label'),
-            style: BarrageType.body.copyWith(
-              fontSize: compact ? 13 : 14,
-              fontWeight: FontWeight.w600,
-              color: tokens.inkMuted,
+        DifficultyPicker(value: value, onChanged: onChanged, compact: compact),
+        if (!compact) ...[
+          SizedBox(width: tokens.space.sm),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 260),
+            child: MotionSwitcher(
+              child: Text(
+                value.summary,
+                key: ValueKey('difficulty-summary-${value.name}'),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: BarrageType.muted.copyWith(
+                  fontSize: 13,
+                  color: tokens.inkMuted,
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
 }
 
+/// Campaign best wave on each difficulty. The picked difficulty is large
+/// and blue; the others show beside it, small and grey, only once they
+/// have a cleared wave.
 class _CampaignBest extends StatelessWidget {
-  const _CampaignBest({required this.wave, required this.compact});
+  const _CampaignBest({
+    required this.wallet,
+    required this.difficulty,
+    required this.compact,
+  });
 
-  final int wave;
+  final MetaState wallet;
+  final Difficulty difficulty;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
+    final shown = [
+      for (final mode in Difficulty.values)
+        if (mode == difficulty || wallet.bestWaveFor(mode) > 0) mode,
+    ];
     return DecoratedBox(
       decoration: BoxDecoration(
         color: tokens.surface.withValues(alpha: 0.92),
@@ -470,14 +497,21 @@ class _CampaignBest extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: BarrageType.overline,
                   ),
-                  Text(
-                    '$wave',
-                    key: const Key('campaign-best-wave'),
-                    style: BarrageType.display.copyWith(
-                      color: tokens.primaryDeep,
-                      fontSize: compact ? 30 : 38,
-                      height: 1,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      for (final mode in shown) ...[
+                        if (mode != shown.first)
+                          SizedBox(width: tokens.space.md),
+                        _BestEntry(
+                          mode: mode,
+                          wave: wallet.bestWaveFor(mode),
+                          current: mode == difficulty,
+                          compact: compact,
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
@@ -489,12 +523,75 @@ class _CampaignBest extends StatelessWidget {
   }
 }
 
+class _BestEntry extends StatelessWidget {
+  const _BestEntry({
+    required this.mode,
+    required this.wave,
+    required this.current,
+    required this.compact,
+  });
+
+  final Difficulty mode;
+  final int wave;
+  final bool current;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final motion = context.motion;
+    final big = compact ? 30.0 : 38.0;
+    final small = compact ? 18.0 : 22.0;
+    return Column(
+      key: Key('campaign-best-${mode.name}'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedDefaultTextStyle(
+          duration: motion.medium,
+          curve: motion.enter,
+          style: BarrageType.display.copyWith(
+            color: current ? tokens.primaryDeep : tokens.inkMuted,
+            fontSize: current ? big : small,
+            height: 1,
+          ),
+          child: Text(
+            '$wave',
+            key: current ? const Key('campaign-best-wave') : null,
+          ),
+        ),
+        SizedBox(height: tokens.space.xs / 2),
+        AnimatedContainer(
+          duration: motion.medium,
+          curve: motion.enter,
+          padding: EdgeInsets.symmetric(
+            horizontal: tokens.space.xs + 2,
+            vertical: 1,
+          ),
+          decoration: BoxDecoration(
+            color: current ? tokens.primary : const Color(0x00000000),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            mode.label.toUpperCase(),
+            style: BarrageType.overline.copyWith(
+              fontSize: 10,
+              color: current ? tokens.onPrimary : tokens.inkMuted,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Big tappable play card for one [PlayMode]. Arcade is the blue primary;
 /// Campaign is the cream secondary with a blue Play pill.
 class _ModeCard extends StatelessWidget {
   const _ModeCard({
     required this.mode,
     required this.wallet,
+    required this.difficulty,
     required this.primary,
     required this.compact,
     required this.wide,
@@ -503,6 +600,7 @@ class _ModeCard extends StatelessWidget {
 
   final PlayMode mode;
   final MetaState wallet;
+  final Difficulty difficulty;
   final bool primary;
   final bool compact;
   final bool wide;
@@ -619,7 +717,9 @@ class _ModeCard extends StatelessWidget {
                     ),
                     SizedBox(height: tokens.space.xs),
                     Text(
-                      '${wallet.coins} coins · best wave ${wallet.bestWave}',
+                      // The lit difficulty pill says which mode this is.
+                      '${wallet.coins} coins · best wave '
+                      '${wallet.bestWaveFor(difficulty)}',
                       key: Key('${mode.name}-wallet'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

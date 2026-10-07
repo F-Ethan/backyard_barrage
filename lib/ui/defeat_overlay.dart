@@ -30,6 +30,7 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
   Widget build(BuildContext context) {
     final game = widget.game;
     final meta = game.meta;
+    final difficulty = game.feel.settings.difficulty;
     final cleared = game.wave - 1;
     final tokens = context.tokens;
     return ModalShell(
@@ -66,12 +67,17 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                   runSpacing: tokens.space.sm,
                   children: [
                     _Stat(label: 'CLEARED', value: '$cleared'),
-                    _Stat(label: 'BEST', value: '${meta.bestWave}'),
+                    _Stat(
+                      label: '${difficulty.label.toUpperCase()} BEST',
+                      value: '${meta.bestWaveFor(difficulty)}',
+                    ),
                     TagPill(child: CoinAmount(amount: meta.coins)),
                   ],
                 ),
-                SizedBox(height: tokens.space.md),
-                SeasonToggle(season: meta.season, onChanged: _setSeason),
+                if (Season.choosable) ...[
+                  SizedBox(height: tokens.space.md),
+                  SeasonToggle(season: meta.season, onChanged: _setSeason),
+                ],
                 SizedBox(height: tokens.space.lg),
                 Wrap(
                   alignment: WrapAlignment.center,

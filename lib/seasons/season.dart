@@ -8,6 +8,17 @@ enum Season {
     Season.summer => 'Summer',
   };
 
+  /// Seasons the player can pick. Summer is off until its art is redone to
+  /// match winter; flip it back on here and the toggles return.
+  static const List<Season> playable = [Season.winter];
+
+  /// Whether the player gets a season choice at all.
+  static bool get choosable => playable.length > 1;
+
+  /// This season if it is playable, otherwise the first playable one. Old
+  /// saves on a switched-off season load into this.
+  Season get orPlayable => playable.contains(this) ? this : playable.first;
+
   static Season? tryParse(String? name) {
     for (final season in Season.values) {
       if (season.name == name) return season;

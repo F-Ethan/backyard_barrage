@@ -26,6 +26,8 @@ Playable MVP loop on the gameplay branch:
 
 Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you notice something you are not fixing in the current PR. Remove or rewrite a row when it is actually fixed.
 
+- **Summer is switched off.** `Season.playable` is winter-only until summer art matches the 3D winter pack. Saves on summer load as winter. Summer assets, `SeasonToggle`, and the summer kit load in the game are kept so adding `Season.summer` back to `Season.playable` restores the toggles. The store one-liner and README still mention water balloons.
+- **Old best waves count as Normal.** Saves from before per-difficulty bests had one best wave per mode with no difficulty recorded; it loads as the Normal record.
 - **Player winter has no 3D idle, walk, throw, hit, or KO frames.** Every player-winter pose now uses the 3D pack (shared crop so the boots sit on the anchor), and the non-aim poses reuse the sheet charge. Walk does not animate, throw has no follow-through frame, and KO tips the upright frame onto its back. `~/Downloads/windup.png` (owner-supplied, Oct 2026) was not used: it is a different kid (blond, no snowflake hat) and has an opaque white background. Replace when the art redesign lands.
 - **3D left-pointing frames are mirrored.** `turn_30l`, `turn_15l`, and the sheet charge point at the player's own fort, so they draw flipped. The hat snowflake and throwing hand swap sides on those three frames. Regenerated art should face right natively.
 - **3D hero still is not the aim-strip face.** `player_charge_winter_3d_v1.png` stays out of the yaw strip until Art regenerates the turns to that face. The in-game 0° frame is `player_charge_winter_3d_from_sheet.png`.

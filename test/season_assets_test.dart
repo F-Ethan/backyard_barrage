@@ -34,14 +34,50 @@ void main() {
     }
   });
 
-  test('player winter throw stays on the 2D draft', () {
+  test('every player winter pose is 3D art, never a 2D draft', () {
+    for (final pose in SeasonAssets.poseNames) {
+      final path = SeasonAssets.pose(
+        player: true,
+        season: Season.winter,
+        pose: pose,
+      );
+      expect(path, contains('_3d_'), reason: pose);
+      expect(SeasonAssets.crop(path), isNotNull, reason: pose);
+    }
+    expect(SeasonAssets.uprightKo(player: true, season: Season.winter), isTrue);
+  });
+
+  test('left-pointing 3D frames mirror so the player faces the rivals', () {
+    String path(String pose) =>
+        SeasonAssets.pose(player: true, season: Season.winter, pose: pose);
+    for (final pose in ['turn_30l', 'turn_15l', 'charge', 'idle', 'throw']) {
+      expect(SeasonAssets.mirror(path(pose)), isTrue, reason: pose);
+    }
+    for (final pose in ['turn_15r', 'turn_30r']) {
+      expect(SeasonAssets.mirror(path(pose)), isFalse, reason: pose);
+    }
     expect(
-      SeasonAssets.pose(player: true, season: Season.winter, pose: 'throw'),
-      'characters/player/player_throw_winter_draft.png',
+      SeasonAssets.mirror(
+        SeasonAssets.pose(player: false, season: Season.winter, pose: 'idle'),
+      ),
+      isFalse,
+    );
+  });
+
+  test('2D drafts use the whole image and their own KO frame', () {
+    final draft = SeasonAssets.pose(
+      player: false,
+      season: Season.winter,
+      pose: 'idle',
+    );
+    expect(SeasonAssets.crop(draft), isNull);
+    expect(
+      SeasonAssets.uprightKo(player: false, season: Season.winter),
+      isFalse,
     );
     expect(
-      SeasonAssets.pose(player: true, season: Season.winter, pose: 'idle'),
-      'characters/player/player_idle_winter_draft.png',
+      SeasonAssets.uprightKo(player: true, season: Season.summer),
+      isFalse,
     );
   });
 

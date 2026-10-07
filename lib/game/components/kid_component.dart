@@ -23,6 +23,7 @@ class KidPoseSprites {
     required this.turn15l,
     required this.turn15r,
     required this.turn30r,
+    this.uprightKo = false,
   });
 
   Sprite idle;
@@ -36,6 +37,9 @@ class KidPoseSprites {
   Sprite turn15l;
   Sprite turn15r;
   Sprite turn30r;
+
+  /// No lying-down KO frame (the 3D pack). The upright pose tips over.
+  bool uprightKo;
 }
 
 /// Kid sprite with idle / walk / charge / throw / hit / KO poses.
@@ -58,6 +62,7 @@ class KidComponent extends SpriteComponent {
        turn15lSprite = poses.turn15l,
        turn15rSprite = poses.turn15r,
        turn30rSprite = poses.turn30r,
+       _uprightKo = poses.uprightKo,
        super(
          sprite: poses.idle,
          position: position,
@@ -79,6 +84,7 @@ class KidComponent extends SpriteComponent {
   Sprite turn15lSprite;
   Sprite turn15rSprite;
   Sprite turn30rSprite;
+  bool _uprightKo;
   final int maxHp;
   int hp;
 
@@ -168,6 +174,7 @@ class KidComponent extends SpriteComponent {
     turn15lSprite = poses.turn15l;
     turn15rSprite = poses.turn15r;
     turn30rSprite = poses.turn30r;
+    _uprightKo = poses.uprightKo;
     _refreshSprite();
   }
 
@@ -410,6 +417,10 @@ class KidComponent extends SpriteComponent {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
       canvas.drawCircle(Offset(size.x / 2, size.y * 0.58), size.x * 0.46, glow);
     }
+    if (isKo && _uprightKo) {
+      _renderTippedOver(canvas);
+      return;
+    }
     canvas.save();
     if (isKo) {
       canvas.translate(0, 40);
@@ -442,8 +453,25 @@ class KidComponent extends SpriteComponent {
     );
   }
 
-  void _drawKnockoutMark(Canvas canvas) {
-    final center = Offset(size.x / 2, size.y * 0.32);
+  /// Upright art laid on its back, pivoting on the boots, so a KO reads
+  /// without a separate lying-down frame.
+  void _renderTippedOver(Canvas canvas) {
+    final lean = side == KidSide.player ? -1.0 : 1.0;
+    canvas.save();
+    canvas.translate(size.x / 2, size.y);
+    canvas.rotate(lean * 1.35);
+    canvas.translate(-size.x / 2, -size.y);
+    super.render(canvas);
+    canvas.restore();
+    _drawKnockoutMark(
+      canvas,
+      center: Offset(size.x / 2 + lean * size.y * 0.55, size.y * 0.72),
+    );
+  }
+
+  void _drawKnockoutMark(Canvas canvas, {Offset? center}) {
+    final upright = center == null;
+    center ??= Offset(size.x / 2, size.y * 0.32);
     canvas.drawCircle(center, 30, Paint()..color = const Color(0xF2FFF8F0));
     canvas.drawCircle(
       center,
@@ -468,7 +496,7 @@ class KidComponent extends SpriteComponent {
       center.translate(-arm, arm),
       mark,
     );
-    _drawSwirl(canvas, Offset(size.x / 2, size.y * 0.08));
+    if (upright) _drawSwirl(canvas, Offset(size.x / 2, size.y * 0.08));
   }
 
   void _drawDizzy(Canvas canvas) {

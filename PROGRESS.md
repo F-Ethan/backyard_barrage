@@ -1,6 +1,6 @@
 # Backyard Barrage progress
 
-Flutter + Flame landscape arena game (winter snowballs / summer water balloons), publisher GameLogic / Ethan. Version `0.1.0+8`. This file tracks leftovers so agents do not drop them.
+Flutter + Flame landscape arena game (winter snowballs / summer water balloons), publisher GameLogic / Ethan. Version `0.1.0+9`. This file tracks leftovers so agents do not drop them.
 
 ## Shipped
 
@@ -26,7 +26,7 @@ Playable MVP loop on the gameplay branch:
 
 Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you notice something you are not fixing in the current PR. Remove or rewrite a row when it is actually fixed.
 
-- **Mild turn-yaw regenerator is not in the repo.** `docs/TURN_YAWS.md` names `scripts/generate_turn_yaws.py`. Studio delivered the sixteen drafts and `turn_yaw_sheet_mild.png`. The pose scripts do not redraw those yaws.
+- **HQ turn-yaw regenerator is not in the repo.** `docs/TURN_YAWS.md` names `scripts/generate_turn_yaws.py` as the writer of the 16 turn drafts, the 4 HQ charge drafts, and `turn_yaw_sheet_hq.png`. Studio delivered those binaries. `scripts/generate_poses_polish.py` still paints `charge` and would overwrite the HQ charge drafts if re-run. The pose scripts do not redraw the yaws.
 - **Enemy fort has no HUD meter.** The enemy fort uses the stage-1 art and shows damage on the sprite. Hearts, coins, and the player fort bar are the screen-space meters.
 - **Old flightVisualY hump is still unused.** Live snowballs draw `loftAt` on the ground track (a 64px climb and drop). `flightVisualY` / `_visualHump` still peaks around 40–120px, but current lobs set `groundTrack` and do not draw that path.
 - **KO, wave-clear, and wave-intro banners still scale with the yard.** The short center banner is drawn in the 1280×720 world, so it shrinks with the letterbox. Hearts, coins, fort, wave, hint, and Pause are screen-space.

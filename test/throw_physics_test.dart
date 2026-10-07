@@ -637,32 +637,44 @@ void main() {
         );
         expect(
           ThrowPhysics.chargeYaw(ThrowPhysics.maxAimRadians),
-          ChargeYaw.back,
+          ChargeYaw.yaw30l,
         );
         expect(
-          ThrowPhysics.chargeYaw(ThrowPhysics.maxAimRadians * 0.5),
-          ChargeYaw.back,
+          ThrowPhysics.chargeYaw(ThrowPhysics.maxAimRadians * 0.6),
+          ChargeYaw.yaw30l,
         );
         expect(
-          ThrowPhysics.chargeYaw(ThrowPhysics.maxAimRadians * 0.49),
+          ThrowPhysics.chargeYaw(ThrowPhysics.maxAimRadians * 0.59),
+          ChargeYaw.yaw15l,
+        );
+        expect(
+          ThrowPhysics.chargeYaw(ThrowPhysics.maxAimRadians * 0.2),
+          ChargeYaw.yaw15l,
+        );
+        expect(
+          ThrowPhysics.chargeYaw(ThrowPhysics.maxAimRadians * 0.19),
           ChargeYaw.across,
         );
         expect(ThrowPhysics.chargeYaw(0), ChargeYaw.across);
         expect(
-          ThrowPhysics.chargeYaw(-ThrowPhysics.maxAimRadians * 0.01),
-          ChargeYaw.quarter,
+          ThrowPhysics.chargeYaw(-ThrowPhysics.maxAimRadians * 0.2),
+          ChargeYaw.across,
         );
         expect(
-          ThrowPhysics.chargeYaw(-ThrowPhysics.maxAimRadians * 0.5),
-          ChargeYaw.quarter,
+          ThrowPhysics.chargeYaw(-ThrowPhysics.maxAimRadians * 0.21),
+          ChargeYaw.yaw15r,
         );
         expect(
-          ThrowPhysics.chargeYaw(-ThrowPhysics.maxAimRadians * 0.51),
-          ChargeYaw.front,
+          ThrowPhysics.chargeYaw(-ThrowPhysics.maxAimRadians * 0.6),
+          ChargeYaw.yaw15r,
+        );
+        expect(
+          ThrowPhysics.chargeYaw(-ThrowPhysics.maxAimRadians * 0.61),
+          ChargeYaw.yaw30r,
         );
         expect(
           ThrowPhysics.chargeYaw(-ThrowPhysics.maxAimRadians),
-          ChargeYaw.front,
+          ChargeYaw.yaw30r,
         );
         final up = ThrowPhysics.planPlayerLob(
           throwerRow: 4,

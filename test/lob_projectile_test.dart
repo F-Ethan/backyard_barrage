@@ -192,9 +192,10 @@ void main() {
         hit: sprite,
         ko: sprite,
         pickup: sprite,
-        turnBack: sprite,
-        turnQuarter: sprite,
-        turnFront: sprite,
+        turn30l: sprite,
+        turn15l: sprite,
+        turn15r: sprite,
+        turn30r: sprite,
       );
       final kid = KidComponent(
         side: KidSide.player,
@@ -297,9 +298,10 @@ void main() {
       hit: sprite,
       ko: sprite,
       pickup: sprite,
-      turnBack: sprite,
-      turnQuarter: sprite,
-      turnFront: sprite,
+      turn30l: sprite,
+      turn15l: sprite,
+      turn15r: sprite,
+      turn30r: sprite,
     );
     final kid = KidComponent(
       side: KidSide.player,
@@ -372,9 +374,10 @@ void main() {
       hit: sprite,
       ko: sprite,
       pickup: sprite,
-      turnBack: sprite,
-      turnQuarter: sprite,
-      turnFront: sprite,
+      turn30l: sprite,
+      turn15l: sprite,
+      turn15r: sprite,
+      turn30r: sprite,
     );
     final kid = KidComponent(
       side: KidSide.enemy,

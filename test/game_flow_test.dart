@@ -965,6 +965,14 @@ void main() {
     final game = (await boot(tester, MetaState())).game;
     final kid = game.players.first;
     final enemy = game.enemies.first;
+    final period = ThrowPhysics.swivelPeriod;
+
+    // Hold time where sin(2π t / period) equals [sine], after the up-screen
+    // peak and before the down-screen end of the same cycle.
+    double holdForSine(double sine) {
+      final angle = math.pi - math.asin(sine);
+      return period * angle / (2 * math.pi);
+    }
 
     game.pressChargeZone();
     expect(kid.chargeYaw, ChargeYaw.across);
@@ -972,28 +980,35 @@ void main() {
     expect(kid.angle, closeTo(0, 0.001));
     expect(kid.scale.x, greaterThan(0));
 
-    game.update(ThrowPhysics.swivelPeriod / 4);
-    expect(kid.chargeYaw, ChargeYaw.back);
-    expect(kid.sprite, kid.turnBackSprite);
+    var held = 0.0;
+    void advanceTo(double t) {
+      game.update(t - held);
+      held = t;
+    }
+
+    advanceTo(period / 4);
+    expect(kid.chargeYaw, ChargeYaw.yaw30l);
+    expect(kid.sprite, kid.turn30lSprite);
     expect(kid.angle, closeTo(0, 0.001));
     expect(kid.scale.x, greaterThan(0));
 
-    game.update(ThrowPhysics.swivelPeriod / 4);
+    advanceTo(holdForSine(0.4));
+    expect(kid.chargeYaw, ChargeYaw.yaw15l);
+    expect(kid.sprite, kid.turn15lSprite);
+
+    advanceTo(period / 2);
     expect(kid.chargeYaw, ChargeYaw.across);
     expect(kid.sprite, kid.chargeSprite);
 
-    game.update(ThrowPhysics.swivelPeriod * math.asin(0.25) / (2 * math.pi));
-    expect(kid.chargeYaw, ChargeYaw.quarter);
-    expect(kid.sprite, kid.turnQuarterSprite);
+    advanceTo(holdForSine(-0.4));
+    expect(kid.chargeYaw, ChargeYaw.yaw15r);
+    expect(kid.sprite, kid.turn15rSprite);
     expect(kid.angle, closeTo(0, 0.001));
 
-    // Just past the front band. A longer jump lets a rival lob land first.
-    final held =
-        ThrowPhysics.swivelPeriod * (0.5 + math.asin(0.25) / (2 * math.pi));
-    game.update(ThrowPhysics.swivelPeriod * 0.60 - held);
+    advanceTo(holdForSine(-0.8));
     expect(game.isCharging, isTrue);
-    expect(kid.chargeYaw, ChargeYaw.front);
-    expect(kid.sprite, kid.turnFrontSprite);
+    expect(kid.chargeYaw, ChargeYaw.yaw30r);
+    expect(kid.sprite, kid.turn30rSprite);
     expect(kid.angle, closeTo(0, 0.001));
     expect(kid.scale.x, greaterThan(0));
 
@@ -1304,7 +1319,10 @@ void main() {
     game.finishEntrance();
     expect(game.phase, MatchPhase.fight);
     expect(game.isCharging, isTrue);
-    expect(game.players.first.sprite, game.players.first.chargeSprite);
+    // The walk-on skip advances one 0.25s tick after the charge starts,
+    // which is already inside the 15l band.
+    expect(game.players.first.chargeYaw, ChargeYaw.yaw15l);
+    expect(game.players.first.sprite, game.players.first.turn15lSprite);
   });
 
   testWidgets('fight HUD stays screen-sized on a short phone', (tester) async {

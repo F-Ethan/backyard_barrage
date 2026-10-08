@@ -137,6 +137,9 @@ class LobProjectile extends SpriteComponent {
   bool fortDamage = false;
 
   bool _spent = false;
+
+  /// True once this shot has hit, been blocked, or landed.
+  bool get spent => _spent;
   final Set<FortComponent> _clearedForts = {};
 
   List<FortComponent> get _fortList {

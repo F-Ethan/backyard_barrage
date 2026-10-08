@@ -380,6 +380,8 @@ class BackyardBarrageGame extends FlameGame {
     if (wave <= 1) {
       fightSeconds = 0;
     }
+    _settling = false;
+    _settleTime = 0;
     _pendingBanner = _Banner.none;
     _bannerTime = 0;
     _clearBanner();
@@ -453,7 +455,7 @@ class BackyardBarrageGame extends FlameGame {
           tuning: _tuning,
           initialDelay: stagger,
           onFire: _onEnemyFire,
-          isFighting: () => phase == MatchPhase.fight,
+          isFighting: () => phase == MatchPhase.fight && !_settling,
           playerChargeSeconds: _baseChargeSeconds,
           profile: rival,
         ),
@@ -622,15 +624,44 @@ class BackyardBarrageGame extends FlameGame {
     onExitToMenu?.call();
   }
 
+  /// A side is down but snowballs are still in the air. The fight holds
+  /// until they land (their hits still count), then the result is called.
+  /// Nobody starts a new throw meanwhile.
+  bool _settling = false;
+  double _settleTime = 0;
+
+  /// Longest the result waits on in-flight shots.
+  static const double settleCapSeconds = 4;
+
+  @visibleForTesting
+  bool get settling => _settling;
+
+  bool get _shotsInFlight => world.children.whereType<LobProjectile>().any(
+    (shot) => !shot.spent && !shot.isRemoving,
+  );
+
   void resolveKnockouts() {
     if (phase != MatchPhase.fight) return;
     _payKnockouts();
     final livingPlayers = players.where((kid) => !kid.isKo).length;
     final livingEnemies = enemies.where((kid) => !kid.isKo).length;
-    switch (CombatRules.roundOutcome(
+    final outcome = CombatRules.roundOutcome(
       livingPlayers: livingPlayers,
       livingEnemies: livingEnemies,
-    )) {
+    );
+    if (outcome != RoundOutcome.ongoing &&
+        _shotsInFlight &&
+        _settleTime < settleCapSeconds) {
+      if (!_settling) {
+        _settling = true;
+        _settleTime = 0;
+        _endActiveThrow();
+      }
+      return;
+    }
+    _settling = false;
+    _settleTime = 0;
+    switch (outcome) {
       case RoundOutcome.defeat:
         _beginDefeat();
       case RoundOutcome.waveClear:
@@ -938,7 +969,7 @@ class BackyardBarrageGame extends FlameGame {
           tuning: _allyTuning,
           initialDelay: profile.throwGap((0.35 + i * 0.2).clamp(0.0, 1.0)),
           onFire: _onAllyFire,
-          isFighting: () => phase == MatchPhase.fight,
+          isFighting: () => phase == MatchPhase.fight && !_settling,
           side: KidSide.player,
           approachColumn: 1,
           isManual: () => identical(_selected, kid),
@@ -965,7 +996,7 @@ class BackyardBarrageGame extends FlameGame {
       _chargeArmed = true;
       return;
     }
-    if (phase != MatchPhase.fight || _chargeHolding) return;
+    if (phase != MatchPhase.fight || _chargeHolding || _settling) return;
     _beginHeldCharge();
   }
 
@@ -1514,6 +1545,12 @@ class BackyardBarrageGame extends FlameGame {
     super.update(dt);
     _tickEntrance(dt);
     if (phase == MatchPhase.fight) fightSeconds += dt;
+    if (_settling) {
+      _settleTime += dt;
+      if (!_shotsInFlight || _settleTime >= settleCapSeconds) {
+        resolveKnockouts();
+      }
+    }
     _tickMove(dt);
     if (_charging) {
       final kid = _selected;

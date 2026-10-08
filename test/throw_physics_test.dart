@@ -73,24 +73,28 @@ void main() {
       expect(step(1.2), closeTo(step(2.5), 1e-9));
     });
 
-    test(
-      'the aim sweep pans at a constant speed with no pause at the ends',
-      () {
-        const quarter = math.pi / 2;
-        expect(ThrowPhysics.sweepWave(0), closeTo(0, 1e-9));
-        expect(ThrowPhysics.sweepWave(quarter), closeTo(1, 1e-9));
-        expect(ThrowPhysics.sweepWave(2 * quarter), closeTo(0, 1e-9));
-        expect(ThrowPhysics.sweepWave(3 * quarter), closeTo(-1, 1e-9));
-        expect(ThrowPhysics.sweepWave(4 * quarter), closeTo(0, 1e-9));
-        // Equal phase steps move the same distance, right up to the turn.
-        const d = 0.1;
-        final mid = ThrowPhysics.sweepWave(d) - ThrowPhysics.sweepWave(0);
-        final nearEnd =
-            ThrowPhysics.sweepWave(quarter) -
-            ThrowPhysics.sweepWave(quarter - d);
-        expect(nearEnd, closeTo(mid, 1e-9));
-      },
-    );
+    test('pan limits reach the back and front lanes at the rivals', () {
+      final d = ThrowPhysics.rivalDepthX - 300;
+      final mid = Vector2(300, ArenaGrid.laneY(4));
+      final (low, high) = ThrowPhysics.sweepLimits(mid);
+      expect(high, greaterThan(0));
+      expect(low, lessThan(0));
+      expect(high, lessThanOrEqualTo(ThrowPhysics.maxAimRadians));
+      expect(-low, lessThanOrEqualTo(ThrowPhysics.maxAimRadians));
+      // Inside the cap, the up limit lands exactly on the back lane.
+      if (high < ThrowPhysics.maxAimRadians) {
+        expect(mid.y - math.tan(high) * d, closeTo(ArenaGrid.laneY(0), 0.01));
+      }
+      // A kid on the back lane cannot pan further up; on the front, down.
+      final (_, backHigh) = ThrowPhysics.sweepLimits(
+        Vector2(300, ArenaGrid.laneY(0)),
+      );
+      expect(backHigh, closeTo(0, 1e-6));
+      final (frontLow, _) = ThrowPhysics.sweepLimits(
+        Vector2(300, ArenaGrid.laneY(ArenaGrid.rows - 1)),
+      );
+      expect(frontLow, closeTo(0, 1e-6));
+    });
 
     test('preview detail drops with difficulty', () {
       expect(Difficulty.easy.aimPreview, AimPreview.full);

@@ -181,8 +181,10 @@ class BackyardBarrageGame extends FlameGame {
   double _chargeHeld = 0;
   double _swivel = 0;
 
-  /// Sweep position in radians. Advances slower while the line is on a rival.
-  double _sweepPhase = 0;
+  /// Pan angle in radians, and which way it is moving (+1 up-screen). It
+  /// bounces between [ThrowPhysics.sweepLimits].
+  double _sweepElev = 0;
+  double _sweepDir = 1;
 
   /// Sweep speed as a share of full speed. Eases toward the friction share
   /// while the line is on a rival, and back to 1 off it.
@@ -951,17 +953,19 @@ class BackyardBarrageGame extends FlameGame {
   void _onEnemyFire(
     KidComponent enemy,
     KidComponent? target,
-    double rangeScale,
-  ) {
+    double rangeScale, {
+    Vector2? aimAt,
+  }) {
     if (phase != MatchPhase.fight || enemy.isKo) return;
     feel.enemyReleased();
     final cell = ArenaGrid.nearestCell(KidSide.enemy, enemy.position);
     final targetRow = target == null
         ? cell.row
         : ArenaGrid.nearestCell(target.side, target.position).row;
-    final distance = target == null
+    final point = aimAt ?? target?.hitCenter;
+    final distance = point == null
         ? 640.0
-        : (enemy.throwOrigin.x - target.hitCenter.x).abs();
+        : (enemy.throwOrigin.x - point.x).abs();
     final lob = ThrowPhysics.planEnemyLob(
       throwerRow: cell.row,
       throwerColumn: cell.column,
@@ -971,12 +975,17 @@ class BackyardBarrageGame extends FlameGame {
       facingRight: false,
       originY: enemy.throwOrigin.y,
       trackY: enemy.hitCenter.y,
-      targetY: target?.hitCenter.y,
+      targetY: point?.y,
     );
     _spawnShot(owner: enemy, lob: lob, targets: players);
   }
 
-  void _onAllyFire(KidComponent ally, KidComponent? target, double rangeScale) {
+  void _onAllyFire(
+    KidComponent ally,
+    KidComponent? target,
+    double rangeScale, {
+    Vector2? aimAt,
+  }) {
     if (phase != MatchPhase.fight || ally.isKo || identical(ally, _selected)) {
       return;
     }
@@ -985,9 +994,10 @@ class BackyardBarrageGame extends FlameGame {
     final targetRow = target == null
         ? cell.row
         : ArenaGrid.nearestCell(target.side, target.position).row;
-    final distance = target == null
+    final point = aimAt ?? target?.hitCenter;
+    final distance = point == null
         ? 640.0
-        : (ally.throwOrigin.x - target.hitCenter.x).abs();
+        : (ally.throwOrigin.x - point.x).abs();
     final lob = ThrowPhysics.planEnemyLob(
       throwerRow: cell.row,
       throwerColumn: cell.column,
@@ -997,7 +1007,7 @@ class BackyardBarrageGame extends FlameGame {
       facingRight: true,
       originY: ally.throwOrigin.y,
       trackY: ally.hitCenter.y,
-      targetY: target?.hitCenter.y,
+      targetY: point?.y,
     );
     _spawnShot(owner: ally, lob: lob, targets: enemies);
   }
@@ -1109,7 +1119,8 @@ class BackyardBarrageGame extends FlameGame {
     _chargeHeld = 0;
     _charge = ThrowPhysics.minThrowCharge;
     _swivel = 0;
-    _sweepPhase = 0;
+    _sweepElev = 0;
+    _sweepDir = 1;
     _sweepSpeed = 1;
     _aimTarget = null;
     _moveTarget = null;
@@ -1321,6 +1332,26 @@ class BackyardBarrageGame extends FlameGame {
     );
   }
 
+  /// Moves the pan and bounces it off the limits for this kid's spot. The
+  /// overshoot reflects, so the turn is instant rather than a pause.
+  void _stepPan(KidComponent kid, double dt) {
+    final (low, high) = ThrowPhysics.sweepLimits(_trackStart(kid));
+    if (high - low < 1e-3) {
+      _sweepElev = 0;
+      return;
+    }
+    var next =
+        _sweepElev + _sweepDir * ThrowPhysics.sweepSpeed * _sweepSpeed * dt;
+    if (next > high) {
+      next = high - (next - high);
+      _sweepDir = -1;
+    } else if (next < low) {
+      next = low + (low - next);
+      _sweepDir = 1;
+    }
+    _sweepElev = next.clamp(low, high);
+  }
+
   /// Where the selected kid's track starts: in front of the hand, at body
   /// height.
   Vector2 _trackStart(KidComponent kid) =>
@@ -1519,7 +1550,8 @@ class BackyardBarrageGame extends FlameGame {
     _charge = 0;
     _chargeHeld = 0;
     _swivel = 0;
-    _sweepPhase = 0;
+    _sweepElev = 0;
+    _sweepDir = 1;
     _sweepSpeed = 1;
     _aimTarget = null;
     _moveTarget = null;
@@ -1605,28 +1637,24 @@ class BackyardBarrageGame extends FlameGame {
           phase != MatchPhase.fight) {
         _endActiveThrow();
       } else {
-        // Full on an earlier frame: the pan starts the frame after power
-        // tops out, from straight ahead.
-        final wasFull = _charge >= 1;
+        // Straight ahead while power builds. The pan starts the frame after
+        // the charge passes [ThrowPhysics.sweepStartCharge].
+        final panning = _charge >= ThrowPhysics.sweepStartCharge;
         _chargeHeld += dt;
         _charge = ThrowPhysics.chargeForHold(
           _chargeHeld,
           _playerChargeSeconds(),
         );
-        // The sweep lingers while the line crosses a rival (in reach or
-        // not), so a release on target is a fair window.
-        // Straight ahead while power builds. The pan starts only once the
-        // charge is full, so power and aim are two separate beats.
-        if (wasFull) {
+        if (panning) {
+          // The sweep lingers while the line crosses a rival (in reach or
+          // not), so a release on target is a fair window.
           final onLine = _scanAim(kid, _swivel, double.infinity).hit != null;
           final goal = onLine ? ThrowPhysics.aimFriction : 1.0;
           final blend = math.min(1.0, dt * ThrowPhysics.aimFrictionBlend);
           _sweepSpeed += (goal - _sweepSpeed) * blend;
-          _sweepPhase +=
-              dt * 2 * math.pi / ThrowPhysics.swivelPeriod * _sweepSpeed;
+          _stepPan(kid, dt);
         }
-        _swivel =
-            ThrowPhysics.sweepWave(_sweepPhase) * ThrowPhysics.maxAimRadians;
+        _swivel = _sweepElev;
         _aimDir = ThrowPhysics.aimForElevation(_swivel, facingRight: true);
         _aimTarget = _scanAim(
           kid,

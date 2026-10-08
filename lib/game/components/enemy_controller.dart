@@ -10,8 +10,15 @@ import '../rival_type.dart';
 import '../throw_physics.dart';
 import 'kid_component.dart';
 
+/// [aimAt] is the body-height point the bot locked onto when its windup
+/// began. Null throws at the target's current spot.
 typedef EnemyFire =
-    void Function(KidComponent enemy, KidComponent? target, double rangeScale);
+    void Function(
+      KidComponent enemy,
+      KidComponent? target,
+      double rangeScale, {
+      Vector2? aimAt,
+    });
 
 enum _AiPhase { wait, step, telegraph }
 
@@ -78,6 +85,10 @@ class EnemyController extends Component {
   int _retreats = 0;
   Vector2? _moveTarget;
 
+  /// Locked when the windup starts: who and where this throw goes.
+  KidComponent? _lockedTarget;
+  Vector2? _lockedAim;
+
   double get _telegraph {
     final player =
         playerChargeSeconds?.call() ?? CombatRules.playerChargeSeconds(0);
@@ -125,6 +136,7 @@ class EnemyController extends Component {
     if (_phase == _AiPhase.wait && _elapsed >= telegraphAt) {
       _phase = _AiPhase.telegraph;
       host.showChargePose();
+      _lockAim();
     }
     if (_phase == _AiPhase.telegraph && _elapsed >= _cycle) {
       _fire();
@@ -172,7 +184,7 @@ class EnemyController extends Component {
     _applyStep(next);
   }
 
-  void _fire() {
+  KidComponent? _pickTarget() {
     final cell = ArenaGrid.nearestCell(side, host.position);
     final rows = [
       for (final kid in players)
@@ -180,7 +192,39 @@ class EnemyController extends Component {
     ];
     final living = [for (final kid in players) !kid.isKo];
     final index = EnemyAi.pickLaneTarget(living, rows, cell.row, rng);
-    final target = index == null ? null : players[index];
+    return index == null ? null : players[index];
+  }
+
+  /// Pick the target and aim point as the windup starts. The point is where
+  /// the target stands now, off by the difficulty's depth error, so a kid
+  /// who moves during the windup can step out of the throw.
+  void _lockAim() {
+    final target = _pickTarget();
+    _lockedTarget = target;
+    if (target == null) {
+      _lockedAim = null;
+      return;
+    }
+    final spread =
+        tuning().aimDepthRows *
+        profile.jitterScale *
+        (aimJitterScale?.call() ?? 1) *
+        ArenaGrid.rowStep;
+    // Center-weighted: the sum of two uniforms.
+    final error = (rng.nextDouble() + rng.nextDouble() - 1) * spread;
+    _lockedAim = target.hitCenter + Vector2(0, error);
+  }
+
+  void _fire() {
+    var target = _lockedTarget;
+    var aim = _lockedAim;
+    if (target == null || target.isKo) {
+      // The locked kid went down during the windup; throw at someone else.
+      target = _pickTarget();
+      aim = target?.hitCenter.clone();
+    }
+    _lockedTarget = null;
+    _lockedAim = null;
     final jitter =
         CombatRules.enemyAimJitterRadians(currentWave?.call() ?? wave) *
         (aimJitterScale?.call() ?? 1) *
@@ -195,7 +239,7 @@ class EnemyController extends Component {
       );
     }
     host.showThrowPose();
-    onFire(host, target, scatter);
+    onFire(host, target, scatter, aimAt: aim);
     _throws += 1;
     _beginCycle(shotFellShort: fellShort);
   }

@@ -56,6 +56,7 @@ class DifficultyTuning {
     required this.enemyHitsToKo,
     this.chargeScale = 1,
     this.paceScale = 1,
+    this.aimDepthRows = 0.6,
   });
 
   /// Seconds from one enemy throw to the next.
@@ -81,6 +82,11 @@ class DifficultyTuning {
   /// Hard is below 1 and still follows the player's hold a little: about
   /// 0.45s at rank 0, down to the 0.3s floor as throw rank rises.
   final double chargeVersusPlayer;
+
+  /// Bots lock their aim when the windup starts, a little off in depth: up
+  /// to this many rows either way (center-weighted). A kid who moves after
+  /// the lock can dodge. Easy 0.9, Normal 0.6, Hard 0.35.
+  final double aimDepthRows;
 
   /// Extra multiplier on the windup. Teammate charge nodes use this so they
   /// shorten the Easy hold without falling into Hard's short window.
@@ -147,6 +153,7 @@ class DifficultyTuning {
       enemyHitsToKo: enemyHitsToKo,
       chargeScale: this.chargeScale * chargeScale,
       paceScale: paceScale,
+      aimDepthRows: aimDepthRows,
     );
   }
 
@@ -171,6 +178,7 @@ class DifficultyTuning {
       enemyHitsToKo: enemyHitsToKo + plan.bonusHp,
       chargeScale: chargeScale,
       paceScale: paceScale * pace,
+      aimDepthRows: aimDepthRows,
     );
   }
 
@@ -200,6 +208,7 @@ class DifficultyTuning {
           playerChargeTimeScale: 0.5,
           allyStunScale: 0.5,
           enemyHitsToKo: 1,
+          aimDepthRows: 0.9,
         );
       case Difficulty.hard:
         final max = (1.5 - steps * 0.025).clamp(1.08, 1.5).toDouble();
@@ -214,6 +223,7 @@ class DifficultyTuning {
           playerChargeTimeScale: 1,
           allyStunScale: 1,
           enemyHitsToKo: 3,
+          aimDepthRows: 0.35,
         );
       case Difficulty.normal:
         // The cycle is at least one full player charge, so Normal bots

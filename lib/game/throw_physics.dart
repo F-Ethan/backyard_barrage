@@ -246,16 +246,31 @@ class ThrowPhysics {
     return minThrowCharge + (1 - minThrowCharge) * u;
   }
 
-  /// Aim sweep position in [-1, 1] for a [phase] in radians (2π per full
-  /// back-and-forth). A triangle wave: constant speed, so the pan never
-  /// eases to a stop at the ends. Phase 0 is straight across, heading
-  /// up-screen first.
-  static double sweepWave(double phase) {
-    var t = (phase / (2 * math.pi)) % 1.0;
-    if (t < 0) t += 1;
-    if (t < 0.25) return 4 * t;
-    if (t < 0.75) return 2 - 4 * t;
-    return 4 * t - 4;
+  /// Charge at which the pan starts: just before power tops out, so the
+  /// start is gentle but the aim is live by the time the bar is full.
+  static const double sweepStartCharge = 0.85;
+
+  /// Pan speed in radians per second: the same average as one
+  /// [swivelPeriod] back-and-forth across ±[maxAimRadians].
+  static double get sweepSpeed => 4 * maxAimRadians / swivelPeriod;
+
+  /// X of the middle of the rival half, where the pan limits are measured.
+  static double get rivalDepthX =>
+      (ArenaGrid.enemyLeft + ArenaGrid.enemyRight) / 2;
+
+  /// Lowest and highest pan angle for a track starting at [start]: the
+  /// angles that reach the front and back lanes at the rivals' distance,
+  /// inside ±[maxAimRadians]. The pan turns around there, so it never
+  /// presses against the yard edge and appears to stall.
+  static (double, double) sweepLimits(Vector2 start) {
+    final d = math.max(200.0, rivalDepthX - start.x);
+    final up = math
+        .atan((start.y - ArenaGrid.laneY(0)) / d)
+        .clamp(0.0, maxAimRadians);
+    final down = math
+        .atan((ArenaGrid.laneY(ArenaGrid.rows - 1) - start.y) / d)
+        .clamp(0.0, maxAimRadians);
+    return (-down, up);
   }
 
   /// How quickly the sweep speed blends into and out of [aimFriction], per

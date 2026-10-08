@@ -1292,18 +1292,98 @@ void main() {
   /// Hold the charge until power is full. The aim pans only after this,
   /// starting straight ahead on the next frame.
   void holdToFull(BackyardBarrageGame game) {
-    for (var i = 0; i < 400 && game.charge < 1; i++) {
+    for (
+      var i = 0;
+      i < 400 && game.charge < ThrowPhysics.sweepStartCharge;
+      i++
+    ) {
       game.update(0.02);
     }
-    expect(game.charge, 1);
+    expect(game.charge, greaterThanOrEqualTo(ThrowPhysics.sweepStartCharge));
     expect(
       ThrowPhysics.aimElevation(game.chargeHud.aimDir, facingRight: true),
       0,
-      reason: 'straight ahead until full power',
+      reason: 'straight ahead until the pan starts',
     );
   }
 
-  testWidgets('below full power the kid throws straight ahead', (tester) async {
+  testWidgets('the pan turns around at the yard edge without stalling', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    freezeRivals(game);
+    for (final e in game.enemies) {
+      e.position = Vector2(40, e.position.y); // keep friction out of it
+    }
+    final kid = game.players.first;
+    game.pressMoveZone(kid.hitCenter);
+    game.releaseMoveZone();
+    game.pressChargeZone();
+    holdToFull(game);
+    final (low, high) = ThrowPhysics.sweepLimits(
+      Vector2(kid.throwOrigin.x, kid.hitCenter.y),
+    );
+    double elevation() =>
+        ThrowPhysics.aimElevation(game.chargeHud.aimDir, facingRight: true);
+    var last = elevation();
+    var turns = 0;
+    var direction = 0.0;
+    for (var i = 0; i < 500; i++) {
+      game.update(1 / 60);
+      final now = elevation();
+      expect(now, inInclusiveRange(low - 1e-6, high + 1e-6));
+      expect((now - last).abs(), greaterThan(1e-6), reason: 'never sits still');
+      final d = (now - last).sign;
+      if (direction != 0 && d != direction) turns++;
+      direction = d;
+      last = now;
+    }
+    expect(turns, greaterThanOrEqualTo(2));
+    // At the rivals' distance the limits land on the back and front lanes.
+    final d = ThrowPhysics.rivalDepthX - kid.throwOrigin.x;
+    final topY = kid.hitCenter.y - math.tan(high) * d;
+    expect(topY, greaterThanOrEqualTo(ArenaGrid.laneY(0) - 1));
+  });
+
+  testWidgets('a rival throws at where you were when its windup began', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    final kid = game.players.first;
+    final rival = game.enemies.first;
+    for (var i = 0; i < 900 && rival.sprite != rival.chargeSprite; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(rival.sprite, rival.chargeSprite, reason: 'windup started');
+    final lockedY = kid.hitCenter.y;
+    // Step three rows away during the windup.
+    final dodge = ArenaGrid.rowStep * 3;
+    kid.position =
+        kid.position + Vector2(0, kid.position.y < 560 ? dodge : -dodge);
+    kid.syncDepth();
+    LobProjectile? shot;
+    for (var i = 0; i < 300 && shot == null; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      for (final s in game.world.children.whereType<LobProjectile>()) {
+        if (identical(s.owner, rival)) shot = s;
+      }
+    }
+    expect(shot, isNotNull);
+    final along = (shot!.originX - kid.hitCenter.x) / shot.flightRange;
+    final yAtKid = shot.originY + (shot.landingY - shot.originY) * along;
+    final spread =
+        DifficultyTuning.of(Difficulty.normal).aimDepthRows * ArenaGrid.rowStep;
+    expect((yAtKid - lockedY).abs(), lessThanOrEqualTo(spread + 1));
+    expect(
+      (yAtKid - kid.hitCenter.y).abs(),
+      greaterThan(ArenaGrid.rowStep * ThrowPhysics.depthWindowFraction),
+      reason: 'the dodge works',
+    );
+  });
+
+  testWidgets('below the pan start the kid throws straight ahead', (
+    tester,
+  ) async {
     final game = (await boot(tester, MetaState())).game;
     freezeRivals(game);
     final kid = game.players.first;
@@ -1356,9 +1436,7 @@ void main() {
     final kid = game.players.first;
     final rival = game.enemies.first;
     const step = 0.1;
-    final free = ThrowPhysics.sweepWave(
-      2 * math.pi * step / ThrowPhysics.swivelPeriod,
-    );
+    final free = ThrowPhysics.sweepSpeed * step / ThrowPhysics.maxAimRadians;
 
     // Off the line: the sweep moves at full speed.
     rival.position = Vector2(1000, kid.position.y + ArenaGrid.rowStep * 3);
@@ -1581,12 +1659,6 @@ void main() {
     final game = (await boot(tester, MetaState())).game;
     final kid = game.players.first;
     final enemy = game.enemies.first;
-    final period = ThrowPhysics.swivelPeriod;
-
-    // Hold time where the triangle sweep equals [sine], after the up-screen
-    // peak and before the down-screen end of the same cycle.
-    double holdForSine(double sine) => period * (2 - sine) / 4;
-
     // Park the rival behind the thrower so the aim line never crosses it
     // and the sweep keeps full speed (no friction) for exact timing.
     freezeRivals(game);
@@ -1600,38 +1672,32 @@ void main() {
     holdToFull(game);
     expect(kid.chargeYaw, ChargeYaw.across);
 
-    // Sweep time from full power.
-    var held = 0.0;
-    void advanceTo(double t) {
-      game.update(t - held);
-      held = t;
+    // Follow the pan for a full there-and-back and record each pose change.
+    final seen = <ChargeYaw>[kid.chargeYaw];
+    for (var i = 0; i < 400; i++) {
+      game.update(1 / 60);
+      if (kid.chargeYaw != seen.last) seen.add(kid.chargeYaw);
+      expect(kid.sprite, switch (kid.chargeYaw) {
+        ChargeYaw.yaw30l => kid.turn30lSprite,
+        ChargeYaw.yaw15l => kid.turn15lSprite,
+        ChargeYaw.across => kid.chargeSprite,
+        ChargeYaw.yaw15r => kid.turn15rSprite,
+        ChargeYaw.yaw30r => kid.turn30rSprite,
+      });
+      expect(kid.angle, closeTo(0, 0.001));
+      expect(kid.scale.x, greaterThan(0));
     }
-
-    advanceTo(period / 4);
-    expect(kid.chargeYaw, ChargeYaw.yaw30l);
-    expect(kid.sprite, kid.turn30lSprite);
-    expect(kid.angle, closeTo(0, 0.001));
-    expect(kid.scale.x, greaterThan(0));
-
-    advanceTo(holdForSine(0.4));
-    expect(kid.chargeYaw, ChargeYaw.yaw15l);
-    expect(kid.sprite, kid.turn15lSprite);
-
-    advanceTo(period / 2);
-    expect(kid.chargeYaw, ChargeYaw.across);
-    expect(kid.sprite, kid.chargeSprite);
-
-    advanceTo(holdForSine(-0.4));
-    expect(kid.chargeYaw, ChargeYaw.yaw15r);
-    expect(kid.sprite, kid.turn15rSprite);
-    expect(kid.angle, closeTo(0, 0.001));
-
-    advanceTo(holdForSine(-0.8));
     expect(game.isCharging, isTrue);
-    expect(kid.chargeYaw, ChargeYaw.yaw30r);
-    expect(kid.sprite, kid.turn30rSprite);
-    expect(kid.angle, closeTo(0, 0.001));
-    expect(kid.scale.x, greaterThan(0));
+    // Up-screen first, straight back down through center, then down-screen.
+    expect(seen.take(7), [
+      ChargeYaw.across,
+      ChargeYaw.yaw15l,
+      ChargeYaw.yaw30l,
+      ChargeYaw.yaw15l,
+      ChargeYaw.across,
+      ChargeYaw.yaw15r,
+      ChargeYaw.yaw30r,
+    ]);
 
     // Rivals keep their own art. The sweep does not mirror either side.
     expect(enemy.scale.x, greaterThan(0));

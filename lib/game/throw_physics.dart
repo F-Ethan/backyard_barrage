@@ -258,6 +258,33 @@ class ThrowPhysics {
     return 4 * t - 4;
   }
 
+  /// Charge at which the pan starts: just before power tops out, so the
+  /// start is gentle but the aim is live by the time the bar is full.
+  static const double sweepStartCharge = 0.85;
+
+  /// Pan speed in radians per second: the same average as one
+  /// [swivelPeriod] back-and-forth across ±[maxAimRadians].
+  static double get sweepSpeed => 4 * maxAimRadians / swivelPeriod;
+
+  /// X of the middle of the rival half, where the pan limits are measured.
+  static double get rivalDepthX =>
+      (ArenaGrid.enemyLeft + ArenaGrid.enemyRight) / 2;
+
+  /// Lowest and highest pan angle for a track starting at [start]: the
+  /// angles that reach the front and back lanes at the rivals' distance,
+  /// inside ±[maxAimRadians]. The pan turns around there, so it never
+  /// presses against the yard edge and appears to stall.
+  static (double, double) sweepLimits(Vector2 start) {
+    final d = math.max(200.0, rivalDepthX - start.x);
+    final up = math
+        .atan((start.y - ArenaGrid.laneY(0)) / d)
+        .clamp(0.0, maxAimRadians);
+    final down = math
+        .atan((ArenaGrid.laneY(ArenaGrid.rows - 1) - start.y) / d)
+        .clamp(0.0, maxAimRadians);
+    return (-down, up);
+  }
+
   /// How quickly the sweep speed blends into and out of [aimFriction], per
   /// second. The pan slows smoothly on a rival instead of snapping.
   static const double aimFrictionBlend = 10;

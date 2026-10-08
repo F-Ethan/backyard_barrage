@@ -49,10 +49,11 @@ class _ShopOverlayState extends State<ShopOverlay> {
   int _purchaseSerial = 0;
 
   Future<void> _buy(SkillNode node) async {
+    final cost = widget.game.meta.costOf(node.id);
     if (!widget.game.meta.buy(node.id)) return;
     widget.game.feel.purchased();
     setState(() {
-      _lastPurchase = _Purchase(node.id, node.cost, ++_purchaseSerial);
+      _lastPurchase = _Purchase(node.id, cost, ++_purchaseSerial);
     });
     await widget.game.persist();
   }
@@ -64,10 +65,11 @@ class _ShopOverlayState extends State<ShopOverlay> {
   }
 
   Future<void> _buyItem(PowerUp item) async {
+    final cost = widget.game.meta.itemCost(item);
     if (!widget.game.meta.buyItem(item)) return;
     widget.game.feel.purchased();
     setState(() {
-      _lastPurchase = _Purchase(item.name, item.cost, ++_purchaseSerial);
+      _lastPurchase = _Purchase(item.name, cost, ++_purchaseSerial);
     });
     await widget.game.persist();
   }
@@ -84,8 +86,9 @@ class _ShopOverlayState extends State<ShopOverlay> {
     setState(() {
       _items = false;
       _group = group;
-      if (!group.branches.contains(_branch)) {
-        _branch = group.branches.first;
+      final shown = _shownBranches(group);
+      if (!shown.contains(_branch)) {
+        _branch = shown.first;
       }
     });
   }
@@ -96,13 +99,39 @@ class _ShopOverlayState extends State<ShopOverlay> {
     setState(() => _branch = branch);
   }
 
+  /// Branches in [group] with something this difficulty can buy. Easy
+  /// hides Recovery: it already heals everyone between waves.
+  List<SkillBranch> _shownBranches(SkillGroup group) => [
+    for (final branch in group.branches)
+      if (!SkillTree.chain(
+        branch,
+      ).every((node) => widget.game.meta.hidesNode(node.id)))
+        branch,
+  ];
+
+  /// The ranks worth showing: the last one owned, then the next few.
+  /// A long chain does not list every rank.
+  static const int _ranksAhead = 3;
+
   @override
   Widget build(BuildContext context) {
     final game = widget.game;
     final meta = game.meta;
     final fromDefeat = game.shoppingFromDefeat;
     final tokens = context.tokens;
-    final chain = SkillTree.chain(_branch);
+    final full = [
+      for (final node in SkillTree.chain(_branch))
+        if (!meta.hidesNode(node.id)) node,
+    ];
+    final next = full.indexWhere((node) => !meta.owns(node.id));
+    final from = next < 0
+        ? math.max(0, full.length - 1)
+        : math.max(0, next - 1);
+    final to = next < 0
+        ? full.length
+        : math.min(full.length, next + _ranksAhead);
+    final chain = full.sublist(from, to);
+    final hiddenOwned = from;
     return ModalShell(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1040),
@@ -160,7 +189,7 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                         child: MotionSwitcher(
                                           child: _BranchList(
                                             key: ValueKey(_group),
-                                            group: _group,
+                                            branches: _shownBranches(_group),
                                             selected: _branch,
                                             onSelect: _selectBranch,
                                           ),
@@ -181,7 +210,9 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                                 style: BarrageType.heading,
                                               ),
                                               Text(
-                                                'Each rank unlocks the next.',
+                                                hiddenOwned > 0
+                                                    ? 'Ranks 1–$hiddenOwned owned. Each rank unlocks the next.'
+                                                    : 'Each rank unlocks the next.',
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: BarrageType.muted,
@@ -194,6 +225,9 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                               )
                                                 _NodeRow(
                                                   node: chain[i],
+                                                  cost: meta.costOf(
+                                                    chain[i].id,
+                                                  ),
                                                   owned: meta.owns(chain[i].id),
                                                   lockReason: meta.lockReason(
                                                     chain[i].id,
@@ -202,7 +236,8 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                                     chain[i].id,
                                                   ),
                                                   continues:
-                                                      i < chain.length - 1,
+                                                      from + i <
+                                                      full.length - 1,
                                                   feel: game.feel,
                                                   celebrate:
                                                       _lastPurchase?.id ==
@@ -454,12 +489,12 @@ class _GroupTabs extends StatelessWidget {
 class _BranchList extends StatelessWidget {
   const _BranchList({
     super.key,
-    required this.group,
+    required this.branches,
     required this.selected,
     required this.onSelect,
   });
 
-  final SkillGroup group;
+  final List<SkillBranch> branches;
   final SkillBranch selected;
   final ValueChanged<SkillBranch> onSelect;
 
@@ -469,7 +504,7 @@ class _BranchList extends StatelessWidget {
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        for (final branch in group.branches) ...[
+        for (final branch in branches) ...[
           Padding(
             padding: EdgeInsets.only(bottom: tokens.space.xs),
             child: _BranchTile(
@@ -549,6 +584,7 @@ enum _NodeState { owned, affordable, short, locked }
 class _NodeRow extends StatelessWidget {
   const _NodeRow({
     required this.node,
+    required this.cost,
     required this.owned,
     required this.lockReason,
     required this.affordable,
@@ -559,6 +595,9 @@ class _NodeRow extends StatelessWidget {
   });
 
   final SkillNode node;
+
+  /// Price now (crew nodes rise after a lost teammate).
+  final int cost;
   final bool owned;
   final String? lockReason;
   final bool affordable;
@@ -678,7 +717,7 @@ class _NodeRow extends StatelessWidget {
                   )
                 : DraftImageButton(
                     key: Key(nextThrow ? 'buy-throw' : 'skill-${node.id}'),
-                    label: locked ? 'Locked' : 'Buy ${node.cost}',
+                    label: locked ? 'Locked' : 'Buy ${compactCoins(cost)}',
                     leadingIcon: locked ? Icons.lock_rounded : null,
                     secondary: state == _NodeState.short,
                     enabled: affordable,
@@ -818,6 +857,7 @@ class _ItemsPanel extends StatelessWidget {
             child: _ItemRow(
               item: item,
               owned: meta.itemCount(item),
+              cost: meta.itemCost(item),
               affordable: meta.canBuyItem(item),
               onBuy: () => onBuy(item),
             ),
@@ -830,12 +870,14 @@ class _ItemsPanel extends StatelessWidget {
 class _ItemRow extends StatelessWidget {
   const _ItemRow({
     required this.item,
+    required this.cost,
     required this.owned,
     required this.affordable,
     required this.onBuy,
   });
 
   final PowerUp item;
+  final int cost;
   final int owned;
   final bool affordable;
   final VoidCallback onBuy;
@@ -908,7 +950,7 @@ class _ItemRow extends StatelessWidget {
                       ),
                     )
                   : CoinAmount(
-                      amount: item.cost,
+                      amount: cost,
                       fontSize: 14,
                       color: affordable ? tokens.onPrimary : tokens.inkMuted,
                     ),

@@ -1,3 +1,5 @@
+import 'skill_effects.dart';
+
 /// Branches of the between-wave skill tree. Each branch is a short chain:
 /// a node can be bought only after its parent.
 enum SkillBranch {
@@ -64,9 +66,9 @@ enum SkillGroup {
 /// still be too expensive.
 enum SkillLock { open, parent, teammate, easyHeals }
 
-/// One purchase. Each rank in a chain costs 2.5× the one before, rounded
-/// to the nearest 5 ([SkillTree.rankCost]), so the top rank is a real
-/// saving goal. Balance lives next to each node.
+/// One purchase. Each rank in a chain costs more than the one before
+/// ([SkillTree.rankCost]): ×2.5 through the hand-made ranks, then ×3 for as
+/// many ranks again, then ×4, and so on. Balance lives next to each node.
 class SkillNode {
   const SkillNode({
     required this.id,
@@ -89,7 +91,11 @@ class SkillNode {
   bool get needsTeammate => switch (branch) {
     SkillBranch.aim || SkillBranch.reaction || SkillBranch.charge => true,
     SkillBranch.recovery => id == 'revive-1',
-    SkillBranch.damage => id == 'damage-3' || id == 'damage-4',
+    // Ranks 3 and 4, then every even rank past 4, only power up teammates.
+    SkillBranch.damage => switch (SkillTree.rankOf(id)) {
+      3 || 4 => true,
+      final rank => rank > 4 && rank.isEven,
+    },
     SkillBranch.team ||
     SkillBranch.fort ||
     SkillBranch.throwSpeed ||
@@ -111,18 +117,48 @@ class SkillTree {
   static const teammateLockReason = 'Buy a second kid first.';
   static const easyHealsReason = 'Easy already heals everyone between waves.';
 
-  /// Price of the [rank]th node (1-based) in a chain that starts at [base]:
-  /// ×2.5 per rank, rounded to the nearest 5.
-  static int rankCost(int base, int rank) {
+  /// Price of the [rank]th node (1-based) in a chain that starts at [base]
+  /// and has [handLength] hand-made ranks, rounded to the nearest 5.
+  static int rankCost(int base, int rank, {int handLength = 1 << 30}) {
     if (rank <= 1) return base;
     var price = base.toDouble();
-    for (var i = 1; i < rank; i++) {
-      price *= 2.5;
+    for (var r = 2; r <= rank; r++) {
+      price *= stepFor(r, handLength);
     }
-    return ((price / 5) + 0.5).floor() * 5;
+    return _round5(price);
   }
 
-  static const List<SkillNode> nodes = [
+  /// Price step into [rank]: ×2.5 within the hand-made ranks, then ×3 for
+  /// the next [handLength] ranks, ×4 for the next, and so on.
+  static double stepFor(int rank, int handLength) {
+    final tier = (rank - 1) ~/ handLength;
+    return tier == 0 ? 2.5 : tier + 2.0;
+  }
+
+  /// Generated ranks stop once a price would pass this.
+  static const int maxPrice = 50000000;
+
+  static int _round5(double price) => ((price / 5) + 0.5).floor() * 5;
+
+  /// Number of hand-made ranks in [branch], before the generated ones.
+  static int handLength(SkillBranch branch) => [
+    for (final node in _hand)
+      if (node.branch == branch) node,
+  ].length;
+
+  /// 1-based rank of [id] within its chain, or 0 when unknown.
+  static int rankOf(String id) {
+    final node = byId[id];
+    if (node == null) return 0;
+    return chain(node.branch).indexOf(node) + 1;
+  }
+
+  static final List<SkillNode> nodes = [..._hand, ..._generated()];
+
+  /// The hand-made ranks only, in catalog order.
+  static List<SkillNode> get handNodes => _hand;
+
+  static const List<SkillNode> _hand = [
     SkillNode(
       id: 'team-2',
       branch: SkillBranch.team,
@@ -463,11 +499,131 @@ class SkillTree {
     for (final node in nodes) node.id: node,
   };
 
-  static List<SkillNode> chain(SkillBranch branch) {
-    return [
-      for (final node in nodes)
-        if (node.branch == branch) node,
-    ];
+  static final Map<SkillBranch, List<SkillNode>> _chains = {
+    for (final branch in SkillBranch.values)
+      branch: List.unmodifiable([
+        for (final node in nodes)
+          if (node.branch == branch) node,
+      ]),
+  };
+
+  static List<SkillNode> chain(SkillBranch branch) => _chains[branch]!;
+
+  /// Chains that keep going past their hand-made ranks. Team (the crew
+  /// stays at three), Recovery, and Lanes stop where they are.
+  static List<SkillNode> _generated() {
+    final out = <SkillNode>[];
+    for (final branch in SkillBranch.values) {
+      final hand = [
+        for (final node in _hand)
+          if (node.branch == branch) node,
+      ];
+      final n = hand.length;
+      final namer = _names(branch, n);
+      if (namer == null) continue;
+      var price = hand.first.cost.toDouble();
+      for (var r = 2; r <= n; r++) {
+        price *= stepFor(r, n);
+      }
+      var parent = hand.last.id;
+      for (var r = n + 1; ; r++) {
+        price *= stepFor(r, n);
+        final cost = _round5(price);
+        if (cost > maxPrice) break;
+        final (id, title, detail) = namer(r);
+        out.add(
+          SkillNode(
+            id: id,
+            branch: branch,
+            title: title,
+            detail: detail,
+            cost: cost,
+            parentId: parent,
+          ),
+        );
+        parent = id;
+      }
+    }
+    return out;
+  }
+
+  static (String, String, String) Function(int rank)? _names(
+    SkillBranch branch,
+    int hand,
+  ) {
+    String pct(double v) => '${(v * 100).round()}%';
+    String x(double v) => '${v.toStringAsFixed(2)}×';
+    return switch (branch) {
+      SkillBranch.team || SkillBranch.recovery || SkillBranch.lanes => null,
+      SkillBranch.throwSpeed => (r) => (
+        'throw-$r',
+        'Quicker throw ${roman(r)}',
+        'Rank $r. Full charge in '
+            '${SkillEffects.chargeSeconds(r).toStringAsFixed(2)}s.',
+      ),
+      SkillBranch.poise => (r) => (
+        'poise-$r',
+        'Shake it off ${roman(r)}',
+        'Your stun is ${pct(SkillEffects.poise(r))} of the base lock.',
+      ),
+      SkillBranch.pressure => (r) => (
+        'pressure-$r',
+        'Heavy hit ${roman(r)}',
+        'Enemy stun is ${x(SkillEffects.pressure(r))}.',
+      ),
+      SkillBranch.aim => (r) => (
+        'aim-$r',
+        'Sharper aim ${roman(r)}',
+        'Teammate scatter is ${pct(SkillEffects.aim(r))}.',
+      ),
+      SkillBranch.reaction => (r) => (
+        'react-$r',
+        'Quicker pals ${roman(r)}',
+        'Teammate wait is ${pct(SkillEffects.gap(r))}.',
+      ),
+      SkillBranch.charge => (r) => (
+        'charge-$r',
+        'Faster pals ${roman(r)}',
+        'Teammate charge is ${pct(SkillEffects.charge(r))} of the Easy windup.',
+      ),
+      SkillBranch.shield => (r) => (
+        'shield-$r',
+        'Shield ${roman(r)}',
+        'Blocks ${SkillEffects.shield(r)} hits a wave.',
+      ),
+      SkillBranch.blast => (r) => (
+        'blast-$r',
+        'Wider splat ${roman(r)}',
+        'Hit radius is ${x(SkillEffects.blast(r))}.',
+      ),
+      SkillBranch.damage => (r) => (
+        'damage-$r',
+        'Harder hit ${roman(r)}',
+        r.isOdd
+            ? 'Your snowballs count as ${SkillEffects.manualHits(r)} hits.'
+            : 'Teammate bots hit for ${SkillEffects.botHits(r)}.',
+      ),
+      // The fort chain is two stages, then packed-snow HP ranks.
+      SkillBranch.fort => (r) => (
+        'fort-hp-${r - 2}',
+        'Ice blocks ${roman(r - 2)}',
+        '+4 more fort HP (+${SkillEffects.fortHp(r - 2)} in all).',
+      ),
+    };
+  }
+
+  static String roman(int n) {
+    const values = [10, 9, 5, 4, 1];
+    const symbols = ['X', 'IX', 'V', 'IV', 'I'];
+    final out = StringBuffer();
+    var left = n;
+    for (var i = 0; i < values.length; i++) {
+      while (left >= values[i]) {
+        out.write(symbols[i]);
+        left -= values[i];
+      }
+    }
+    return out.toString();
   }
 
   static SkillNode? node(String id) => byId[id];

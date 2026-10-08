@@ -118,6 +118,49 @@ class HoundComponent extends SpriteComponent {
     Difficulty.hard => 0.25,
   };
 
+  /// From this wave a hound is likelier ([bracketChance]).
+  static const int likelyWave = 5;
+
+  /// From this wave every wave has a hound, and maybe more.
+  static const int packWave = 10;
+
+  /// Most hounds in one wave.
+  static const int maxPack = 4;
+
+  /// Chance of a hound on waves [likelyWave] to [packWave] - 1.
+  static double bracketChance(Difficulty difficulty) => switch (difficulty) {
+    Difficulty.easy => 0.5,
+    Difficulty.normal => 0.6,
+    Difficulty.hard => 0.7,
+  };
+
+  /// Expected extra hounds on top of the first from [packWave]: 10% / 15% /
+  /// 20% at first, +10% every five waves after that.
+  static double extraFor(int wave, Difficulty difficulty) {
+    if (wave < packWave) return 0;
+    final base = switch (difficulty) {
+      Difficulty.easy => 0.1,
+      Difficulty.normal => 0.15,
+      Difficulty.hard => 0.2,
+    };
+    return base + 0.1 * ((wave - packWave) ~/ 5);
+  }
+
+  /// How many hounds [wave] gets.
+  static int countFor(int wave, Difficulty difficulty, math.Random rng) {
+    if (wave < firstWave) return 0;
+    if (wave < likelyWave) {
+      return rng.nextDouble() < chanceFor(difficulty) ? 1 : 0;
+    }
+    if (wave < packWave) {
+      return rng.nextDouble() < bracketChance(difficulty) ? 1 : 0;
+    }
+    final extra = extraFor(wave, difficulty);
+    final sure = extra.floor();
+    final maybe = rng.nextDouble() < extra - sure ? 1 : 0;
+    return math.min(maxPack, 1 + sure + maybe);
+  }
+
   /// Catch box: how far off its lane (feet Y, in rows) a kid is still in
   /// its path, and how far ahead it pounces from. Larger on harder modes.
   static double laneHalfRows(Difficulty d) => switch (d) {

@@ -91,7 +91,7 @@ class FeelBus {
       audio.playSfx(switch (item) {
         PowerUp.frostArmor => AudioCues.powerUpArmor,
         PowerUp.freezeAll => AudioCues.powerUpFreeze,
-        PowerUp.hotCocoa => AudioCues.powerUpCocoa,
+        PowerUp.hotCocoa || PowerUp.revive => AudioCues.powerUpCocoa,
         PowerUp.fortCracker ||
         PowerUp.powerThrow ||
         PowerUp.bigSplat => AudioCues.powerUpPower,

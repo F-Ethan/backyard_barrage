@@ -10,7 +10,14 @@ enum PowerUp {
   freezeAll('Freeze all', 'Every rival freezes for 2.5 seconds.', 35),
   powerThrow('Power throw', 'Your next charge starts at full power.', 15),
   bigSplat('Big splat', 'Your next throw splats three times as wide.', 20),
-  hotCocoa('Hot cocoa', 'Every standing kid regains 1 HP.', 30);
+  hotCocoa('Hot cocoa', 'Every standing kid regains 1 HP.', 30),
+
+  /// Price grows with each one bought; see MetaState.itemCost.
+  revive(
+    'Revive',
+    'One knocked-out teammate gets back up with full health.',
+    100,
+  );
 
   const PowerUp(this.label, this.detail, this.cost);
 

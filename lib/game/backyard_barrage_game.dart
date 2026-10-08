@@ -14,6 +14,7 @@ import '../feel/feel_bus.dart';
 import '../meta/difficulty.dart';
 import '../meta/game_settings.dart';
 import '../meta/meta_state.dart';
+import '../meta/play_mode.dart';
 import '../meta/power_up.dart';
 import '../meta/save_store.dart';
 import '../meta/settings_store.dart';
@@ -143,6 +144,37 @@ class BackyardBarrageGame extends FlameGame {
 
   final Set<KidComponent> _paidKills = {};
 
+  /// Teammates who left the crew at the last wave clear (still out after
+  /// the carry). Their spots reopen in the shop at a higher price.
+  int lostKidsThisWave = 0;
+
+  /// Points the last wave clear added to the score.
+  int lastWaveScore = 0;
+
+  /// What the last defeat did: the wave a retry starts on, coins lost, and
+  /// coins refunded (Arcade's checkpoint). Null before any defeat.
+  CheckpointResult? lastDefeat;
+
+  /// Points the last defeat took off the score.
+  int lastScorePenalty = 0;
+
+  /// Health for each kid going into the next wave, set at a wave clear
+  /// after the kids still out have left. Null starts everyone full.
+  List<int>? _pendingCrewHp;
+
+  /// Rivals still offstage this wave, in walk-on order.
+  final List<RivalType> _reserve = [];
+  double _walkOnTimer = 0;
+
+  /// Rivals walking on mid-fight, and where each is headed.
+  final List<({KidComponent kid, Vector2 goal})> _arrivals = [];
+
+  /// Rivals waiting offstage to walk on.
+  int get rivalsWaiting => _reserve.length;
+
+  /// Rivals still standing on the yard, not counting those waiting.
+  int get rivalsOnField => enemies.where((kid) => !kid.isKo).length;
+
   /// Walk-on pace. Not the locked drag rate.
   static const double entranceSpeed = 280;
 
@@ -243,7 +275,7 @@ class BackyardBarrageGame extends FlameGame {
     PowerUp.fortCracker => _crackerArmed,
     PowerUp.bigSplat => _splatArmed,
     PowerUp.powerThrow => _powerArmed,
-    PowerUp.freezeAll || PowerUp.hotCocoa => false,
+    PowerUp.freezeAll || PowerUp.hotCocoa || PowerUp.revive => false,
   };
 
   /// Fire one [item] from the wallet. False outside a live fight, when the
@@ -254,6 +286,9 @@ class BackyardBarrageGame extends FlameGame {
     if (item == PowerUp.hotCocoa &&
         !players.any((kid) => !kid.isKo && kid.hp < kid.maxHp)) {
       return false; // nobody to heal; keep the cocoa
+    }
+    if (item == PowerUp.revive && !players.any((kid) => kid.isKo)) {
+      return false; // nobody to bring back; keep the potion
     }
     if (!meta.useItem(item)) return false;
     switch (item) {
@@ -278,6 +313,15 @@ class BackyardBarrageGame extends FlameGame {
             kid.hp = math.min(kid.hp + 1, kid.maxHp);
           }
         }
+      case PowerUp.revive:
+        final down = players.firstWhere((kid) => kid.isKo);
+        down
+          ..revive()
+          ..shieldHits = meta.shieldCharges
+          ..armored = _armorTime > 0
+          ..syncDepth();
+        _burst(down.hitCenter, depthY: down.hitCenter.y, power: 0.8);
+        if (_selected == null || _selected!.isKo) _setSelected(down);
     }
     feel.powerUpUsed(item);
     hudRevision.value++;
@@ -485,6 +529,13 @@ class BackyardBarrageGame extends FlameGame {
     phase = MatchPhase.entering;
     _entrance.clear();
 
+    if (meta.mode == PlayMode.campaign &&
+        (MetaState.opensStage(wave) || !meta.ledger.hasCheckpoint) &&
+        meta.ledger.checkpointWave != MetaState.stageStart(wave)) {
+      meta.takeCheckpoint(wave);
+    }
+
+    final crewHp = _nextCrewHp();
     while (players.length > meta.crewSize) {
       players.removeLast().removeFromParent();
     }
@@ -493,7 +544,6 @@ class BackyardBarrageGame extends FlameGame {
       players.add(kid);
       world.add(kid);
     }
-    final crewHp = _nextCrewHp();
     _waveStartHp = List<int>.of(crewHp);
     for (var i = 0; i < players.length; i++) {
       final kid = players[i];
@@ -517,47 +567,14 @@ class BackyardBarrageGame extends FlameGame {
 
     final count = CombatRules.enemyCountForWave(wave);
     final lineup = RivalRoster.forWave(count: count, rng: _rng);
-    for (var i = 0; i < count; i++) {
-      final type = lineup[i];
-      final rival = RivalProfile.of(type);
-      final kid = _makeRival(type, i);
-      final slot =
-          ArenaGrid.enemySlots[i.clamp(0, ArenaGrid.enemySlots.length - 1)];
-      // Slot rows are distinct, so a type's home column never stacks kids.
-      final goal = ArenaGrid.cellCenter(
-        KidSide.enemy,
-        rival.holdColumn ?? slot.$1,
-        slot.$2,
-      );
-      kid.position = Vector2(worldWidth + _offstage + i * 36, goal.y);
-      kid.setWalking(true);
+    final starting = math.min(count, WavePlan.fieldStart);
+    for (var i = 0; i < starting; i++) {
+      final kid = _spawnRival(lineup[i], i);
+      kid.position.x = worldWidth + _offstage + i * 36;
       kid.syncDepth();
-      enemies.add(kid);
-      world.add(kid);
-      _entrance.add((kid: kid, goal: goal));
-      final profile = _tuning();
-      final gap = profile.throwGap(_rng.nextDouble());
-      final stagger = (gap * (0.75 + i * 0.1)).clamp(
-        profile.throwGapMin,
-        profile.throwGapMax,
-      );
-      kid.add(
-        EnemyController(
-          host: kid,
-          players: players,
-          rivals: enemies,
-          wave: wave,
-          rng: _rng,
-          tuning: _tuning,
-          initialDelay: stagger,
-          onFire: _onEnemyFire,
-          isFighting: () => phase == MatchPhase.fight && !_settling,
-          playerChargeSeconds: _baseChargeSeconds,
-          profile: rival,
-          onWindup: rival.glint ? feel.frostGlint : null,
-        ),
-      );
     }
+    _reserve.addAll(lineup.skip(starting));
+    _walkOnTimer = WavePlan.walkOnGap;
 
     fort.applyStage(
       nextStage: meta.fortStage,
@@ -590,6 +607,7 @@ class BackyardBarrageGame extends FlameGame {
       fort.maxHp,
       players.length,
       enemies.length,
+      _reserve.length,
     );
     for (final kid in players) {
       signature = Object.hash(signature, kid.hp);
@@ -630,47 +648,185 @@ class BackyardBarrageGame extends FlameGame {
     return kid;
   }
 
+  /// Adds a rival of [type] offstage, walking toward its post. The first
+  /// five use the fixed slots; later ones take a free cell.
+  KidComponent _spawnRival(RivalType type, int index, {bool walkOn = false}) {
+    final rival = RivalProfile.of(type);
+    final kid = _makeRival(type, index);
+    final Vector2 goal;
+    if (index < ArenaGrid.enemySlots.length) {
+      final slot = ArenaGrid.enemySlots[index];
+      // Slot rows are distinct, so a type's home column never stacks kids.
+      goal = ArenaGrid.cellCenter(
+        KidSide.enemy,
+        rival.holdColumn ?? slot.$1,
+        slot.$2,
+      );
+    } else {
+      goal = _freeRivalCell(rival.holdColumn);
+    }
+    kid.position = Vector2(worldWidth + _offstage, goal.y);
+    kid.setWalking(true);
+    kid.syncDepth();
+    enemies.add(kid);
+    world.add(kid);
+    if (walkOn) {
+      _arrivals.add((kid: kid, goal: goal));
+    } else {
+      _entrance.add((kid: kid, goal: goal));
+    }
+    final profile = _tuning();
+    final gap = profile.throwGap(_rng.nextDouble());
+    final stagger = (gap * (0.75 + (index % 5) * 0.1)).clamp(
+      profile.throwGapMin,
+      profile.throwGapMax,
+    );
+    kid.add(
+      EnemyController(
+        host: kid,
+        players: players,
+        rivals: enemies,
+        wave: wave,
+        rng: _rng,
+        tuning: _tuning,
+        initialDelay: stagger,
+        onFire: _onEnemyFire,
+        isFighting: () =>
+            phase == MatchPhase.fight &&
+            !_settling &&
+            !_arrivals.any((a) => identical(a.kid, kid)),
+        playerChargeSeconds: _baseChargeSeconds,
+        profile: rival,
+        onWindup: rival.glint ? feel.frostGlint : null,
+      ),
+    );
+    return kid;
+  }
+
+  /// A rival cell no standing rival is on, preferring empty rows.
+  Vector2 _freeRivalCell(int? column) {
+    final taken = <(int, int)>{};
+    final rowLoad = List.filled(ArenaGrid.rows, 0);
+    for (final kid in enemies) {
+      if (kid.isKo) continue;
+      final cell = ArenaGrid.nearestCell(KidSide.enemy, kid.position);
+      taken.add((cell.column, cell.row));
+      rowLoad[cell.row] += 1;
+    }
+    for (final mark in _arrivals) {
+      final cell = ArenaGrid.nearestCell(KidSide.enemy, mark.goal);
+      taken.add((cell.column, cell.row));
+      rowLoad[cell.row] += 1;
+    }
+    final cells = <(int, int)>[
+      for (var row = 0; row < ArenaGrid.rows; row++)
+        for (var col = 0; col < ArenaGrid.columnsPerSide; col++)
+          if ((column == null || col == column) && !taken.contains((col, row)))
+            (col, row),
+    ];
+    if (cells.isEmpty) {
+      final row = _rng.nextInt(ArenaGrid.rows);
+      return ArenaGrid.cellCenter(KidSide.enemy, column ?? 3, row);
+    }
+    final least = cells.map((c) => rowLoad[c.$2]).reduce(math.min);
+    final best = [
+      for (final c in cells)
+        if (rowLoad[c.$2] == least) c,
+    ];
+    final pick = best[_rng.nextInt(best.length)];
+    return ArenaGrid.cellCenter(KidSide.enemy, pick.$1, pick.$2);
+  }
+
+  /// Rivals waiting offstage walk on every [WavePlan.walkOnGap] seconds
+  /// while fewer than [WavePlan.fieldCap] stand on the yard. At the cap,
+  /// the next one walks on as soon as a rival goes down.
+  @visibleForTesting
+  void debugTickWalkOns(double dt) => _tickWalkOns(dt);
+
+  void _tickWalkOns(double dt) {
+    if (phase != MatchPhase.fight) return;
+    final step = entranceSpeed * dt;
+    _arrivals.removeWhere((mark) {
+      final kid = mark.kid;
+      if (kid.isKo || kid.isRemoved) return true;
+      final delta = mark.goal - kid.position;
+      final distance = delta.length;
+      if (distance <= step || distance < 1) {
+        kid.position = mark.goal.clone();
+        kid.setWalking(false);
+        kid.syncDepth();
+        return true;
+      }
+      kid.position += delta / distance * step;
+      kid.setWalking(true);
+      kid.syncDepth();
+      return false;
+    });
+    if (_reserve.isEmpty || _settling) return;
+    if (rivalsOnField >= WavePlan.fieldCap) {
+      // Full yard: the next one walks on the moment a rival goes down.
+      _walkOnTimer = 0;
+      return;
+    }
+    _walkOnTimer = math.max(0, _walkOnTimer - dt);
+    if (_walkOnTimer > 0) return;
+    _spawnRival(_reserve.removeAt(0), enemies.length, walkOn: true);
+    _walkOnTimer = WavePlan.walkOnGap;
+    _publishHud();
+  }
+
   void _clearEnemies() {
     for (final enemy in List<KidComponent>.of(enemies)) {
       enemy.removeFromParent();
     }
     enemies.clear();
     _rivalTypes.clear();
+    _reserve.clear();
+    _arrivals.clear();
   }
 
-  // Ice hound: rolled at wave start, released partway into the fight.
+  // Ice hounds: rolled at wave start, released partway into the fight.
   HoundSprites? _houndSprites;
-  HoundComponent? _hound;
-  double? _houndAt;
+  final List<HoundComponent> _hounds = [];
+
+  /// Seconds into the fight when each hound still to come is released.
+  final List<double> _houndTimes = [];
   double _waveFight = 0;
 
-  /// The hound on the yard, if any.
-  HoundComponent? get hound => _hound;
+  /// The most recent hound on the yard, if any.
+  HoundComponent? get hound => _hounds.isEmpty ? null : _hounds.last;
 
-  /// Seconds into the fight when this wave's hound comes, or null.
-  double? get houndDueAt => _houndAt;
+  /// Hounds on the yard.
+  List<HoundComponent> get hounds => List.unmodifiable(_hounds);
+
+  /// Seconds into the fight when this wave's next hound comes, or null.
+  double? get houndDueAt => _houndTimes.isEmpty ? null : _houndTimes.first;
+
+  /// Hounds still to come this wave.
+  int get houndsDue => _houndTimes.length;
 
   void _rollHound() {
     _clearHound();
     _waveFight = 0;
-    final difficulty = feel.settings.difficulty;
-    _houndAt =
-        wave >= HoundComponent.firstWave &&
-            _rng.nextDouble() < HoundComponent.chanceFor(difficulty)
-        ? 4 + _rng.nextDouble() * 5
-        : null;
+    final count = HoundComponent.countFor(wave, feel.settings.difficulty, _rng);
+    var at = 4 + _rng.nextDouble() * 5;
+    for (var i = 0; i < count; i++) {
+      _houndTimes.add(at);
+      at += 3 + _rng.nextDouble() * 3;
+    }
   }
 
   void _clearHound() {
-    _hound?.removeFromParent();
-    _hound = null;
+    for (final hound in _hounds) {
+      hound.removeFromParent();
+    }
+    _hounds.clear();
+    _houndTimes.clear();
   }
 
-  /// Sends the hound down [target]'s lane now.
+  /// Sends a hound down [target]'s lane now.
   @visibleForTesting
   HoundComponent releaseHound(KidComponent target) {
-    _clearHound();
-    _houndAt = null;
     final hound = HoundComponent(
       sprites: _houndSprites!,
       laneY: target.position.y,
@@ -680,7 +836,7 @@ class BackyardBarrageGame extends FlameGame {
       difficulty: feel.settings.difficulty,
       onState: _houndSound,
     );
-    _hound = hound;
+    _hounds.add(hound);
     world.add(hound);
     feel.houndGrowl();
     return hound;
@@ -700,34 +856,42 @@ class BackyardBarrageGame extends FlameGame {
   void _tickHound(double dt) {
     if (phase != MatchPhase.fight) return;
     _waveFight += dt;
-    final due = _houndAt;
-    if (due != null && !_settling && _waveFight >= due) {
+    _hounds.removeWhere((hound) => hound.state == HoundState.gone);
+    while (_houndTimes.isNotEmpty &&
+        !_settling &&
+        _waveFight >= _houndTimes.first) {
+      _houndTimes.removeAt(0);
       final living = [
         for (final kid in players)
           if (!kid.isKo) kid,
       ];
-      _houndAt = null;
-      if (living.isNotEmpty) {
-        releaseHound(living[_rng.nextInt(living.length)]);
-      }
+      if (living.isEmpty) break;
+      // Prefer a lane no hound is already running.
+      final open = [
+        for (final kid in living)
+          if (!_hounds.any((h) => (h.laneY - kid.position.y).abs() < 1)) kid,
+      ];
+      final pool = open.isEmpty ? living : open;
+      releaseHound(pool[_rng.nextInt(pool.length)]);
     }
-    // A player snowball that meets the hound before it crosses scares it.
-    final hound = _hound;
-    if (hound == null || !hound.scareable) return;
-    for (final shot in world.children.whereType<LobProjectile>()) {
-      if (shot.spent || shot.owner?.side != KidSide.player) continue;
-      if (!ThrowPhysics.snowballContacts(
-        ground: shot.hitPosition,
-        shotRadius: shot.radius,
-        kidCenter: hound.hitCenter,
-        kidRadius: HoundComponent.hitRadius,
-      )) {
-        continue;
+    // A player snowball that meets a hound before it crosses scares it.
+    for (final hound in _hounds) {
+      if (!hound.scareable) continue;
+      for (final shot in world.children.whereType<LobProjectile>()) {
+        if (shot.spent || shot.owner?.side != KidSide.player) continue;
+        if (!ThrowPhysics.snowballContacts(
+          ground: shot.hitPosition,
+          shotRadius: shot.radius,
+          kidCenter: hound.hitCenter,
+          kidRadius: HoundComponent.hitRadius,
+        )) {
+          continue;
+        }
+        _burst(shot.position, power: 0.8);
+        shot.absorb();
+        hound.scare();
+        break;
       }
-      _burst(shot.position, power: 0.8);
-      shot.absorb();
-      hound.scare();
-      return;
     }
   }
 
@@ -795,7 +959,10 @@ class BackyardBarrageGame extends FlameGame {
   void retryFromDefeat() {
     if (overlays.isActive('defeat')) overlays.remove('defeat');
     if (paused) resumeEngine();
-    wave = 1;
+    wave = lastDefeat?.wave ?? 1;
+    meta.resumeWave = 0;
+    meta.resumeArena = null;
+    _pendingCrewHp = null;
     _rollArena(avoidCurrent: true);
     startWave();
   }
@@ -807,14 +974,14 @@ class BackyardBarrageGame extends FlameGame {
     final maxHp = CombatRules.hitsToKo;
     final saved = _resumeCrewHp;
     _resumeCrewHp = null;
-    if (saved != null) {
-      return [
-        for (var i = 0; i < players.length; i++)
-          i < saved.length ? saved[i].clamp(0, maxHp) : maxHp,
-      ];
-    }
-    if (wave <= 1) return List.filled(players.length, maxHp);
-    return _carriedHp([for (final kid in players) kid.hp]);
+    final pending = _pendingCrewHp;
+    _pendingCrewHp = null;
+    final from = saved ?? (wave <= 1 ? null : pending);
+    // One entry per kid in the crew. A kid bought in the shop is full.
+    return [
+      for (var i = 0; i < meta.crewSize; i++)
+        from != null && i < from.length ? from[i].clamp(0, maxHp) : maxHp,
+    ];
   }
 
   List<int> _carriedHp(List<int> now) => CrewCarry.next(
@@ -856,7 +1023,9 @@ class BackyardBarrageGame extends FlameGame {
         // This wave already paid out; pick up on the next one, with the
         // health the crew would carry into it.
         meta.resumeWave = wave + 1;
-        meta.resumeCrewHp = _carriedHp([for (final kid in players) kid.hp]);
+        meta.resumeCrewHp = List<int>.of(
+          _pendingCrewHp ?? [for (final kid in players) kid.maxHp],
+        );
       case MatchPhase.defeat || MatchPhase.paused:
         meta.resumeWave = 0;
         meta.resumeCrewHp = null;
@@ -893,7 +1062,7 @@ class BackyardBarrageGame extends FlameGame {
     if (phase != MatchPhase.fight) return;
     _payKnockouts();
     final livingPlayers = players.where((kid) => !kid.isKo).length;
-    final livingEnemies = enemies.where((kid) => !kid.isKo).length;
+    final livingEnemies = rivalsOnField + _reserve.length;
     final outcome = CombatRules.roundOutcome(
       livingPlayers: livingPlayers,
       livingEnemies: livingEnemies,
@@ -922,14 +1091,15 @@ class BackyardBarrageGame extends FlameGame {
 
   void _beginWaveClear() {
     _clearHound();
-    _houndAt = null;
     if (phase != MatchPhase.fight) return;
     phase = MatchPhase.clearing;
     _endActiveThrow();
     _clearShots();
     lastReward = MetaState.coinsForWave(wave);
     meta.earn(lastReward);
+    lastWaveScore = meta.scoreWaveClear(wave);
     meta.noteWaveCleared(wave);
+    _settleCrew();
     unawaited(persist());
     feel.waveCleared();
     _showBanner('KO!', fontSize: 56, color: const Color(0xFFFFE66D));
@@ -937,18 +1107,43 @@ class BackyardBarrageGame extends FlameGame {
     _bannerTime = 0.65;
   }
 
+  /// Carry the crew's health into the next wave, then let any kid still
+  /// out leave the crew so their spot reopens in the shop.
+  void _settleCrew() {
+    final carried = _carriedHp([for (final kid in players) kid.hp]);
+    lostKidsThisWave = 0;
+    for (var i = players.length - 1; i >= 0; i--) {
+      if (carried[i] > 0) continue;
+      if (!meta.loseKid()) break;
+      final gone = players.removeAt(i);
+      if (identical(gone, _selected)) _selected = null;
+      gone.removeFromParent();
+      carried.removeAt(i);
+      lostKidsThisWave += 1;
+    }
+    _pendingCrewHp = carried;
+  }
+
   void _beginDefeat() {
     _clearHound();
-    _houndAt = null;
     if (phase == MatchPhase.defeat || phase == MatchPhase.shop) return;
     phase = MatchPhase.defeat;
     _endActiveThrow();
     _clearShots();
     feel.defeated();
+    lastScorePenalty = meta.scoreDefeat(wave);
+    final result = meta.resetRun(lostOn: wave);
+    lastDefeat = result;
     carriedCoins = meta.coins;
-    meta.resetRun();
-    meta.resumeWave = 0;
-    meta.resumeArena = null;
+    _pendingCrewHp = null;
+    if (meta.mode == PlayMode.campaign) {
+      // Arcade: the Play card picks up at the checkpoint, crew at full.
+      meta.resumeWave = result.wave;
+      meta.resumeArena = _arena.name;
+    } else {
+      meta.resumeWave = 0;
+      meta.resumeArena = null;
+    }
     meta.resumeCrewHp = null;
     unawaited(persist());
     _publishHud();
@@ -967,9 +1162,13 @@ class BackyardBarrageGame extends FlameGame {
       case _Banner.waveKo:
         _showBanner(
           'Wave $wave clear!',
-          subtitle: killCoinsThisWave > 0
-              ? 'KO +$killCoinsThisWave · bonus +$lastReward'
-              : '+$lastReward coins',
+          subtitle: [
+            killCoinsThisWave > 0
+                ? 'KO +$killCoinsThisWave · bonus +$lastReward'
+                : '+$lastReward coins',
+            if (lostKidsThisWave == 1) 'a teammate left',
+            if (lostKidsThisWave > 1) '$lostKidsThisWave teammates left',
+          ].join(' · '),
           fontSize: 42,
           color: const Color(0xFF1A2332),
         );
@@ -1022,7 +1221,14 @@ class BackyardBarrageGame extends FlameGame {
 
   /// Center title for the walk-on. Cleared when the crews reach their spots.
   void _showWaveIntro() {
-    _showBanner('Wave $wave', fontSize: 56, color: const Color(0xFF1A2332));
+    _showBanner(
+      'Wave $wave',
+      subtitle: meta.mode == PlayMode.campaign
+          ? 'Stage ${MetaState.stageOf(wave)}'
+          : null,
+      fontSize: 56,
+      color: const Color(0xFF1A2332),
+    );
     feel.waveStart();
     _pendingBanner = _Banner.waveIntro;
     _bannerTime = 0;
@@ -1140,7 +1346,7 @@ class BackyardBarrageGame extends FlameGame {
     var paid = 0;
     for (final kid in enemies) {
       if (!kid.isKo || !_paidKills.add(kid)) continue;
-      paid += MetaState.coinsPerKnockout;
+      paid += MetaState.coinsForKnockout(wave);
     }
     if (paid == 0) return;
     meta.earn(paid);
@@ -1455,7 +1661,7 @@ class BackyardBarrageGame extends FlameGame {
     if (target.isKo && target.side == KidSide.enemy) {
       world.add(
         CoinPop(
-          amount: MetaState.coinsPerKnockout,
+          amount: MetaState.coinsForKnockout(wave),
           position: target.hitCenter - Vector2(0, 92),
         ),
       );
@@ -1887,6 +2093,7 @@ class BackyardBarrageGame extends FlameGame {
       }
     }
     _tickHound(dt);
+    _tickWalkOns(dt);
     if (_armorTime > 0) {
       _armorTime -= dt;
       if (_armorTime <= 0) {

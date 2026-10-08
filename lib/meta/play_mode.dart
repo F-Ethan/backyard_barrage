@@ -16,7 +16,7 @@ enum PlayMode {
   /// One line on the home card. Matches the defeat rules.
   String get blurb => switch (this) {
     PlayMode.arcade => 'Skills wipe on defeat. Coins stay.',
-    PlayMode.campaign => 'Skills stay. Restart at wave 1.',
+    PlayMode.campaign => 'Skills stay. A loss sends you back to your stage.',
   };
 
   /// Campaign is ranked by highest wave. Arcade is ranked by score.

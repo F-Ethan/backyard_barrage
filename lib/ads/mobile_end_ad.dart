@@ -63,6 +63,8 @@ class MobileEndAd extends EndAd {
 
   void _load() {
     if (removeAds.owned || _loading || _ready != null) return;
+    // A release build without a live unit shows no ads, never test ads.
+    if (AdConfig.interstitialId.isEmpty) return;
     _loading = true;
     unawaited(
       InterstitialAd.load(

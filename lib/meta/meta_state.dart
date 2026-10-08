@@ -26,6 +26,7 @@ class MetaState {
     Season season = Season.winter,
     this.bestWave = 0,
     this.score = 0,
+    int? bestScore,
     this.resumeWave = 0,
     this.resumeArena,
     this.resumeCrewHp,
@@ -34,6 +35,7 @@ class MetaState {
     this.difficulty = Difficulty.normal,
     RunLedger? ledger,
   }) : _season = season.orPlayable,
+       bestScore = math.max(bestScore ?? 0, score),
        ledger = ledger ?? RunLedger() {
     if (items != null) replaceItems(items);
     if (skills != null) {
@@ -81,8 +83,16 @@ class MetaState {
   /// Lifetime points. Every coin earned adds a point, clearing a wave adds
   /// [waveClearPoints] plus a thrift bonus on unspent coins, and a defeat
   /// takes [defeatPenalty] away (never below 0). Points are never spent.
-  /// Arcade shows this as its score.
+  /// Arcade shows this as its score. [startOver] sets it back to 0.
   int score;
+
+  /// Highest [score] this wallet has reached. A defeat or a start-over
+  /// never lowers it.
+  int bestScore;
+
+  void _noteScore() {
+    if (score > bestScore) bestScore = score;
+  }
 
   /// Wave to pick up from after leaving through Pause → Menu, or 0 when
   /// there is no run to resume. A defeat clears it.
@@ -159,6 +169,7 @@ class MetaState {
     if (amount <= 0) return;
     coins = math.min(coins + amount, maxCoins);
     score += amount;
+    _noteScore();
     ledger.earnedSinceCheckpoint += amount;
   }
 
@@ -173,6 +184,7 @@ class MetaState {
   int scoreWaveClear(int wave) {
     final points = waveClearPoints(wave) + coins ~/ 10;
     score += points;
+    _noteScore();
     return points;
   }
 
@@ -420,6 +432,20 @@ class MetaState {
     );
   }
 
+  /// A fresh Arcade run from wave 1: no coins, skills, or items, prices
+  /// back to the start, and the run score at 0. [bestScore] and the best
+  /// wave stay.
+  void startOver() {
+    coins = 0;
+    score = 0;
+    _skills.clear();
+    _items.clear();
+    ledger = RunLedger();
+    resumeWave = 0;
+    resumeArena = null;
+    resumeCrewHp = null;
+  }
+
   /// A defeat. [PlayMode.arcade] (shown as Campaign) drops every skill and
   /// starts over at wave 1; unspent coins stay. [PlayMode.campaign] (shown
   /// as Arcade) goes back to its stage checkpoint.
@@ -466,6 +492,7 @@ class MetaState {
     'season': season.name,
     'bestWave': bestWave,
     'score': score,
+    'bestScore': bestScore,
     'resumeWave': resumeWave,
     'items': {for (final e in _items.entries) e.key.name: e.value},
     'resumeArena': ?resumeArena,
@@ -500,6 +527,7 @@ class MetaState {
       season: Season.tryParse(json['season'] as String?) ?? Season.winter,
       bestWave: _clampInt(_asInt(json['bestWave']), 0, 9999),
       score: _clampInt(_asInt(json['score']), 0, 999999999),
+      bestScore: _clampInt(_asInt(json['bestScore']), 0, 999999999),
       resumeWave: _clampInt(_asInt(json['resumeWave']), 0, 9999),
       items: _readItems(json['items']),
       resumeArena: json['resumeArena'] is String

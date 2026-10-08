@@ -943,4 +943,42 @@ void main() {
       expect(meta.fortBonusHp, 12);
     });
   });
+
+  test('start over wipes the wallet but keeps the best score', () {
+    final meta =
+        MetaState(
+            mode: PlayMode.campaign,
+            coins: 300,
+            skills: {'team-2', 'throw-1'},
+            items: {PowerUp.revive: 1},
+            score: 900,
+            bestWave: 15,
+          )
+          ..ledger.kidLosses = 2
+          ..takeCheckpoint(11)
+          ..resumeWave = 11;
+    expect(meta.bestScore, 900);
+    meta.startOver();
+    expect(meta.coins, 0);
+    expect(meta.skills, isEmpty);
+    expect(meta.items, isEmpty);
+    expect(meta.score, 0);
+    expect(meta.bestScore, 900);
+    expect(meta.bestWave, 15);
+    expect(meta.ledger.kidLosses, 0);
+    expect(meta.ledger.hasCheckpoint, isFalse);
+    expect(meta.canResume, isFalse);
+    meta.earn(40);
+    expect(meta.bestScore, 900, reason: 'a new run has to beat it');
+    final back = MetaState.fromJson(
+      jsonDecode(jsonEncode(meta.toJson())) as Map<String, dynamic>,
+    );
+    expect(back.score, 40);
+    expect(back.bestScore, 900);
+    expect(
+      MetaState.fromJson({'score': 120}).bestScore,
+      120,
+      reason: 'older saves start their best at the current score',
+    );
+  });
 }

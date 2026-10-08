@@ -2461,6 +2461,59 @@ void main() {
     expect(game.meta.resumeWave, 0);
   });
 
+  testWidgets('Arcade Start over asks first, then restarts with nothing', (
+    tester,
+  ) async {
+    final booted = await boot(
+      tester,
+      MetaState(
+        mode: PlayMode.campaign,
+        coins: 500,
+        skills: {'team-2', 'throw-1'},
+        score: 700,
+      ),
+    );
+    final game = booted.game;
+    game.wave = 15;
+    knockOut(game.players);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(1.5);
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('start-over')));
+    await tester.pump();
+    expect(find.byKey(const Key('start-over-warning')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('start-over-cancel')));
+    await tester.pump();
+    expect(find.byKey(const Key('retry')), findsOneWidget);
+    expect(game.meta.coins, greaterThan(0), reason: 'cancel wipes nothing');
+
+    await tester.tap(find.byKey(const Key('start-over')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('start-over-yes')));
+    await tester.pump();
+    game.finishEntrance();
+    expect(game.wave, 1);
+    expect(game.players, hasLength(1));
+    expect(game.meta.coins, 0);
+    expect(game.meta.skills, isEmpty);
+    expect(game.meta.score, 0);
+    expect(game.meta.bestScore, 700);
+    expect(game.meta.ledger.checkpointWave, 1);
+  });
+
+  testWidgets('Campaign has no Start over button', (tester) async {
+    final game = (await boot(tester, MetaState())).game;
+    knockOut(game.players);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(1.5);
+    await tester.pump();
+    expect(find.byKey(const Key('retry')), findsOneWidget);
+    expect(find.byKey(const Key('start-over')), findsNothing);
+  });
+
   testWidgets('Easy hides Recovery in the shop', (tester) async {
     await _useSurface(tester, const Size(844, 390));
     final booted = await boot(

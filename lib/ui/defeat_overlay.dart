@@ -21,6 +21,9 @@ class DefeatOverlay extends StatefulWidget {
 }
 
 class _DefeatOverlayState extends State<DefeatOverlay> {
+  /// Start over was tapped once; the buttons ask to confirm.
+  bool _confirmStartOver = false;
+
   Future<void> _setSeason(Season season) async {
     await widget.game.setSeason(season);
     if (!mounted) return;
@@ -103,13 +106,18 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                   runSpacing: tokens.space.sm,
                   children: [
                     _Stat(label: 'CLEARED', value: '$cleared'),
-                    if (meta.mode.showsScore)
+                    if (meta.mode.showsScore) ...[
                       _Stat(
                         key: const Key('defeat-score'),
                         label: '${difficulty.label.toUpperCase()} SCORE',
                         value: '${meta.score}',
-                      )
-                    else
+                      ),
+                      _Stat(
+                        key: const Key('defeat-best-score'),
+                        label: 'BEST',
+                        value: '${meta.bestScore}',
+                      ),
+                    ] else
                       _Stat(
                         label: '${difficulty.label.toUpperCase()} BEST',
                         value: '${meta.bestWave}',
@@ -122,49 +130,119 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                   SeasonToggle(season: meta.season, onChanged: _setSeason),
                 ],
                 SizedBox(height: tokens.space.lg),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: tokens.space.md,
-                  runSpacing: tokens.space.sm,
-                  children: [
-                    DraftImageButton(
-                      key: const Key('retry'),
-                      label: checkpoint ? 'Retry stage $stage' : 'Retry',
-                      leadingIcon: Icons.replay_rounded,
-                      onPressed: game.retryFromDefeat,
-                      width: checkpoint ? 220 : 180,
-                      height: 56,
-                      fontSize: 18,
-                      feel: game.feel,
-                    ),
-                    DraftImageButton(
-                      key: const Key('open-skills'),
-                      label: 'Skills',
-                      secondary: true,
-                      leadingIcon: Icons.auto_awesome_rounded,
-                      onPressed: game.openSkillTree,
-                      width: 150,
-                      height: 56,
-                      feel: game.feel,
-                    ),
-                    DraftImageButton(
-                      key: const Key('back-to-menu'),
-                      label: 'Menu',
-                      back: true,
-                      secondary: true,
-                      leadingIcon: Icons.home_rounded,
-                      onPressed: game.exitToMenu,
-                      width: 140,
-                      height: 56,
-                      feel: game.feel,
-                    ),
-                  ],
-                ),
+                if (_confirmStartOver)
+                  _StartOverConfirm(
+                    game: game,
+                    onCancel: () => setState(() => _confirmStartOver = false),
+                  )
+                else
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: tokens.space.md,
+                    runSpacing: tokens.space.sm,
+                    children: [
+                      DraftImageButton(
+                        key: const Key('retry'),
+                        label: checkpoint ? 'Retry stage $stage' : 'Retry',
+                        leadingIcon: Icons.replay_rounded,
+                        onPressed: game.retryFromDefeat,
+                        width: checkpoint ? 220 : 180,
+                        height: 56,
+                        fontSize: 18,
+                        feel: game.feel,
+                      ),
+                      DraftImageButton(
+                        key: const Key('open-skills'),
+                        label: 'Skills',
+                        secondary: true,
+                        leadingIcon: Icons.auto_awesome_rounded,
+                        onPressed: game.openSkillTree,
+                        width: 150,
+                        height: 56,
+                        feel: game.feel,
+                      ),
+                      if (checkpoint)
+                        DraftImageButton(
+                          key: const Key('start-over'),
+                          label: 'Start over',
+                          secondary: true,
+                          leadingIcon: Icons.restart_alt_rounded,
+                          onPressed: () =>
+                              setState(() => _confirmStartOver = true),
+                          width: 170,
+                          height: 56,
+                          feel: game.feel,
+                        ),
+                      DraftImageButton(
+                        key: const Key('back-to-menu'),
+                        label: 'Menu',
+                        back: true,
+                        secondary: true,
+                        leadingIcon: Icons.home_rounded,
+                        onPressed: game.exitToMenu,
+                        width: 140,
+                        height: 56,
+                        feel: game.feel,
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Second step of Start over: says what it wipes, then Yes / Cancel.
+class _StartOverConfirm extends StatelessWidget {
+  const _StartOverConfirm({required this.game, required this.onCancel});
+
+  final BackyardBarrageGame game;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Start over at wave 1 with 0 coins, no skills, and no items? '
+          'Your score goes back to 0. Your best score stays.',
+          key: const Key('start-over-warning'),
+          style: BarrageType.body,
+          textAlign: TextAlign.center,
+        ),
+        SizedBox(height: tokens.space.md),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: tokens.space.md,
+          runSpacing: tokens.space.sm,
+          children: [
+            DraftImageButton(
+              key: const Key('start-over-yes'),
+              label: 'Yes, start over',
+              leadingIcon: Icons.restart_alt_rounded,
+              onPressed: game.startOverFromDefeat,
+              width: 220,
+              height: 56,
+              feel: game.feel,
+            ),
+            DraftImageButton(
+              key: const Key('start-over-cancel'),
+              label: 'Cancel',
+              back: true,
+              secondary: true,
+              onPressed: onCancel,
+              width: 140,
+              height: 56,
+              feel: game.feel,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

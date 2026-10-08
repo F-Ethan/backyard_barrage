@@ -65,6 +65,7 @@ class PlayerSave {
       ..coins = snap.coins
       ..bestWave = snap.bestWave
       ..score = snap.score
+      ..bestScore = snap.bestScore
       ..resumeWave = snap.resumeWave
       ..resumeArena = snap.resumeArena
       ..resumeCrewHp = snap.resumeCrewHp
@@ -159,6 +160,7 @@ class WalletSnap {
     required this.coins,
     required this.bestWave,
     required this.score,
+    this.bestScore = 0,
     required this.skills,
     this.resumeWave = 0,
     this.resumeArena,
@@ -175,6 +177,7 @@ class WalletSnap {
       coins: state.coins,
       bestWave: state.bestWave,
       score: state.score,
+      bestScore: state.bestScore,
       resumeWave: state.resumeWave,
       resumeArena: state.resumeArena,
       resumeCrewHp: state.resumeCrewHp == null
@@ -192,6 +195,7 @@ class WalletSnap {
   final int coins;
   final int bestWave;
   final int score;
+  final int bestScore;
   final Set<String> skills;
   final int resumeWave;
   final String? resumeArena;

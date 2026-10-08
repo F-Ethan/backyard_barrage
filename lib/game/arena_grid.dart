@@ -207,6 +207,32 @@ class ArenaGrid {
     return const Rect.fromLTRB(enemyLeft, rowBack, enemyRight, rowFront);
   }
 
+  /// How far right a player kid's feet may walk, at the back and front
+  /// rows: 60px short of the river bank, which slants with the perspective
+  /// (x≈579 at [rowBack], x≈458 at [rowFront] on both winter arenas). The
+  /// grid columns still end at [playerRight]; only free walking reaches
+  /// past them.
+  static const double playerReachBack = 519;
+  static const double playerReachFront = 398;
+
+  /// Furthest right the player's feet may go at feet height [y].
+  static double playerReachX(double y) {
+    final t = ((y - rowBack) / (rowFront - rowBack)).clamp(0.0, 1.0);
+    return playerReachBack + (playerReachFront - playerReachBack) * t;
+  }
+
+  /// Where the player may drag a kid: the home half, out to the river.
+  static Rect dragField() =>
+      const Rect.fromLTRB(playerLeft, rowBack, playerReachBack, rowFront);
+
+  /// [point] inside [dragField] and short of the river at its depth.
+  static Vector2 clampPlayerFeet(Vector2 point) {
+    final inside = clampToRect(dragField(), point);
+    final reach = playerReachX(inside.y);
+    if (inside.x > reach) inside.x = reach;
+    return inside;
+  }
+
   /// Body-height band used when the left thumb aims at the enemy half.
   static Rect aimField(KidSide side) {
     final feet = field(side);

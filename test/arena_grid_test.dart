@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:backyard_barrage/game/arena_grid.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
+import 'package:flame/components.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -132,5 +133,35 @@ void main() {
       expect(box.right, closeTo(baseline.right, 0.01));
     }
     expect(seen.length, greaterThan(1));
+  });
+
+  test('player feet reach toward the river, closer at the back', () {
+    expect(
+      ArenaGrid.playerReachX(ArenaGrid.rowBack),
+      ArenaGrid.playerReachBack,
+    );
+    expect(
+      ArenaGrid.playerReachX(ArenaGrid.rowFront),
+      ArenaGrid.playerReachFront,
+    );
+    // Past the old grid edge everywhere, short of the bank everywhere.
+    for (var y = ArenaGrid.rowBack; y <= ArenaGrid.rowFront; y += 20) {
+      final reach = ArenaGrid.playerReachX(y);
+      expect(reach, greaterThan(ArenaGrid.playerRight));
+      final bank =
+          579 +
+          (458 - 579) *
+              (y - ArenaGrid.rowBack) /
+              (ArenaGrid.rowFront - ArenaGrid.rowBack);
+      expect(reach, lessThanOrEqualTo(bank - 59));
+    }
+    final far = ArenaGrid.clampPlayerFeet(Vector2(900, ArenaGrid.rowFront));
+    expect(far.x, ArenaGrid.playerReachFront);
+    final back = ArenaGrid.clampPlayerFeet(Vector2(900, ArenaGrid.rowBack));
+    expect(back.x, ArenaGrid.playerReachBack);
+    expect(
+      ArenaGrid.clampPlayerFeet(Vector2(0, 0)),
+      Vector2(ArenaGrid.playerLeft, ArenaGrid.rowBack),
+    );
   });
 }

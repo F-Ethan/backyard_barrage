@@ -1112,6 +1112,69 @@ void main() {
     expect(game.charge, 0);
   });
 
+  /// Rivals hold still so aim tests can place them.
+  void freezeRivals(BackyardBarrageGame game) {
+    for (final enemy in game.enemies) {
+      for (final brain in enemy.children.whereType<EnemyController>()) {
+        brain.removeFromParent();
+      }
+    }
+    game.update(0);
+  }
+
+  testWidgets('dragging right walks a kid up to the river bank', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    freezeRivals(game);
+    final kid = game.players.first;
+    final y = kid.position.y;
+    game.pressMoveZone(kid.hitCenter);
+    game.dragMoveZone(Vector2(1000, kid.hitCenter.y));
+    for (var i = 0; i < 60; i++) {
+      game.update(1 / 30);
+    }
+    game.releaseMoveZone();
+    expect(kid.position.x, greaterThan(ArenaGrid.playerRight + 30));
+    expect(kid.position.x, closeTo(ArenaGrid.playerReachX(y), 1));
+  });
+
+  /// Hold the charge until power is full. The aim pans only after this,
+  /// starting straight ahead on the next frame.
+  void holdToFull(BackyardBarrageGame game) {
+    for (var i = 0; i < 400 && game.charge < 1; i++) {
+      game.update(0.02);
+    }
+    expect(game.charge, 1);
+    expect(
+      ThrowPhysics.aimElevation(game.chargeHud.aimDir, facingRight: true),
+      0,
+      reason: 'straight ahead until full power',
+    );
+  }
+
+  testWidgets('below full power the kid throws straight ahead', (tester) async {
+    final game = (await boot(tester, MetaState())).game;
+    freezeRivals(game);
+    final kid = game.players.first;
+    game.pressMoveZone(kid.hitCenter);
+    game.releaseMoveZone();
+    game.pressChargeZone();
+    for (var i = 0; i < 20; i++) {
+      game.update(0.04);
+      expect(game.charge, lessThan(1));
+      expect(
+        ThrowPhysics.aimElevation(game.chargeHud.aimDir, facingRight: true),
+        0,
+      );
+      expect(kid.chargeYaw, ChargeYaw.across);
+    }
+    game.releaseChargeZone();
+    game.update(0);
+    final lob = game.world.children.whereType<LobProjectile>().single;
+    expect(lob.landingY, closeTo(lob.originY, 0.01), reason: 'no drift');
+  });
+
   testWidgets('release during the swivel picks the throw depth', (
     tester,
   ) async {
@@ -1125,8 +1188,8 @@ void main() {
     expect(game.selectedKid, kid);
 
     game.pressChargeZone();
+    holdToFull(game);
     game.update(ThrowPhysics.swivelPeriod / 4);
-    expect(game.charge, greaterThan(0.3));
     game.releaseChargeZone();
     expect(game.isCharging, isFalse);
     game.update(0);
@@ -1136,16 +1199,6 @@ void main() {
     expect(lob.landingRow, lessThan(row));
     expect(kid.angle, closeTo(0, 0.001));
   });
-
-  /// Rivals hold still so aim tests can place them.
-  void freezeRivals(BackyardBarrageGame game) {
-    for (final enemy in game.enemies) {
-      for (final brain in enemy.children.whereType<EnemyController>()) {
-        brain.removeFromParent();
-      }
-    }
-    game.update(0);
-  }
 
   testWidgets('the sweep lingers while the line is on a rival', (tester) async {
     final game = (await boot(tester, MetaState())).game;
@@ -1162,6 +1215,7 @@ void main() {
     game.pressMoveZone(kid.hitCenter);
     game.releaseMoveZone();
     game.pressChargeZone();
+    holdToFull(game);
     game.update(step);
     final open = ThrowPhysics.aimElevation(
       game.chargeHud.aimDir,
@@ -1177,6 +1231,7 @@ void main() {
     // Dead on the flat line: the sweep slows by the friction factor.
     rival.position = Vector2(1000, kid.position.y);
     game.pressChargeZone();
+    holdToFull(game);
     game.update(step);
     final sticky = ThrowPhysics.aimElevation(
       game.chargeHud.aimDir,
@@ -1379,12 +1434,20 @@ void main() {
     // peak and before the down-screen end of the same cycle.
     double holdForSine(double sine) => period * (2 - sine) / 4;
 
+    // Park the rival behind the thrower so the aim line never crosses it
+    // and the sweep keeps full speed (no friction) for exact timing.
+    freezeRivals(game);
+    enemy.position = Vector2(40, enemy.position.y);
+
     game.pressChargeZone();
     expect(kid.chargeYaw, ChargeYaw.across);
     expect(kid.sprite, kid.chargeSprite);
     expect(kid.angle, closeTo(0, 0.001));
     expect(kid.scale.x, greaterThan(0));
+    holdToFull(game);
+    expect(kid.chargeYaw, ChargeYaw.across);
 
+    // Sweep time from full power.
     var held = 0.0;
     void advanceTo(double t) {
       game.update(t - held);
@@ -1741,10 +1804,10 @@ void main() {
     game.finishEntrance();
     expect(game.phase, MatchPhase.fight);
     expect(game.isCharging, isTrue);
-    // The walk-on skip advances one 0.25s tick after the charge starts,
-    // which is already inside the 15l band.
-    expect(game.players.first.chargeYaw, ChargeYaw.yaw15l);
-    expect(game.players.first.sprite, game.players.first.turn15lSprite);
+    // Power is still building, so the kid is aiming straight ahead.
+    expect(game.charge, lessThan(1));
+    expect(game.players.first.chargeYaw, ChargeYaw.across);
+    expect(game.players.first.sprite, game.players.first.chargeSprite);
   });
 
   testWidgets('fight HUD stays screen-sized on a short phone', (tester) async {

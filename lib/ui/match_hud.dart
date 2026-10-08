@@ -53,21 +53,21 @@ class MatchHud extends StatelessWidget {
               ),
             if (fighting)
               Positioned(
-                right: 0,
+                left: 0,
                 top: 0,
                 bottom: 0,
                 child: SafeArea(
                   child: Padding(
-                    // Below the status chips and the hint, clear of the
-                    // thumbs lower down.
+                    // Bottom-left, under the left thumb. The top inset
+                    // keeps a tall stack clear of the status chips.
                     padding: EdgeInsets.fromLTRB(
-                      0,
-                      120,
                       tokens.space.md,
-                      tokens.space.sm,
+                      120,
+                      0,
+                      tokens.space.lg,
                     ),
                     child: Align(
-                      alignment: Alignment.topRight,
+                      alignment: Alignment.bottomLeft,
                       child: PowerUpBar(game: game),
                     ),
                   ),

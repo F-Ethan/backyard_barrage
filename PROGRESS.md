@@ -41,6 +41,7 @@ Playable MVP loop on the gameplay branch:
 
 Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you notice something you are not fixing in the current PR. Remove or rewrite a row when it is actually fixed.
 
+- **Launch screen is the Flutter default.** `ios/Runner/Assets.xcassets/LaunchImage.imageset` holds the 1×1 placeholder, so the launch screen is plain white before the menu appears. Not a store blocker; add a branded launch image when art is ready.
 - **Power-ups use Material icons, not art.** The six items and their HUD buttons draw Material glyphs until item art lands. Prices and durations are first-pass. Fort cracker only affects rival forts (only one rival fort exists so far). Items are kept through a Campaign defeat (unlike skills).
 - **River reach is tuned to the current arenas.** `ArenaGrid.playerReachBack/Front` (519 / 398) are 60px short of the bank both winter maps share. A map with a different river needs its own limit. Rivals still stay inside their grid columns.
 - **Arena river is scenery only.** Both winter maps (`world/arena_backyard_draft.png`, `world/arena_park_draft.png`, 16:9 centre crops of the owner's 2796×1290 art) have a river in the neutral band. Balls fly over it and nothing interacts with it. `world/backyard_bg_winter_draft.png` is no longer drawn in winter.

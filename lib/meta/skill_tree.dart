@@ -105,6 +105,8 @@ class SkillTree {
 
   static const parentLockReason = 'Unlock the node above first.';
 
+  static const teammateLockReason = 'Buy a second kid first.';
+
   /// Price of the [rank]th node (1-based) in a chain that starts at [base]:
   /// ×2.5 per rank, rounded to the nearest 5.
   static int rankCost(int base, int rank) {
@@ -115,7 +117,6 @@ class SkillTree {
     }
     return ((price / 5) + 0.5).floor() * 5;
   }
-  static const teammateLockReason = 'Buy a second kid first.';
 
   static const List<SkillNode> nodes = [
     SkillNode(
@@ -361,7 +362,8 @@ class SkillTree {
       id: 'lanes',
       branch: SkillBranch.lanes,
       title: 'Open fort',
-      detail: 'Your snowballs pass through your own fort. The base rule stays until you buy this.',
+      detail:
+          'Your snowballs pass through your own fort. The base rule stays until you buy this.',
       cost: 40,
     ),
     SkillNode(

@@ -266,7 +266,7 @@ class MetaState {
     'bestWave': bestWave,
     'score': score,
     'resumeWave': resumeWave,
-    if (resumeArena != null) 'resumeArena': resumeArena!,
+    'resumeArena': ?resumeArena,
     'difficulty': difficulty.name,
     'mode': mode.name,
   };

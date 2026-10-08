@@ -1395,23 +1395,22 @@ class BackyardBarrageGame extends FlameGame {
     kid.syncDepth();
   }
 
-  /// Feet stay in the player's half and off a teammate.
+  /// Feet stay in the player's half, short of the river, and off a teammate.
   Vector2 _dragPoint(KidComponent kid, Vector2 world) {
-    final field = ArenaGrid.field(KidSide.player);
-    var point = ArenaGrid.clampToRect(field, world);
+    var point = ArenaGrid.clampPlayerFeet(world);
     for (var pass = 0; pass < players.length; pass++) {
       for (final other in players) {
         if (identical(other, kid) || other.isKo) continue;
-        point = _apartFrom(field, point, other.position);
+        point = _apartFrom(point, other.position);
       }
     }
     return point;
   }
 
-  /// Pushes [point] out to [kidSpacing] from [other], staying inside [field].
+  /// Pushes [point] out to [kidSpacing] from [other], staying walkable.
   ///
   /// A teammate on the edge would otherwise clamp the push back on top of them.
-  Vector2 _apartFrom(Rect field, Vector2 point, Vector2 other) {
+  Vector2 _apartFrom(Vector2 point, Vector2 other) {
     final away = point - other;
     final dist = away.length;
     if (dist >= kidSpacing) return point;
@@ -1425,7 +1424,7 @@ class BackyardBarrageGame extends FlameGame {
     Vector2? best;
     var bestMiss = double.infinity;
     for (final option in options) {
-      final clamped = ArenaGrid.clampToRect(field, option);
+      final clamped = ArenaGrid.clampPlayerFeet(option);
       if (clamped.distanceTo(other) < kidSpacing - 0.5) continue;
       final miss = clamped.distanceTo(point);
       if (miss < bestMiss) {
@@ -1524,6 +1523,9 @@ class BackyardBarrageGame extends FlameGame {
           phase != MatchPhase.fight) {
         _endActiveThrow();
       } else {
+        // Full on an earlier frame: the pan starts the frame after power
+        // tops out, from straight ahead.
+        final wasFull = _charge >= 1;
         _chargeHeld += dt;
         _charge = ThrowPhysics.chargeForHold(
           _chargeHeld,
@@ -1531,12 +1533,16 @@ class BackyardBarrageGame extends FlameGame {
         );
         // The sweep lingers while the line crosses a rival (in reach or
         // not), so a release on target is a fair window.
-        final onLine = _scanAim(kid, _swivel, double.infinity).hit != null;
-        final goal = onLine ? ThrowPhysics.aimFriction : 1.0;
-        final blend = math.min(1.0, dt * ThrowPhysics.aimFrictionBlend);
-        _sweepSpeed += (goal - _sweepSpeed) * blend;
-        _sweepPhase +=
-            dt * 2 * math.pi / ThrowPhysics.swivelPeriod * _sweepSpeed;
+        // Straight ahead while power builds. The pan starts only once the
+        // charge is full, so power and aim are two separate beats.
+        if (wasFull) {
+          final onLine = _scanAim(kid, _swivel, double.infinity).hit != null;
+          final goal = onLine ? ThrowPhysics.aimFriction : 1.0;
+          final blend = math.min(1.0, dt * ThrowPhysics.aimFrictionBlend);
+          _sweepSpeed += (goal - _sweepSpeed) * blend;
+          _sweepPhase +=
+              dt * 2 * math.pi / ThrowPhysics.swivelPeriod * _sweepSpeed;
+        }
         _swivel =
             ThrowPhysics.sweepWave(_sweepPhase) * ThrowPhysics.maxAimRadians;
         _aimDir = ThrowPhysics.aimForElevation(_swivel, facingRight: true);

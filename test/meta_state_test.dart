@@ -606,4 +606,19 @@ void main() {
     save.season = Season.summer;
     expect(save.season, Season.winter);
   });
+
+  test('a run bookmark survives a save and the wallet split', () {
+    final profile = PlayerSave();
+    profile.wallet(PlayMode.arcade, Difficulty.hard)
+      ..resumeWave = 5
+      ..resumeArena = 'park';
+    final back = PlayerSave.fromJson(profile.toJson());
+    final hard = back.wallet(PlayMode.arcade, Difficulty.hard);
+    expect(hard.resumeWave, 5);
+    expect(hard.resumeArena, 'park');
+    expect(back.wallet(PlayMode.arcade, Difficulty.normal).canResume, isFalse);
+    final snap = WalletSnap.from(hard);
+    final other = PlayerSave()..apply(snap);
+    expect(other.wallet(PlayMode.arcade, Difficulty.hard).resumeWave, 5);
+  });
 }

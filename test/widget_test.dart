@@ -105,4 +105,24 @@ void main() {
     expect(big().data, '0');
     expect(find.byKey(const Key('campaign-best-hard')), findsOneWidget);
   });
+
+  testWidgets('a bookmarked mode offers Resume with its wave', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final store = SaveStore(preferences: prefs);
+    final profile = await store.load();
+    profile.wallet(PlayMode.campaign, Difficulty.normal).resumeWave = 6;
+    await store.saveProfile(profile);
+
+    await tester.pumpWidget(BackyardBarrageApp(saveStore: store));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    Text label(String mode) =>
+        tester.widget<Text>(find.byKey(Key('$mode-play-label')));
+    expect(label('campaign').data, 'Resume');
+    expect(label('arcade').data, 'Play');
+    expect(find.text('wave 6'), findsOneWidget);
+    expect(find.byKey(const Key('arcade-resume-wave')), findsNothing);
+  });
 }

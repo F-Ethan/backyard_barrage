@@ -641,19 +641,38 @@ class _ModeCard extends StatelessWidget {
             color: primary ? tokens.primaryDeep : tokens.onPrimary,
           ),
           const SizedBox(width: 2),
-          Text(
-            'Play',
-            style: BarrageType.button.copyWith(
-              fontSize: compact ? 16 : 20,
-              color: primary ? tokens.primaryDeep : tokens.onPrimary,
-            ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                wallet.canResume ? 'Resume' : 'Play',
+                key: Key('${mode.name}-play-label'),
+                style: BarrageType.button.copyWith(
+                  fontSize: compact ? 16 : 20,
+                  color: primary ? tokens.primaryDeep : tokens.onPrimary,
+                ),
+              ),
+              // The run left through Pause picks up on this wave.
+              if (wallet.canResume)
+                Text(
+                  'wave ${wallet.resumeWave}',
+                  key: Key('${mode.name}-resume-wave'),
+                  style: BarrageType.overline.copyWith(
+                    fontSize: compact ? 10 : 12,
+                    color: (primary ? tokens.primaryDeep : tokens.onPrimary)
+                        .withValues(alpha: 0.8),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
     );
     return Semantics(
       button: true,
-      label: 'Play ${mode.label}',
+      label: wallet.canResume
+          ? 'Resume ${mode.label} at wave ${wallet.resumeWave}'
+          : 'Play ${mode.label}',
       child: PressScale(
         key: Key('play-${mode.name}'),
         pressedScale: 0.97,

@@ -14,6 +14,7 @@ import '../feel/feel_bus.dart';
 import '../meta/difficulty.dart';
 import '../meta/game_settings.dart';
 import '../meta/meta_state.dart';
+import '../meta/play_mode.dart';
 import '../meta/save_store.dart';
 import '../meta/settings_store.dart';
 import '../seasons/arena.dart';
@@ -21,6 +22,7 @@ import '../seasons/season.dart';
 import '../seasons/season_kit.dart';
 import 'arena_grid.dart';
 import 'combat_rules.dart';
+import 'crew_carry.dart';
 import 'rival_type.dart';
 import 'components/charge_indicator.dart';
 import 'components/coin_pop.dart';
@@ -402,10 +404,19 @@ class BackyardBarrageGame extends FlameGame {
       players.add(kid);
       world.add(kid);
     }
+    final crewHp = _nextCrewHp();
+    _waveStartHp = List<int>.of(crewHp);
     for (var i = 0; i < players.length; i++) {
       final kid = players[i];
       final goal = ArenaGrid.slot(KidSide.player, i);
+      if (crewHp[i] <= 0) {
+        // Knocked out in an earlier wave and not brought back.
+        kid.benchOut();
+        kid.position = Vector2(-_offstage - i * 36, goal.y);
+        continue;
+      }
       kid.revive();
+      kid.hp = crewHp[i];
       kid.shieldHits = meta.shieldCharges;
       kid.position = Vector2(-_offstage - i * 36, goal.y);
       kid.setWalking(true);
@@ -587,12 +598,43 @@ class BackyardBarrageGame extends FlameGame {
     startWave();
   }
 
+  /// HP each player kid starts the wave on. A resumed run uses its saved
+  /// crew; the first wave of a run starts full; later waves carry per
+  /// [CrewCarry]. A kid bought in the shop joins at full health.
+  List<int> _nextCrewHp() {
+    final maxHp = CombatRules.hitsToKo;
+    final saved = _resumeCrewHp;
+    _resumeCrewHp = null;
+    if (saved != null) {
+      return [
+        for (var i = 0; i < players.length; i++)
+          i < saved.length ? saved[i].clamp(0, maxHp) : maxHp,
+      ];
+    }
+    if (wave <= 1) return List.filled(players.length, maxHp);
+    return _carriedHp([for (final kid in players) kid.hp]);
+  }
+
+  List<int> _carriedHp(List<int> now) => CrewCarry.next(
+    hp: now,
+    maxHp: CombatRules.hitsToKo,
+    difficulty: feel.settings.difficulty,
+    carries: meta.mode == PlayMode.arcade,
+    healBonus: meta.healPerWave,
+    reviveOne: meta.reviveOne,
+  );
+
+  List<int>? _resumeCrewHp;
+  List<int> _waveStartHp = const [];
+
   /// Picks up a run left through Pause → Menu: same wave (the next one if
-  /// that wave was already cleared) and same arena. The bookmark is used
-  /// once.
+  /// that wave was already cleared), same arena, and in Campaign the saved
+  /// crew health. The bookmark is used once.
   void _takeResume() {
     if (!meta.canResume) return;
     wave = meta.resumeWave;
+    _resumeCrewHp = meta.resumeCrewHp;
+    meta.resumeCrewHp = null;
     for (final arena in Arena.values) {
       if (arena.name == meta.resumeArena) _arena = arena;
     }
@@ -605,12 +647,17 @@ class BackyardBarrageGame extends FlameGame {
     final at = phase == MatchPhase.paused ? _resumePhase : phase;
     switch (at) {
       case MatchPhase.entering || MatchPhase.fight:
+        // Replay this wave with the health it started on.
         meta.resumeWave = wave;
+        meta.resumeCrewHp = List<int>.of(_waveStartHp);
       case MatchPhase.clearing || MatchPhase.shop:
-        // This wave already paid out; pick up on the next one.
+        // This wave already paid out; pick up on the next one, with the
+        // health the crew would carry into it.
         meta.resumeWave = wave + 1;
+        meta.resumeCrewHp = _carriedHp([for (final kid in players) kid.hp]);
       case MatchPhase.defeat || MatchPhase.paused:
         meta.resumeWave = 0;
+        meta.resumeCrewHp = null;
     }
     meta.resumeArena = meta.resumeWave > 0 ? _arena.name : null;
   }
@@ -696,6 +743,7 @@ class BackyardBarrageGame extends FlameGame {
     meta.resetRun();
     meta.resumeWave = 0;
     meta.resumeArena = null;
+    meta.resumeCrewHp = null;
     unawaited(persist());
     _publishHud();
     _showBanner(

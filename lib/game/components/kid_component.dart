@@ -349,6 +349,16 @@ class KidComponent extends SpriteComponent {
     _refreshSprite();
   }
 
+  /// Out for this whole wave: knocked out in an earlier one and not
+  /// brought back. Already faded and off the yard.
+  void benchOut() {
+    revive();
+    hp = 0;
+    _applyKoLook();
+    _koAge = koFadeDelay + koFadeSeconds;
+    opacity = 0;
+  }
+
   void _applyKoLook() {
     _hitPoseTimer = 0;
     _chargingPose = false;

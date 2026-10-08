@@ -704,6 +704,106 @@ void main() {
     expect(game.isCharging, isFalse);
   });
 
+  /// Campaign crew of two: the lead kid is down to [leadHp] and the
+  /// teammate is knocked out. Clears the wave and starts the next one.
+  Future<BackyardBarrageGame> nextWaveWithHurtCrew(
+    WidgetTester tester, {
+    required Difficulty difficulty,
+    PlayMode mode = PlayMode.arcade,
+    Set<String> extraSkills = const {},
+    int leadHp = 1,
+  }) async {
+    final meta = MetaState(
+      skills: {'team-2', ...extraSkills},
+      mode: mode,
+      difficulty: difficulty,
+    );
+    final game = (await boot(tester, meta)).game;
+    game.feel.apply(game.feel.settings.copyWith(difficulty: difficulty));
+    expect(game.players, hasLength(2));
+    game.players[0].hp = leadHp;
+    knockOut([game.players[1]]);
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+    expect(game.phase, MatchPhase.shop);
+    game.continueFromShop();
+    game.finishEntrance();
+    expect(game.wave, 2);
+    return game;
+  }
+
+  testWidgets('Campaign on Normal heals one and leaves the KOd kid out', (
+    tester,
+  ) async {
+    final game = await nextWaveWithHurtCrew(
+      tester,
+      difficulty: Difficulty.normal,
+    );
+    expect(game.players[0].hp, 2);
+    expect(game.players[1].isKo, isTrue);
+    expect(game.selectedKid, game.players[0]);
+    expect(game.phase, MatchPhase.fight);
+  });
+
+  testWidgets('Campaign on Hard carries health as it is', (tester) async {
+    final game = await nextWaveWithHurtCrew(
+      tester,
+      difficulty: Difficulty.hard,
+    );
+    expect(game.players[0].hp, 1);
+    expect(game.players[1].isKo, isTrue);
+  });
+
+  testWidgets('Easy and Arcade bring the whole crew back full', (tester) async {
+    final easy = await nextWaveWithHurtCrew(
+      tester,
+      difficulty: Difficulty.easy,
+    );
+    expect(easy.players.map((k) => k.hp), [3, 3]);
+    await tester.pumpWidget(const SizedBox.shrink());
+    final arcade = await nextWaveWithHurtCrew(
+      tester,
+      difficulty: Difficulty.hard,
+      mode: PlayMode.campaign,
+    );
+    expect(arcade.players.map((k) => k.hp), [3, 3]);
+  });
+
+  testWidgets('Patch up and Second wind soften Hard', (tester) async {
+    final game = await nextWaveWithHurtCrew(
+      tester,
+      difficulty: Difficulty.hard,
+      extraSkills: {'mend-1', 'mend-2', 'revive-1'},
+    );
+    expect(game.players[0].hp, 3);
+    expect(game.players[1].isKo, isFalse);
+    expect(game.players[1].hp, 1);
+  });
+
+  testWidgets('leaving mid-wave cannot heal the Campaign crew', (tester) async {
+    final game = await nextWaveWithHurtCrew(
+      tester,
+      difficulty: Difficulty.hard,
+    );
+    final meta = game.meta;
+    game.players[0].hp = 1;
+    game.pauseMatch();
+    game.exitToMenu();
+    expect(meta.resumeWave, 2);
+    expect(meta.resumeCrewHp, [1, 0]);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    final again = (await boot(tester, meta)).game;
+    again.feel.apply(again.feel.settings.copyWith(difficulty: Difficulty.hard));
+    expect(again.wave, 2);
+    expect(again.players[0].hp, 1);
+    expect(again.players[1].isKo, isTrue);
+    expect(meta.resumeCrewHp, isNull);
+  });
+
   testWidgets('a wiped crew can retry at full HP', (tester) async {
     final game = (await boot(
       tester,

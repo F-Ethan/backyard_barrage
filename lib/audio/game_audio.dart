@@ -14,6 +14,23 @@ abstract final class AudioCues {
   static const loseStinger = 'lose_stinger';
   static const uiTap = 'ui_tap';
   static const purchaseCoin = 'purchase_coin';
+  static const uiBack = 'ui_back';
+  static const throwFullPower = 'throw_full_power';
+  static const chargeHum = 'charge_hum';
+  static const fortHit = 'fort_hit';
+  static const fortCollapse = 'fort_collapse';
+  static const coinPop = 'coin_pop';
+  static const waveStart = 'wave_start';
+  static const frostGlint = 'frost_glint';
+  static const armorBlock = 'armor_block';
+  static const powerUpArmor = 'powerup_armor';
+  static const powerUpFreeze = 'powerup_freeze';
+  static const powerUpCocoa = 'powerup_cocoa';
+  static const powerUpPower = 'powerup_power';
+  static const houndGrowl = 'hound_growl';
+  static const houndLeap = 'hound_leap';
+  static const houndSnap = 'hound_snap';
+  static const houndWhimper = 'hound_whimper';
   static const menuLoop = 'menu_loop';
   static const battleWinter = 'battle_loop_winter';
   static const battleSummer = 'battle_loop_summer';
@@ -28,6 +45,23 @@ abstract final class AudioCues {
     loseStinger,
     uiTap,
     purchaseCoin,
+    uiBack,
+    throwFullPower,
+    chargeHum,
+    fortHit,
+    fortCollapse,
+    coinPop,
+    waveStart,
+    frostGlint,
+    armorBlock,
+    powerUpArmor,
+    powerUpFreeze,
+    powerUpCocoa,
+    powerUpPower,
+    houndGrowl,
+    houndLeap,
+    houndSnap,
+    houndWhimper,
   ];
 
   static const loops = <String>[menuLoop, battleWinter, battleSummer];
@@ -74,16 +108,41 @@ abstract class AudioPlayback {
   Future<void> playSfx(String relativePath);
   Future<void> playLoop(String relativePath, {double volume = 0.5});
   Future<void> stopLoop();
+
+  /// A looping sound effect (the charge hum), separate from the music.
+  Future<void> startSfxLoop(String relativePath);
+  Future<void> stopSfxLoop();
 }
 
 class FlameAudioPlayback extends AudioPlayback {
   FlameAudioPlayback();
 
   bool _bgmReady = false;
+  AudioPlayer? _sfxLoop;
 
   @override
   Future<void> playSfx(String relativePath) {
     return FlameAudio.play(relativePath);
+  }
+
+  @override
+  Future<void> startSfxLoop(String relativePath) async {
+    final player = await FlameAudio.loop(relativePath, volume: 0.6);
+    final old = _sfxLoop;
+    _sfxLoop = player;
+    if (old != null) await _dispose(old);
+  }
+
+  @override
+  Future<void> stopSfxLoop() async {
+    final player = _sfxLoop;
+    _sfxLoop = null;
+    if (player != null) await _dispose(player);
+  }
+
+  static Future<void> _dispose(AudioPlayer player) async {
+    await player.stop();
+    await player.dispose();
   }
 
   @override
@@ -113,6 +172,12 @@ class SilentAudioPlayback extends AudioPlayback {
 
   @override
   Future<void> stopLoop() async {}
+
+  @override
+  Future<void> startSfxLoop(String relativePath) async {}
+
+  @override
+  Future<void> stopSfxLoop() async {}
 }
 
 /// flame_audio hooks. SFX and music stay silent when the file is absent
@@ -131,6 +196,7 @@ class GameAudio {
   bool sfxEnabled = true;
   bool musicEnabled = true;
   String? _currentLoop;
+  String? _sfxLoopCue;
   Future<void>? _warming;
 
   Future<void> warmUp() {
@@ -169,6 +235,28 @@ class GameAudio {
     if (file == null) return;
     try {
       await _playback.playSfx(file);
+    } catch (_) {}
+  }
+
+  /// Starts [cue] looping as a sound effect until [stopSfxLoop]. A stop
+  /// that lands while the start is still loading wins.
+  Future<void> startSfxLoop(String cue) async {
+    if (!sfxEnabled || _sfxLoopCue == cue) return;
+    _sfxLoopCue = cue;
+    await warmUp();
+    final file = _resolved[cue];
+    if (file == null || _sfxLoopCue != cue) return;
+    try {
+      await _playback.startSfxLoop(file);
+      if (_sfxLoopCue != cue) await _playback.stopSfxLoop();
+    } catch (_) {}
+  }
+
+  Future<void> stopSfxLoop() async {
+    if (_sfxLoopCue == null) return;
+    _sfxLoopCue = null;
+    try {
+      await _playback.stopSfxLoop();
     } catch (_) {}
   }
 

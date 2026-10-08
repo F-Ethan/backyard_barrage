@@ -114,6 +114,7 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                     DraftImageButton(
                       key: const Key('back-to-menu'),
                       label: 'Menu',
+                      back: true,
                       secondary: true,
                       leadingIcon: Icons.home_rounded,
                       onPressed: game.exitToMenu,

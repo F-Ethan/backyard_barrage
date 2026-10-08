@@ -279,7 +279,7 @@ class BackyardBarrageGame extends FlameGame {
           }
         }
     }
-    feel.powerUpUsed();
+    feel.powerUpUsed(item);
     hudRevision.value++;
     unawaited(persist());
     return true;
@@ -554,6 +554,7 @@ class BackyardBarrageGame extends FlameGame {
           isFighting: () => phase == MatchPhase.fight && !_settling,
           playerChargeSeconds: _baseChargeSeconds,
           profile: rival,
+          onWindup: rival.glint ? feel.frostGlint : null,
         ),
       );
     }
@@ -677,10 +678,23 @@ class BackyardBarrageGame extends FlameGame {
       onCatch: _houndCaught,
       isLive: () => phase == MatchPhase.fight,
       difficulty: feel.settings.difficulty,
+      onState: _houndSound,
     );
     _hound = hound;
     world.add(hound);
+    feel.houndGrowl();
     return hound;
+  }
+
+  void _houndSound(HoundState state) {
+    switch (state) {
+      case HoundState.jump:
+        feel.houndLeap();
+      case HoundState.flee:
+        feel.houndWhimper();
+      default:
+        break;
+    }
   }
 
   void _tickHound(double dt) {
@@ -721,9 +735,13 @@ class BackyardBarrageGame extends FlameGame {
   /// is the only thing that turns it away.
   bool _houndCaught(KidComponent kid) {
     if (phase != MatchPhase.fight || kid.isKo) return false;
-    if (_armorTime > 0) return false;
+    if (_armorTime > 0) {
+      feel.armorBlocked();
+      return false;
+    }
     final selected = identical(kid, _selected);
     kid.knockOutNow();
+    feel.houndSnap();
     _burst(kid.hitCenter, depthY: kid.hitCenter.y, power: 1.3);
     feel.kidHit(knockedOut: true, season: meta.season);
     _punch(knockedOut: true);
@@ -1005,6 +1023,7 @@ class BackyardBarrageGame extends FlameGame {
   /// Center title for the walk-on. Cleared when the crews reach their spots.
   void _showWaveIntro() {
     _showBanner('Wave $wave', fontSize: 56, color: const Color(0xFF1A2332));
+    feel.waveStart();
     _pendingBanner = _Banner.waveIntro;
     _bannerTime = 0;
   }
@@ -1302,6 +1321,7 @@ class BackyardBarrageGame extends FlameGame {
       return;
     }
     _charging = true;
+    feel.chargeHum(true);
     _chargeHeld = 0;
     _charge = ThrowPhysics.minThrowCharge;
     if (_powerArmed) {
@@ -1332,6 +1352,7 @@ class BackyardBarrageGame extends FlameGame {
       _playerChargeSeconds(),
     );
     _charging = false;
+    feel.chargeHum(false);
     _chargeHeld = 0;
     _charge = 0;
     _swivel = 0;
@@ -1359,7 +1380,7 @@ class BackyardBarrageGame extends FlameGame {
       trackY: kid.hitCenter.y,
     );
     kid.showThrowPose();
-    feel.playerReleased();
+    feel.playerReleased(fullPower: charge >= 0.999);
     _spawnShot(owner: kid, lob: lob, targets: enemies, manualThrow: true);
   }
 
@@ -1416,11 +1437,18 @@ class BackyardBarrageGame extends FlameGame {
     world.add(shot);
   }
 
+  @visibleForTesting
+  void debugKidHit(LobProjectile shot, KidComponent target) =>
+      _onKidHit(shot, target);
+
   void _onKidHit(LobProjectile shot, KidComponent target) {
     _burst(shot.position, depthY: target.hitCenter.y);
     if (phase != MatchPhase.fight || target.isKo) return;
     final selectedHit = identical(target, _selected);
-    applySnowballHit(shot: shot, target: target);
+    if (!applySnowballHit(shot: shot, target: target)) {
+      feel.armorBlocked();
+      return;
+    }
     feel.kidHit(knockedOut: target.isKo, season: meta.season);
     target.recoil(shot.facing);
     _punch(knockedOut: target.isKo);
@@ -1431,6 +1459,7 @@ class BackyardBarrageGame extends FlameGame {
           position: target.hitCenter - Vector2(0, 92),
         ),
       );
+      feel.coinPop();
     }
     if (selectedHit) {
       _endActiveThrow();
@@ -1442,16 +1471,17 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   /// One snowball. Damage nodes repeat the hit. Shields eat a hit each time.
+  /// False when Frost armor turned it away.
   @visibleForTesting
-  void applySnowballHit({
+  bool applySnowballHit({
     required LobProjectile shot,
     required KidComponent target,
   }) {
-    if (phase != MatchPhase.fight || target.isKo) return;
+    if (phase != MatchPhase.fight || target.isKo) return true;
     final owner = shot.owner;
     final fromPlayer = owner != null && owner.side == KidSide.player;
     final ally = target.side == KidSide.player;
-    if (ally && _armorTime > 0) return; // Frost armor
+    if (ally && _armorTime > 0) return false; // Frost armor
     final hits = fromPlayer ? meta.hitsFor(manualThrow: shot.manualThrow) : 1;
     var scale = meta.stunScaleFor(ally: ally);
     // Difficulty shortens ally stun only. Rival brush-off and knockdown
@@ -1460,6 +1490,7 @@ class BackyardBarrageGame extends FlameGame {
     for (var i = 0; i < hits && !target.isKo; i++) {
       target.takeHit(stunScale: scale);
     }
+    return true;
   }
 
   @visibleForTesting
@@ -1467,10 +1498,11 @@ class BackyardBarrageGame extends FlameGame {
 
   void _onFortHit(LobProjectile shot) {
     _burst(shot.position, power: 0.75);
-    feel.impact(meta.season);
-    if (phase != MatchPhase.fight) return;
     final cover = shot.struckFort;
-    if (cover == null) return;
+    if (phase != MatchPhase.fight || cover == null) {
+      feel.impact(meta.season);
+      return;
+    }
     if (shot.cracker && cover.side == KidSide.enemy) {
       cover.collapse();
       // A whole fort coming down lands harder than a chip.
@@ -1479,7 +1511,13 @@ class BackyardBarrageGame extends FlameGame {
       feel.fortCollapsed();
       return;
     }
+    final wasStanding = cover.standing;
     if (shot.fortDamage) cover.takeHit();
+    if (wasStanding && cover.isCollapsed) {
+      feel.fortCollapsed();
+    } else {
+      feel.fortHit();
+    }
   }
 
   void _onGroundMiss(LobProjectile shot) {
@@ -1760,6 +1798,7 @@ class BackyardBarrageGame extends FlameGame {
     _chargeArmed = false;
     _moveHolding = false;
     _charging = false;
+    feel.chargeHum(false);
     _charge = 0;
     _chargeHeld = 0;
     _swivel = 0;
@@ -1827,6 +1866,12 @@ class BackyardBarrageGame extends FlameGame {
       }
     }
     return best;
+  }
+
+  @override
+  void onRemove() {
+    feel.chargeHum(false);
+    super.onRemove();
   }
 
   @override

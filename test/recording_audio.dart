@@ -20,6 +20,19 @@ class RecordingPlayback extends AudioPlayback {
   Future<void> stopLoop() async {
     stops += 1;
   }
+
+  final sfxLoops = <String>[];
+  int sfxLoopStops = 0;
+
+  @override
+  Future<void> startSfxLoop(String relativePath) async {
+    sfxLoops.add(relativePath);
+  }
+
+  @override
+  Future<void> stopSfxLoop() async {
+    sfxLoopStops += 1;
+  }
 }
 
 class RecordingPulse extends HapticPulse {

@@ -1,7 +1,11 @@
+import 'dart:math' as math;
+
 import '../seasons/season.dart';
 import 'difficulty.dart';
 import 'power_up.dart';
 import 'play_mode.dart';
+import 'run_ledger.dart';
+import 'skill_effects.dart';
 import 'skill_tree.dart';
 
 /// One wallet: the skill tree, coins, and best wave for one mode on one
@@ -9,8 +13,9 @@ import 'skill_tree.dart';
 ///
 /// Crew size, fort stage, and throw rank are the team, fort, and throw
 /// chains. Season is shared by both modes and stored here so a match can
-/// swap it. Arcade defeat clears every node and keeps the unspent coins.
-/// Campaign defeat keeps the nodes.
+/// swap it. [PlayMode.arcade] (shown as Campaign) defeat clears every node
+/// and keeps the unspent coins. [PlayMode.campaign] (shown as Arcade) goes
+/// back to its stage checkpoint ([restoreCheckpoint]).
 class MetaState {
   MetaState({
     this.coins = 0,
@@ -27,7 +32,9 @@ class MetaState {
     Map<PowerUp, int>? items,
     this.mode = PlayMode.arcade,
     this.difficulty = Difficulty.normal,
-  }) : _season = season.orPlayable {
+    RunLedger? ledger,
+  }) : _season = season.orPlayable,
+       ledger = ledger ?? RunLedger() {
     if (items != null) replaceItems(items);
     if (skills != null) {
       _skills.addAll(_closed(skills));
@@ -44,19 +51,20 @@ class MetaState {
 
   static const int maxCrew = 3;
   static const int maxFortStage = 3;
+
+  /// Hand-made throw ranks. The chain keeps going past this.
   static const int maxThrowRank = 5;
 
   /// Snowball body radius before blast ranks.
   static const double baseBlastRadius = 22;
 
-  static const List<double> _poiseScales = [1, 0.82, 0.66, 0.52, 0.40];
-  static const List<double> _pressureScales = [1, 1.25, 1.55, 1.9, 2.3];
-  static const List<double> _aimScales = [1, 0.72, 0.48, 0.28];
-  static const List<double> _gapScales = [1, 0.84, 0.68, 0.52];
-  static const List<double> _chargeScales = [1, 0.86, 0.72, 0.58];
-  static const List<double> _blastScales = [1, 1.2, 1.45, 1.75, 2.05];
+  /// Most coins a wallet holds.
+  static const int maxCoins = 999999999;
 
   int coins;
+
+  /// Lost kids, Revive purchases, and the Arcade checkpoint.
+  RunLedger ledger;
   PlayMode mode;
 
   /// Never a switched-off season ([Season.playable]).
@@ -70,8 +78,10 @@ class MetaState {
   /// Highest wave cleared in this mode on [difficulty]. 0 when none.
   int bestWave;
 
-  /// Lifetime points. Every coin earned also adds a point, but points are
-  /// never spent and never reset. Arcade shows this as its score.
+  /// Lifetime points. Every coin earned adds a point, clearing a wave adds
+  /// [waveClearPoints] plus a thrift bonus on unspent coins, and a defeat
+  /// takes [defeatPenalty] away (never below 0). Points are never spent.
+  /// Arcade shows this as its score.
   int score;
 
   /// Wave to pick up from after leaving through Pause → Menu, or 0 when
@@ -113,13 +123,22 @@ class MetaState {
     }
   }
 
+  /// What [item] costs now. Revive starts at twice the third kid's price
+  /// and goes up 1.5× with every one bought.
+  int itemCost(PowerUp item) {
+    if (item != PowerUp.revive) return item.cost;
+    final base = 2 * SkillTree.node('team-3')!.cost;
+    return _round5(base * math.pow(1.5, ledger.reviveBought).toDouble());
+  }
+
   bool canBuyItem(PowerUp item) =>
-      coins >= item.cost && itemCount(item) < PowerUp.maxStack;
+      coins >= itemCost(item) && itemCount(item) < PowerUp.maxStack;
 
   bool buyItem(PowerUp item) {
     if (!canBuyItem(item)) return false;
-    coins -= item.cost;
+    coins -= itemCost(item);
     _items[item] = itemCount(item) + 1;
+    if (item == PowerUp.revive) ledger.reviveBought += 1;
     return true;
   }
 
@@ -138,8 +157,30 @@ class MetaState {
   /// Pay [amount] coins and the matching points.
   void earn(int amount) {
     if (amount <= 0) return;
-    coins += amount;
+    coins = math.min(coins + amount, maxCoins);
     score += amount;
+    ledger.earnedSinceCheckpoint += amount;
+  }
+
+  /// Points for clearing [wave]: how far the run got.
+  static int waveClearPoints(int wave) => 10 * wave;
+
+  /// Points lost to a defeat on [wave].
+  static int defeatPenalty(int wave) => 50 * wave;
+
+  /// Score for clearing [wave]: distance, plus a tenth of the unspent coins
+  /// (spending less scores more). Returns the points added.
+  int scoreWaveClear(int wave) {
+    final points = waveClearPoints(wave) + coins ~/ 10;
+    score += points;
+    return points;
+  }
+
+  /// Score for a defeat on [wave]. Returns the points taken (never below 0).
+  int scoreDefeat(int wave) {
+    final taken = math.min(score, defeatPenalty(wave));
+    score -= taken;
+    return taken;
   }
 
   final Set<String> _skills = {};
@@ -156,49 +197,47 @@ class MetaState {
     return 1;
   }
 
-  int get throwRank =>
-      _ownedPrefix(SkillBranch.throwSpeed).clamp(0, maxThrowRank);
+  int get throwRank => _ownedPrefix(SkillBranch.throwSpeed);
 
   /// Extra fort HP from the packed-snow chain, on top of the stage.
-  int get fortBonusHp => 4 * _hpRank;
+  int get fortBonusHp => SkillEffects.fortHp(_hpRank);
 
   int get _hpRank {
     var rank = 0;
-    if (owns('fort-hp-1')) rank = 1;
-    if (owns('fort-hp-2')) rank = 2;
+    while (owns('fort-hp-${rank + 1}')) {
+      rank += 1;
+    }
     return rank;
   }
 
-  int get shieldCharges => _ownedPrefix(SkillBranch.shield).clamp(0, 3);
+  int get shieldCharges =>
+      SkillEffects.shield(_ownedPrefix(SkillBranch.shield));
 
   bool get passesOwnFort => owns('lanes');
 
-  double get blastScale => _scale(_blastScales, SkillBranch.blast);
+  double get blastScale => SkillEffects.blast(_ownedPrefix(SkillBranch.blast));
 
-  double get allyAimScale => _scale(_aimScales, SkillBranch.aim);
+  double get allyAimScale => SkillEffects.aim(_ownedPrefix(SkillBranch.aim));
 
-  double get allyGapScale => _scale(_gapScales, SkillBranch.reaction);
+  double get allyGapScale =>
+      SkillEffects.gap(_ownedPrefix(SkillBranch.reaction));
 
-  double get allyChargeScale => _scale(_chargeScales, SkillBranch.charge);
+  double get allyChargeScale =>
+      SkillEffects.charge(_ownedPrefix(SkillBranch.charge));
 
   /// Hits one of your snowballs applies. The manual thrower reaches 2, then 3.
   /// Teammate bots stay at 1 until the later damage nodes.
   int hitsFor({required bool manualThrow}) {
     final rank = _ownedPrefix(SkillBranch.damage);
-    if (manualThrow) {
-      if (rank >= 2) return 3;
-      if (rank >= 1) return 2;
-      return 1;
-    }
-    if (rank >= 4) return 3;
-    if (rank >= 3) return 2;
-    return 1;
+    return manualThrow
+        ? SkillEffects.manualHits(rank)
+        : SkillEffects.botHits(rank);
   }
 
   /// Multiplier on the base stun lock. Allies use poise. Rivals use pressure.
   double stunScaleFor({required bool ally}) {
-    if (ally) return _scale(_poiseScales, SkillBranch.poise);
-    return _scale(_pressureScales, SkillBranch.pressure);
+    if (ally) return SkillEffects.poise(_ownedPrefix(SkillBranch.poise));
+    return SkillEffects.pressure(_ownedPrefix(SkillBranch.pressure));
   }
 
   SkillNode? nextIn(SkillBranch branch) {
@@ -221,11 +260,26 @@ class MetaState {
 
   SkillNode? get nextThrowNode => nextIn(SkillBranch.throwSpeed);
 
-  int? get nextKidCost => nextKidNode?.cost;
+  int? get nextKidCost => _costOrNull(nextKidNode);
 
-  int? get nextFortCost => nextFortStageNode?.cost;
+  int? get nextFortCost => _costOrNull(nextFortStageNode);
 
-  int? get nextThrowCost => nextThrowNode?.cost;
+  int? get nextThrowCost => _costOrNull(nextThrowNode);
+
+  int? _costOrNull(SkillNode? node) => node == null ? null : costOf(node.id);
+
+  /// What node [id] costs now. Crew nodes go up 1.5× for every teammate
+  /// lost so far; everything else is the catalog price.
+  int costOf(String id) {
+    final node = SkillTree.node(id);
+    if (node == null) return 0;
+    if (node.branch != SkillBranch.team || ledger.kidLosses == 0) {
+      return node.cost;
+    }
+    return _round5(node.cost * math.pow(1.5, ledger.kidLosses).toDouble());
+  }
+
+  static int _round5(double price) => ((price / 5) + 0.5).floor() * 5;
 
   bool get canBuyKid => canBuy(nextKidNode?.id);
 
@@ -238,7 +292,7 @@ class MetaState {
     final node = SkillTree.node(id);
     if (node == null || owns(id)) return false;
     if (skillLock(id) != SkillLock.open) return false;
-    return coins >= node.cost;
+    return coins >= costOf(id);
   }
 
   /// Parent chain first, then the second-kid gate. Owned nodes are open.
@@ -264,9 +318,28 @@ class MetaState {
 
   bool buy(String id) {
     if (!canBuy(id)) return false;
-    final node = SkillTree.node(id)!;
-    coins -= node.cost;
+    coins -= costOf(id);
     _skills.add(id);
+    return true;
+  }
+
+  /// True when a node should not show in the shop at all: it can never be
+  /// bought on this difficulty (Easy already gives Recovery for free).
+  bool hidesNode(String id) =>
+      difficulty == Difficulty.easy &&
+      SkillTree.node(id)?.branch == SkillBranch.recovery;
+
+  /// A teammate was knocked out and not brought back: their spot in the
+  /// crew opens up again, and the crew nodes cost more from now on.
+  /// Returns false when there was no teammate to lose.
+  bool loseKid() {
+    final owned = [
+      for (final node in SkillTree.chain(SkillBranch.team))
+        if (owns(node.id)) node.id,
+    ];
+    if (owned.isEmpty) return false;
+    _skills.remove(owned.last);
+    ledger.kidLosses += 1;
     return true;
   }
 
@@ -292,14 +365,74 @@ class MetaState {
     if (wave > bestWave) bestWave = wave;
   }
 
-  /// Arcade drops every skill. Campaign keeps bought nodes.
-  ///
-  /// Unspent coins, season, and best wave stay either way. The caller
-  /// restarts the match at wave 1.
-  void resetRun() {
-    if (mode == PlayMode.arcade) {
-      _skills.clear();
+  /// Waves in one Arcade stage.
+  static const int stageLength = 5;
+
+  /// 1-based stage for [wave]: waves 1–5 are stage 1, 6–10 stage 2.
+  static int stageOf(int wave) => (math.max(wave, 1) - 1) ~/ stageLength + 1;
+
+  /// First wave of [wave]'s stage.
+  static int stageStart(int wave) => (stageOf(wave) - 1) * stageLength + 1;
+
+  /// True when [wave] opens a stage.
+  static bool opensStage(int wave) => stageStart(wave) == wave;
+
+  /// Lock in the build at the start of [wave]'s stage (Arcade).
+  void takeCheckpoint(int wave) {
+    ledger
+      ..checkpointWave = stageStart(wave)
+      ..checkpointCoins = coins
+      ..checkpointSkills = Set.of(_skills)
+      ..checkpointItems = Map.of(_items)
+      ..checkpointKidLosses = ledger.kidLosses
+      ..checkpointReviveBought = ledger.reviveBought
+      ..earnedSinceCheckpoint = 0;
+  }
+
+  /// Back to the checkpoint build after an Arcade defeat: every skill and
+  /// item bought since is refunded, and half the coins earned since are
+  /// lost. The checkpoint then holds the new coin total for the retry.
+  /// Without a checkpoint (an older save), the run goes back to the start
+  /// of [lostOn]'s stage and only the coin half is taken.
+  CheckpointResult restoreCheckpoint({int lostOn = 1}) {
+    final wave = ledger.hasCheckpoint
+        ? ledger.checkpointWave
+        : stageStart(lostOn);
+    final earned = ledger.earnedSinceCheckpoint;
+    final kept = earned ~/ 2;
+    final spent = ledger.hasCheckpoint
+        ? math.max(0, ledger.checkpointCoins + earned - coins)
+        : 0;
+    if (ledger.hasCheckpoint) {
+      replaceSkills(ledger.checkpointSkills);
+      replaceItems(ledger.checkpointItems);
+      ledger.kidLosses = ledger.checkpointKidLosses;
+      ledger.reviveBought = ledger.checkpointReviveBought;
+      coins = ledger.checkpointCoins + kept;
+    } else {
+      coins = math.max(0, coins - (earned - kept));
     }
+    takeCheckpoint(wave);
+    return CheckpointResult(
+      wave: wave,
+      coinsLost: earned - kept,
+      refunded: spent,
+    );
+  }
+
+  /// A defeat. [PlayMode.arcade] (shown as Campaign) drops every skill and
+  /// starts over at wave 1; unspent coins stay. [PlayMode.campaign] (shown
+  /// as Arcade) goes back to its stage checkpoint.
+  ///
+  /// Season and best wave stay either way. The caller restarts the match
+  /// at [CheckpointResult.wave].
+  CheckpointResult resetRun({int lostOn = 1}) {
+    if (mode == PlayMode.campaign) return restoreCheckpoint(lostOn: lostOn);
+    _skills.clear();
+    ledger
+      ..kidLosses = 0
+      ..clearCheckpoint();
+    return const CheckpointResult(wave: 1, coinsLost: 0, refunded: 0);
   }
 
   /// Replace the owned set with [owned], closing any gap back to the root.
@@ -310,11 +443,19 @@ class MetaState {
       ..addAll(next);
   }
 
-  /// Soft currency for knocking out one rival.
+  /// Soft currency for knocking out one rival on wave 1–5. Each later
+  /// stage pays one more ([coinsForKnockout]).
   static const int coinsPerKnockout = 4;
 
-  /// Bonus for clearing [wave] (1-based), on top of each knockout.
-  static int coinsForWave(int wave) => 6 + wave * 4;
+  static int coinsForKnockout(int wave) => coinsPerKnockout + stageOf(wave) - 1;
+
+  /// Bonus for clearing [wave] (1-based), on top of each knockout. Grows
+  /// 10% a wave on top of the old linear 6 + 4w, so later skill ranks stay
+  /// in reach for a run that keeps winning.
+  static int coinsForWave(int wave) {
+    final w = math.max(wave, 1);
+    return ((6 + w * 4) * math.pow(1.1, w - 1)).round();
+  }
 
   Map<String, Object> toJson() => {
     'coins': coins,
@@ -331,6 +472,7 @@ class MetaState {
     'resumeCrewHp': ?resumeCrewHp,
     'difficulty': difficulty.name,
     'mode': mode.name,
+    'ledger': ledger.toJson(),
   };
 
   factory MetaState.fromJson(Map<String, dynamic> json) {
@@ -353,7 +495,7 @@ class MetaState {
       );
     }
     return MetaState(
-      coins: _clampInt(_asInt(json['coins']), 0, 999999),
+      coins: _clampInt(_asInt(json['coins']), 0, maxCoins),
       skills: skills,
       season: Season.tryParse(json['season'] as String?) ?? Season.winter,
       bestWave: _clampInt(_asInt(json['bestWave']), 0, 9999),
@@ -371,6 +513,7 @@ class MetaState {
           : null,
       difficulty: _readDifficulty(json['difficulty']),
       mode: PlayMode.tryParse(json['mode'] as String?) ?? PlayMode.arcade,
+      ledger: RunLedger.fromJson(json['ledger']),
     );
   }
 
@@ -418,14 +561,6 @@ class MetaState {
 
   int get fortHpRank => _hpRank;
 
-  double _scale(List<double> table, SkillBranch branch) {
-    final rank = branch == SkillBranch.fort ? _hpRank : _ownedPrefix(branch);
-    final index = rank < 0
-        ? 0
-        : (rank >= table.length ? table.length - 1 : rank);
-    return table[index];
-  }
-
   static Set<String> _closed(Set<String> owned) {
     final closed = <String>{};
     for (final id in owned) {
@@ -450,4 +585,22 @@ class MetaState {
     if (value > max) return max;
     return value;
   }
+}
+
+/// What a defeat did to the wallet.
+class CheckpointResult {
+  const CheckpointResult({
+    required this.wave,
+    required this.coinsLost,
+    required this.refunded,
+  });
+
+  /// Wave the retry starts on.
+  final int wave;
+
+  /// Coins taken back (half of those earned since the checkpoint).
+  final int coinsLost;
+
+  /// Coins handed back for skills and items bought since the checkpoint.
+  final int refunded;
 }

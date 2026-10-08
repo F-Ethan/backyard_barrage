@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../game/backyard_barrage_game.dart';
 import '../game/components/kid_component.dart';
+import '../meta/meta_state.dart';
+import '../meta/play_mode.dart';
 import 'barrage_colors.dart';
 import 'barrage_theme.dart';
 import 'coin_amount.dart';
@@ -113,7 +115,9 @@ class MatchHud extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    'Wave ${game.wave}',
+                                    game.meta.mode == PlayMode.campaign
+                                        ? 'Stage ${MetaState.stageOf(game.wave)} · Wave ${game.wave}'
+                                        : 'Wave ${game.wave}',
                                     key: const Key('hud-wave'),
                                     style: BarrageType.heading.copyWith(
                                       fontSize: 14,
@@ -127,10 +131,31 @@ class MatchHud extends StatelessWidget {
                             SizedBox(width: tokens.space.sm),
                             _HudChip(
                               key: const Key('hud-rivals'),
-                              child: _HeartCluster(
-                                label: 'Rivals',
-                                kids: game.enemies,
-                                idPrefix: 'rival',
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _HeartCluster(
+                                    label: 'Rivals',
+                                    // A big wave lists only those standing.
+                                    kids: game.enemies.length <= 5
+                                        ? game.enemies
+                                        : [
+                                            for (final kid in game.enemies)
+                                              if (!kid.isKo) kid,
+                                          ],
+                                    idPrefix: 'rival',
+                                  ),
+                                  if (game.rivalsWaiting > 0) ...[
+                                    const SizedBox(width: 6),
+                                    TagPill(
+                                      key: const Key('hud-rivals-waiting'),
+                                      child: Text(
+                                        '+${game.rivalsWaiting} waiting',
+                                        style: BarrageType.overline,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                             SizedBox(width: tokens.space.sm),

@@ -14,6 +14,7 @@ IconData powerUpIcon(PowerUp item) => switch (item) {
   PowerUp.powerThrow => Icons.bolt_rounded,
   PowerUp.bigSplat => Icons.blur_on_rounded,
   PowerUp.hotCocoa => Icons.local_cafe_rounded,
+  PowerUp.revive => Icons.favorite_rounded,
 };
 
 /// Fight HUD: one round button per power-up the wallet holds, with its

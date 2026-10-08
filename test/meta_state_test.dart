@@ -6,6 +6,8 @@ import 'package:backyard_barrage/meta/power_up.dart';
 import 'package:backyard_barrage/meta/play_mode.dart';
 import 'package:backyard_barrage/meta/player_save.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
+import 'package:backyard_barrage/meta/run_ledger.dart';
+import 'package:backyard_barrage/meta/skill_effects.dart';
 import 'package:backyard_barrage/meta/skill_tree.dart';
 import 'package:backyard_barrage/seasons/season.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -50,8 +52,10 @@ void main() {
       for (var i = 0; i < MetaState.maxThrowRank; i++) {
         expect(meta.buyThrowSpeed(), isTrue);
       }
-      expect(meta.buyThrowSpeed(), isFalse);
       expect(meta.throwRank, MetaState.maxThrowRank);
+      // The throw chain keeps going past the hand-made ranks, at ×3.
+      expect(meta.nextThrowNode!.id, 'throw-6');
+      expect(meta.nextThrowCost, 390 * 3);
       expect(meta.coins, greaterThanOrEqualTo(0));
     });
 
@@ -148,7 +152,7 @@ void main() {
 
     test('skill ids and costs stay stable for saves', () {
       expect(
-        [for (final node in SkillTree.nodes) '${node.id}:${node.cost}'],
+        [for (final node in SkillTree.handNodes) '${node.id}:${node.cost}'],
         [
           'team-2:20',
           'team-3:50',
@@ -197,7 +201,7 @@ void main() {
       );
       expect(
         [
-          for (final node in SkillTree.nodes)
+          for (final node in SkillTree.handNodes)
             if (node.needsTeammate) node.id,
         ],
         [
@@ -324,30 +328,67 @@ void main() {
       expect(meta.shieldCharges, 0);
     });
 
-    test('the full tree is a long save, not one short run', () {
-      final total = SkillTree.nodes.fold<int>(
-        0,
-        (sum, node) => sum + node.cost,
-      );
-      expect(total, 3437);
+    test('the hand-made tree fits one long run; the rest keeps going', () {
+      int sum(Iterable<SkillNode> nodes) =>
+          nodes.fold<int>(0, (total, node) => total + node.cost);
+      expect(sum(SkillTree.handNodes), 3437);
       var waves = 0;
       for (var wave = 1; wave <= 20; wave++) {
         waves += MetaState.coinsForWave(wave);
       }
-      expect(waves, 960);
-      expect(waves * 2, lessThan(total), reason: 'several long runs');
+      expect(waves, 3433);
+      expect(
+        sum(SkillTree.nodes),
+        greaterThan(waves * 100),
+        reason: 'the generated ranks outrun any one run',
+      );
       expect(MetaState.coinsForWave(1), 10);
+      expect(MetaState.coinsForWave(30), greaterThan(1500));
       expect(MetaState.coinsPerKnockout, 4);
+      expect(MetaState.coinsForKnockout(5), 4);
+      expect(MetaState.coinsForKnockout(6), 5);
+      expect(MetaState.coinsForKnockout(21), 8);
     });
 
-    test('each rank in a chain costs 2.5x the last, rounded to 5', () {
+    test('generated ranks step ×3, then ×4, and stop at the price cap', () {
+      final aim = SkillTree.chain(SkillBranch.aim);
+      expect(SkillTree.handLength(SkillBranch.aim), 3);
+      expect(aim[2].id, 'aim-3');
+      expect(aim[3].id, 'aim-4');
+      expect(aim[3].cost, closeTo(75 * 3, 5));
+      expect(aim[6].cost, closeTo(75 * 27 * 4, 5));
+      expect(aim[6].parentId, aim[5].id);
+      for (final node in SkillTree.nodes) {
+        expect(node.cost, lessThanOrEqualTo(SkillTree.maxPrice));
+      }
+      for (final branch in [
+        SkillBranch.team,
+        SkillBranch.recovery,
+        SkillBranch.lanes,
+      ]) {
+        expect(
+          SkillTree.chain(branch).length,
+          SkillTree.handLength(branch),
+          reason: '${branch.name} stops where it is',
+        );
+      }
+      expect(SkillTree.node('fort-hp-3')!.parentId, 'fort-hp-2');
+      expect(SkillTree.node('damage-5')!.needsTeammate, isFalse);
+      expect(SkillTree.node('damage-6')!.needsTeammate, isTrue);
+    });
+
+    test('each rank costs 2.5x the last, then 3x, 4x past the hand ranks', () {
       for (final branch in SkillBranch.values) {
         final chain = SkillTree.chain(branch);
         final base = chain.first.cost;
         for (var i = 0; i < chain.length; i++) {
           expect(
             chain[i].cost,
-            SkillTree.rankCost(base, i + 1),
+            SkillTree.rankCost(
+              base,
+              i + 1,
+              handLength: SkillTree.handLength(branch),
+            ),
             reason: chain[i].id,
           );
         }
@@ -619,7 +660,10 @@ void main() {
       expect(PlayMode.arcade.blurb, 'Skills wipe on defeat. Coins stay.');
       expect(PlayMode.arcade.showsScore, isFalse);
       expect(PlayMode.campaign.label, 'Arcade');
-      expect(PlayMode.campaign.blurb, 'Skills stay. Restart at wave 1.');
+      expect(
+        PlayMode.campaign.blurb,
+        'Skills stay. A loss sends you back to your stage.',
+      );
       expect(PlayMode.campaign.showsScore, isTrue);
     },
   );
@@ -735,6 +779,168 @@ void main() {
       );
       meta.resetRun();
       expect(meta.itemCount(PowerUp.bigSplat), 1);
+    });
+  });
+
+  group('stages, lost kids, and checkpoints', () {
+    test('five waves to a stage', () {
+      expect(
+        [
+          for (final w in [1, 5, 6, 10, 11, 21]) MetaState.stageOf(w),
+        ],
+        [1, 1, 2, 2, 3, 5],
+      );
+      expect(MetaState.stageStart(7), 6);
+      expect(MetaState.opensStage(11), isTrue);
+      expect(MetaState.opensStage(12), isFalse);
+    });
+
+    test('a lost teammate reopens the top crew spot at 1.5x a loss', () {
+      final meta = MetaState(skills: {'team-2', 'team-3'});
+      expect(meta.loseKid(), isTrue);
+      expect(meta.crewSize, 2);
+      expect(meta.owns('team-3'), isFalse);
+      expect(meta.costOf('team-3'), 75);
+      expect(meta.loseKid(), isTrue);
+      expect(meta.crewSize, 1);
+      expect(meta.costOf('team-2'), 45, reason: '20 × 2.25');
+      expect(meta.loseKid(), isFalse, reason: 'the lead kid is not for sale');
+      expect(meta.ledger.kidLosses, 2);
+      expect(meta.costOf('throw-1'), 10, reason: 'only crew nodes rise');
+      meta.coins = 45;
+      expect(meta.buy('team-2'), isTrue);
+      expect(meta.coins, 0);
+    });
+
+    test('each Revive bought makes the next 1.5x dearer', () {
+      final meta = MetaState(coins: 1000);
+      expect(meta.itemCost(PowerUp.revive), 100, reason: '2 × the third kid');
+      expect(meta.buyItem(PowerUp.revive), isTrue);
+      expect(meta.itemCost(PowerUp.revive), 150);
+      expect(meta.buyItem(PowerUp.revive), isTrue);
+      expect(meta.itemCost(PowerUp.revive), 225);
+      expect(meta.coins, 750);
+      expect(meta.itemCost(PowerUp.hotCocoa), PowerUp.hotCocoa.cost);
+    });
+
+    test('Arcade loss refunds the stage build and keeps half the earnings', () {
+      final meta = MetaState(
+        mode: PlayMode.campaign,
+        coins: 100,
+        skills: {'throw-1'},
+      )..takeCheckpoint(7);
+      expect(meta.ledger.checkpointWave, 6);
+      meta.earn(40);
+      expect(meta.buy('throw-2'), isTrue);
+      expect(meta.buyItem(PowerUp.hotCocoa), isTrue);
+      expect(meta.buy('team-2'), isTrue);
+      meta.loseKid();
+      final result = meta.resetRun(lostOn: 8);
+      expect(result.wave, 6);
+      expect(result.coinsLost, 20);
+      expect(result.refunded, 25 + 30 + 20);
+      expect(meta.coins, 120);
+      expect(meta.skills, {'throw-1'});
+      expect(meta.itemCount(PowerUp.hotCocoa), 0);
+      expect(meta.ledger.kidLosses, 0);
+      // The retry starts from the new total; a second loss costs nothing more.
+      final again = meta.resetRun(lostOn: 6);
+      expect(again.coinsLost, 0);
+      expect(meta.coins, 120);
+    });
+
+    test('Campaign loss still wipes skills and starts over', () {
+      final meta = MetaState(coins: 50, skills: {'team-2'})
+        ..ledger.kidLosses = 2;
+      final result = meta.resetRun(lostOn: 9);
+      expect(result.wave, 1);
+      expect(meta.skills, isEmpty);
+      expect(meta.coins, 50);
+      expect(meta.ledger.kidLosses, 0);
+    });
+
+    test('an older save with no checkpoint goes back to its stage', () {
+      final meta = MetaState(mode: PlayMode.campaign, coins: 30)..earn(20);
+      final result = meta.resetRun(lostOn: 13);
+      expect(result.wave, 11);
+      expect(meta.coins, 40);
+    });
+
+    test('score: distance and thrift up, a defeat down', () {
+      final meta = MetaState(coins: 50);
+      expect(meta.scoreWaveClear(3), 30 + 5);
+      expect(meta.score, 35);
+      expect(meta.scoreDefeat(4), 35, reason: 'never below 0');
+      expect(meta.score, 0);
+      meta.score = 1000;
+      expect(meta.scoreDefeat(4), MetaState.defeatPenalty(4));
+      expect(meta.score, 800);
+    });
+
+    test('Easy hides Recovery; the other modes show it', () {
+      final easy = MetaState(difficulty: Difficulty.easy);
+      final normal = MetaState();
+      for (final node in SkillTree.chain(SkillBranch.recovery)) {
+        expect(easy.hidesNode(node.id), isTrue);
+        expect(normal.hidesNode(node.id), isFalse);
+      }
+      expect(easy.hidesNode('throw-1'), isFalse);
+    });
+
+    test('the ledger rides along in the save', () {
+      final meta = MetaState(mode: PlayMode.campaign, coins: 60)
+        ..ledger.kidLosses = 1
+        ..ledger.reviveBought = 2
+        ..takeCheckpoint(11)
+        ..earn(10);
+      final back = MetaState.fromJson(
+        jsonDecode(jsonEncode(meta.toJson())) as Map<String, dynamic>,
+      );
+      expect(back.ledger.kidLosses, 1);
+      expect(back.ledger.reviveBought, 2);
+      expect(back.ledger.checkpointWave, 11);
+      expect(back.ledger.checkpointCoins, 60);
+      expect(back.ledger.earnedSinceCheckpoint, 10);
+      expect(RunLedger.fromJson(null).hasCheckpoint, isFalse);
+    });
+
+    test('skill effects keep going past the tables, within limits', () {
+      for (final (name, f, rising) in [
+        ('poise', SkillEffects.poise, false),
+        ('aim', SkillEffects.aim, false),
+        ('gap', SkillEffects.gap, false),
+        ('charge', SkillEffects.charge, false),
+        ('pressure', SkillEffects.pressure, true),
+        ('blast', SkillEffects.blast, true),
+      ]) {
+        var last = f(0);
+        for (var rank = 1; rank < 30; rank++) {
+          final now = f(rank);
+          if (rising) {
+            expect(now, greaterThanOrEqualTo(last), reason: '$name $rank');
+          } else {
+            expect(now, lessThanOrEqualTo(last), reason: '$name $rank');
+            expect(now, greaterThan(0), reason: '$name $rank');
+          }
+          last = now;
+        }
+      }
+      expect(SkillEffects.poise(4), 0.40);
+      expect(SkillEffects.poise(5), closeTo(0.34, 0.001));
+      expect(SkillEffects.chargeSeconds(5), closeTo(1.9, 1e-9));
+      expect(SkillEffects.chargeSeconds(6), lessThan(1.9));
+      expect(SkillEffects.chargeSeconds(40), 0.8);
+      expect(SkillEffects.projectileSpeed(9), SkillEffects.projectileSpeed(5));
+      expect(
+        [for (var r = 0; r <= 8; r++) SkillEffects.manualHits(r)],
+        [1, 2, 3, 3, 3, 4, 4, 5, 5],
+      );
+      expect(
+        [for (var r = 0; r <= 8; r++) SkillEffects.botHits(r)],
+        [1, 1, 1, 2, 3, 3, 4, 4, 5],
+      );
+      final meta = MetaState(skills: {'fort-hp-3'});
+      expect(meta.fortBonusHp, 12);
     });
   });
 }

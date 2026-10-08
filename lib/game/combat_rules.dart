@@ -1,5 +1,6 @@
 import 'package:flame/extensions.dart';
 
+import '../meta/skill_effects.dart';
 import 'throw_physics.dart';
 
 enum RoundOutcome { ongoing, waveClear, defeat }
@@ -33,11 +34,13 @@ class HitResolution {
 /// | 4 | 3 | faster throws, quicker steps | +0 |
 /// | 5 | 3 | those buffs | +1 |
 /// | 6 | 4 | those buffs | +1 |
-/// | 7+ | 5 | those buffs | +1 |
+/// | 7–10 | 5 | those buffs | +1 |
+/// | 11+ | +1 every five waves | those buffs | +1 |
 ///
 /// Waves 1–3 add bodies. Waves 4 and 5 stay at 3 and make each rival
-/// harder. Waves 6 and 7 add bodies again, then the count stops so a long
-/// run does not keep filling the yard.
+/// harder. Waves 6 and 7 add bodies again. From wave 11 there is one more
+/// rival every five waves with no cap; the yard holds [fieldStart] at the
+/// start and [fieldCap] at once, and the rest wait to walk on.
 class WavePlan {
   const WavePlan({
     required this.rivalCount,
@@ -47,6 +50,15 @@ class WavePlan {
   });
 
   final int rivalCount;
+
+  /// Rivals on the yard when the wave starts.
+  static const int fieldStart = 5;
+
+  /// Most rivals on the yard at once. The rest wait offstage.
+  static const int fieldCap = 8;
+
+  /// Seconds between walk-ons while there is room.
+  static const double walkOnGap = 3;
 
   /// Shorter windup and a shorter gap between throws.
   final bool fasterThrows;
@@ -102,8 +114,8 @@ class WavePlan {
         quickerSteps: true,
         bonusHp: 1,
       ),
-      _ => const WavePlan(
-        rivalCount: 5,
+      _ => WavePlan(
+        rivalCount: n <= 10 ? 5 : 5 + (n - 6) ~/ 5,
         fasterThrows: true,
         quickerSteps: true,
         bonusHp: 1,
@@ -143,17 +155,11 @@ class CombatRules {
 
   /// Seconds to reach a full player charge. Rank 0 is about 3 seconds.
   /// Throw-speed ranks shorten it; a full hold stays deliberate.
-  static double playerChargeSeconds(int throwRank) {
-    final rank = _clampInt(throwRank, 0, 5);
-    final seconds = 3 - rank * 0.22;
-    if (seconds < 1.7) return 1.7;
-    return seconds;
-  }
+  static double playerChargeSeconds(int throwRank) =>
+      SkillEffects.chargeSeconds(throwRank);
 
-  static double projectileSpeedScale(int throwRank) {
-    final rank = _clampInt(throwRank, 0, 5);
-    return 1 + rank * 0.07;
-  }
+  static double projectileSpeedScale(int throwRank) =>
+      SkillEffects.projectileSpeed(throwRank);
 
   /// Aim error in radians. Higher waves tighten it. The error scales how far
   /// an enemy lob lands short or long inside the throw lane.

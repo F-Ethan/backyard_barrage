@@ -28,7 +28,10 @@ void main() {
     expect(find.byKey(const Key('home-backdrop-winter')), findsOneWidget);
     expect(find.byKey(const Key('season-summer')), findsNothing);
     expect(find.text('Skills wipe on defeat. Coins stay.'), findsOneWidget);
-    expect(find.text('Skills stay. Restart at wave 1.'), findsOneWidget);
+    expect(
+      find.text('Skills stay. A loss sends you back to your stage.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('home shows each wallet and the campaign best wave', (

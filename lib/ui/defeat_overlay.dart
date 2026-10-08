@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../game/backyard_barrage_game.dart';
+import '../meta/meta_state.dart';
 import '../meta/play_mode.dart';
 import '../seasons/season.dart';
 import 'barrage_colors.dart';
@@ -33,6 +34,10 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
     final difficulty = game.feel.settings.difficulty;
     final cleared = game.wave - 1;
     final tokens = context.tokens;
+    final checkpoint = meta.mode == PlayMode.campaign;
+    final result = game.lastDefeat;
+    final retryWave = result?.wave ?? 1;
+    final stage = MetaState.stageOf(retryWave);
     return ModalShell(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
@@ -53,12 +58,43 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                 const Text('Crew down', style: BarrageType.title),
                 SizedBox(height: tokens.space.xs),
                 Text(
-                  meta.mode == PlayMode.arcade
-                      ? 'Skills reset. Unspent coins carry over.'
-                      : 'Skills stay. You restart at wave 1.',
+                  checkpoint
+                      ? 'Back to wave $retryWave, the start of stage $stage. '
+                            'Your build from then is back, everything bought '
+                            'since is refunded, and half the coins earned '
+                            'since are lost.'
+                      : 'Skills reset. Unspent coins carry over.',
+                  key: const Key('defeat-rule'),
                   style: BarrageType.body,
                   textAlign: TextAlign.center,
                 ),
+                if (checkpoint && result != null) ...[
+                  SizedBox(height: tokens.space.sm),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: tokens.space.sm,
+                    runSpacing: tokens.space.xs,
+                    children: [
+                      if (result.refunded > 0)
+                        _Stat(
+                          key: const Key('defeat-refund'),
+                          label: 'REFUNDED',
+                          value: '+${compactCoins(result.refunded)}',
+                        ),
+                      _Stat(
+                        key: const Key('defeat-lost'),
+                        label: 'COINS LOST',
+                        value: '-${compactCoins(result.coinsLost)}',
+                      ),
+                      if (game.lastScorePenalty > 0)
+                        _Stat(
+                          key: const Key('defeat-penalty'),
+                          label: 'SCORE',
+                          value: '-${game.lastScorePenalty}',
+                        ),
+                    ],
+                  ),
+                ],
                 SizedBox(height: tokens.space.md),
                 Wrap(
                   alignment: WrapAlignment.center,
@@ -93,10 +129,10 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                   children: [
                     DraftImageButton(
                       key: const Key('retry'),
-                      label: 'Retry',
+                      label: checkpoint ? 'Retry stage $stage' : 'Retry',
                       leadingIcon: Icons.replay_rounded,
                       onPressed: game.retryFromDefeat,
-                      width: 180,
+                      width: checkpoint ? 220 : 180,
                       height: 56,
                       fontSize: 18,
                       feel: game.feel,

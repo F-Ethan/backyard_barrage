@@ -3,6 +3,7 @@ import 'difficulty.dart';
 import 'meta_state.dart';
 import 'play_mode.dart';
 import 'power_up.dart';
+import 'run_ledger.dart';
 
 /// Every wallet plus the shared season and the last mode played.
 ///
@@ -67,6 +68,7 @@ class PlayerSave {
       ..resumeWave = snap.resumeWave
       ..resumeArena = snap.resumeArena
       ..resumeCrewHp = snap.resumeCrewHp
+      ..ledger = snap.ledger.copy()
       ..replaceItems(snap.items)
       ..replaceSkills(snap.skills);
   }
@@ -162,7 +164,8 @@ class WalletSnap {
     this.resumeArena,
     this.resumeCrewHp,
     this.items = const {},
-  });
+    RunLedger? ledger,
+  }) : ledger = ledger ?? RunLedger();
 
   factory WalletSnap.from(MetaState state) {
     return WalletSnap(
@@ -179,6 +182,7 @@ class WalletSnap {
           : List<int>.of(state.resumeCrewHp!),
       items: Map<PowerUp, int>.from(state.items),
       skills: Set<String>.from(state.skills),
+      ledger: state.ledger.copy(),
     );
   }
 
@@ -193,4 +197,5 @@ class WalletSnap {
   final String? resumeArena;
   final List<int>? resumeCrewHp;
   final Map<PowerUp, int> items;
+  final RunLedger ledger;
 }

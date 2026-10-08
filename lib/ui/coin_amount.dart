@@ -4,6 +4,17 @@ import 'barrage_colors.dart';
 import 'barrage_theme.dart';
 import 'ui_assets.dart';
 
+/// Short coin count for tight spots: 9999, 12.3k, 4.5M. Under 10,000 it is
+/// the plain number.
+String compactCoins(int amount) {
+  if (amount < 10000) return '$amount';
+  if (amount < 1000000) return '${_trim(amount / 1000)}k';
+  return '${_trim(amount / 1000000)}M';
+}
+
+String _trim(double v) =>
+    v >= 100 ? v.round().toString() : v.toStringAsFixed(1);
+
 /// Coin sprite + amount. Changes tick toward the new value and the coin
 /// gives a small pop; the first build shows the amount as-is.
 class CoinAmount extends StatefulWidget {
@@ -59,8 +70,10 @@ class _CoinAmountState extends State<CoinAmount> {
           tween: Tween(end: widget.amount.toDouble()),
           duration: motion.slow * 1.5,
           curve: motion.enter,
-          builder: (context, value, _) =>
-              Text('${widget.prefix}${value.round()}', style: style),
+          builder: (context, value, _) => Text(
+            '${widget.prefix}${compactCoins(value.round())}',
+            style: style,
+          ),
         ),
       ],
     );

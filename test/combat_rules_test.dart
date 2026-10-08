@@ -236,4 +236,13 @@ void main() {
       expect(high.bottom, closeTo(low.bottom, 0.01));
     });
   });
+
+  test('waves past 10 add a rival every five waves, uncapped', () {
+    expect(CombatRules.enemyCountForWave(10), 5);
+    expect(CombatRules.enemyCountForWave(11), 6);
+    expect(CombatRules.enemyCountForWave(16), 7);
+    expect(CombatRules.enemyCountForWave(100), 23);
+    expect(WavePlan.fieldStart, 5);
+    expect(WavePlan.fieldCap, 8);
+  });
 }

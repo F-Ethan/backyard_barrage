@@ -476,8 +476,12 @@ void main() {
       game.meta.coins,
       MetaState.coinsForWave(1) + MetaState.coinsPerKnockout,
     );
-    // Every coin earned in the fight also lands on the lifetime score.
-    expect(game.meta.score, game.meta.coins);
+    // Every coin earned lands on the lifetime score, plus the clear points
+    // and a tenth of the unspent coins.
+    expect(
+      game.meta.score,
+      game.meta.coins + MetaState.waveClearPoints(1) + game.meta.coins ~/ 10,
+    );
     expect(game.meta.bestWave, 1);
 
     game.update(0.7);
@@ -747,17 +751,20 @@ void main() {
     return game;
   }
 
-  testWidgets('Campaign on Normal heals one and leaves the KOd kid out', (
+  testWidgets('Campaign on Normal heals one and the KOd kid leaves the crew', (
     tester,
   ) async {
     final game = await nextWaveWithHurtCrew(
       tester,
       difficulty: Difficulty.normal,
     );
+    expect(game.players, hasLength(1));
     expect(game.players[0].hp, 2);
-    expect(game.players[1].isKo, isTrue);
     expect(game.selectedKid, game.players[0]);
     expect(game.phase, MatchPhase.fight);
+    expect(game.meta.owns('team-2'), isFalse, reason: 'spot reopens');
+    expect(game.meta.ledger.kidLosses, 1);
+    expect(game.meta.costOf('team-2'), 30, reason: '20 × 1.5');
   });
 
   testWidgets('Campaign on Hard carries health as it is', (tester) async {
@@ -765,8 +772,8 @@ void main() {
       tester,
       difficulty: Difficulty.hard,
     );
+    expect(game.players, hasLength(1));
     expect(game.players[0].hp, 1);
-    expect(game.players[1].isKo, isTrue);
   });
 
   testWidgets('Easy brings the whole crew back full in both modes', (
@@ -793,7 +800,7 @@ void main() {
       mode: PlayMode.campaign,
     );
     expect(hard.players[0].hp, 1, reason: 'Hard: no heal');
-    expect(hard.players[1].isKo, isTrue, reason: 'Hard: no revive');
+    expect(hard.players, hasLength(1), reason: 'Hard: the KOd kid left');
     await tester.pumpWidget(const SizedBox.shrink());
     final normal = await nextWaveWithHurtCrew(
       tester,
@@ -801,7 +808,7 @@ void main() {
       mode: PlayMode.campaign,
     );
     expect(normal.players[0].hp, 2, reason: 'Normal: +1');
-    expect(normal.players[1].isKo, isTrue, reason: 'Normal: no revive');
+    expect(normal.players, hasLength(1), reason: 'Normal: the KOd kid left');
   });
 
   testWidgets('a teammate looks up and down the yard while winding up', (
@@ -858,14 +865,14 @@ void main() {
     game.pauseMatch();
     game.exitToMenu();
     expect(meta.resumeWave, 2);
-    expect(meta.resumeCrewHp, [1, 0]);
+    expect(meta.resumeCrewHp, [1]);
 
     await tester.pumpWidget(const SizedBox.shrink());
     final again = (await boot(tester, meta)).game;
     again.feel.apply(again.feel.settings.copyWith(difficulty: Difficulty.hard));
     expect(again.wave, 2);
+    expect(again.players, hasLength(1));
     expect(again.players[0].hp, 1);
-    expect(again.players[1].isKo, isTrue);
     expect(meta.resumeCrewHp, isNull);
   });
 
@@ -1064,7 +1071,7 @@ void main() {
     expect(game.enemies, hasLength(1));
   });
 
-  testWidgets('campaign defeat keeps skills and restarts at wave 1', (
+  testWidgets('Arcade defeat keeps the stage build and retries the stage', (
     tester,
   ) async {
     final meta = MetaState(
@@ -1102,7 +1109,11 @@ void main() {
     game.update(0.7);
     game.update(1.5);
     await tester.pump();
-    expect(find.text('Skills stay. You restart at wave 1.'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('defeat-rule'))).data,
+      startsWith('Back to wave 1, the start of stage 1.'),
+    );
+    expect(find.text('Retry stage 1'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('retry')));
     await tester.pump();
@@ -2331,7 +2342,7 @@ void main() {
     expect(booted.playback.sfxLoopStops, 1);
   });
 
-  testWidgets('hounds only come from wave 3', (tester) async {
+  testWidgets('hounds come from wave 3 and every wave from 10', (tester) async {
     final game = (await boot(tester, MetaState())).game;
     game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));
     var rolled = 0;
@@ -2347,7 +2358,126 @@ void main() {
       }
     }
     expect(rolled, greaterThan(0));
-    expect(rolled, lessThan(40), reason: 'rare');
+    for (var wave = HoundComponent.packWave; wave <= 30; wave++) {
+      game.wave = wave;
+      game.startWave();
+      expect(game.houndsDue, greaterThanOrEqualTo(1), reason: 'wave $wave');
+    }
+  });
+
+  testWidgets('a big wave starts five, walks the rest on, and caps at 8', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.wave = 46; // 13 rivals
+    game.startWave();
+    game.finishEntrance();
+    await tester.pump();
+    expect(game.enemies, hasLength(WavePlan.fieldStart));
+    expect(game.rivalsWaiting, 8);
+    expect(find.text('+8 waiting'), findsOneWidget);
+
+    // One walks on every few seconds while there is room.
+    for (var i = 0; i < 40; i++) {
+      game.debugTickWalkOns(0.25);
+    }
+    expect(game.rivalsOnField, WavePlan.fieldCap);
+    expect(game.rivalsWaiting, 5);
+
+    // A knockout at the cap is not a clear while rivals still wait, and
+    // the next one walks on right away.
+    knockOut(game.enemies.where((kid) => !kid.isKo).take(1));
+    game.resolveKnockouts();
+    expect(game.phase, MatchPhase.fight);
+    game.debugTickWalkOns(0.05);
+    expect(game.rivalsOnField, WavePlan.fieldCap);
+    expect(game.rivalsWaiting, 4);
+    final spots = {
+      for (final kid in game.enemies)
+        if (!kid.isKo) ArenaGrid.nearestCell(KidSide.enemy, kid.position),
+    };
+    expect(spots.length, greaterThan(4), reason: 'walk-ons spread out');
+  });
+
+  testWidgets('Revive brings back a knocked-out teammate mid-fight', (
+    tester,
+  ) async {
+    final game = (await boot(
+      tester,
+      MetaState(skills: {'team-2'}, items: {PowerUp.revive: 1}),
+    )).game;
+    expect(game.usePowerUp(PowerUp.revive), isFalse, reason: 'nobody down');
+    knockOut([game.players[1]]);
+    expect(game.usePowerUp(PowerUp.revive), isTrue);
+    expect(game.players[1].isKo, isFalse);
+    expect(game.players[1].hp, CombatRules.hitsToKo);
+    expect(game.meta.itemCount(PowerUp.revive), 0);
+  });
+
+  testWidgets('Arcade: a loss goes back to the stage with the stage build', (
+    tester,
+  ) async {
+    final booted = await boot(
+      tester,
+      MetaState(mode: PlayMode.campaign, coins: 200),
+    );
+    final game = booted.game;
+    game.wave = 6;
+    game.startWave();
+    game.finishEntrance();
+    expect(game.meta.ledger.checkpointWave, 6);
+    expect(game.meta.ledger.checkpointCoins, 200);
+    await tester.pump();
+    expect(find.text('Stage 2 · Wave 6'), findsOneWidget);
+
+    // Wave 6 clear pays out; the shop buys a kid; wave 7 is lost.
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    final earned = game.meta.coins - 200;
+    expect(earned, greaterThan(0));
+    expect(game.meta.buy('team-2'), isTrue);
+    game.wave = 7;
+    game.startWave();
+    game.finishEntrance();
+    expect(game.players, hasLength(2));
+    knockOut(game.players);
+    game.resolveKnockouts();
+    expect(game.phase, MatchPhase.defeat);
+    expect(game.lastDefeat!.wave, 6);
+    expect(game.meta.crewSize, 1, reason: 'back to the stage build');
+    expect(game.meta.coins, 200 + earned ~/ 2);
+    expect(game.meta.resumeWave, 6, reason: 'Play picks up at the stage');
+
+    game.update(0.7);
+    game.update(1.5);
+    await tester.pump();
+    expect(find.byKey(const Key('defeat-lost')), findsOneWidget);
+    expect(find.byKey(const Key('defeat-refund')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('retry')));
+    await tester.pump();
+    game.finishEntrance();
+    expect(game.wave, 6);
+    expect(game.players.single.hp, CombatRules.hitsToKo);
+    expect(game.meta.resumeWave, 0);
+  });
+
+  testWidgets('Easy hides Recovery in the shop', (tester) async {
+    await _useSurface(tester, const Size(844, 390));
+    final booted = await boot(
+      tester,
+      MetaState(coins: 400, difficulty: Difficulty.easy),
+    );
+    final game = booted.game;
+    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.easy));
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('skill-group-crew')));
+    await tester.pump();
+    expect(find.byKey(const Key('skill-branch-team')), findsOneWidget);
+    expect(find.byKey(const Key('skill-branch-recovery')), findsNothing);
   });
 
   testWidgets('the player kid runs on a looping two-frame cycle', (

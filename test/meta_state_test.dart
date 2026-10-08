@@ -35,7 +35,7 @@ void main() {
     });
 
     test('purchases spend coins and stop at the MVP caps', () {
-      final meta = MetaState(coins: 500);
+      final meta = MetaState(coins: 2000);
       expect(meta.buyExtraKid(), isTrue);
       expect(meta.buyExtraKid(), isTrue);
       expect(meta.buyExtraKid(), isFalse);
@@ -65,7 +65,7 @@ void main() {
       );
       meta.buy('shield-1');
       meta.resetRun();
-      expect(meta.coins, 80 - 36);
+      expect(meta.coins, 80 - SkillTree.node('shield-1')!.cost);
       expect(meta.skills, isEmpty);
       expect(meta.crewSize, 1);
       expect(meta.fortStage, 1);
@@ -90,7 +90,7 @@ void main() {
       meta.buy('shield-1');
       meta.resetRun();
       expect(meta.mode, PlayMode.campaign);
-      expect(meta.coins, 80 - 36);
+      expect(meta.coins, 80 - SkillTree.node('shield-1')!.cost);
       expect(meta.owns('team-2'), isTrue);
       expect(meta.owns('team-3'), isTrue);
       expect(meta.owns('fort-2'), isTrue);
@@ -120,7 +120,10 @@ void main() {
         isTrue,
       );
       profile.wallet(PlayMode.arcade, Difficulty.normal).resetRun();
-      expect(profile.wallet(PlayMode.arcade, Difficulty.normal).coins, 82);
+      expect(
+        profile.wallet(PlayMode.arcade, Difficulty.normal).coins,
+        100 - SkillTree.node('team-2')!.cost,
+      );
       expect(
         profile.wallet(PlayMode.arcade, Difficulty.normal).skills,
         isEmpty,
@@ -136,53 +139,56 @@ void main() {
       expect(profile.wallet(PlayMode.campaign, Difficulty.normal).crewSize, 2);
       expect(profile.wallet(PlayMode.campaign, Difficulty.normal).coins, 100);
       expect(profile.wallet(PlayMode.arcade, Difficulty.normal).bestWave, 2);
-      expect(profile.wallet(PlayMode.arcade, Difficulty.normal).coins, 82);
+      expect(
+        profile.wallet(PlayMode.arcade, Difficulty.normal).coins,
+        100 - SkillTree.node('team-2')!.cost,
+      );
     });
 
     test('skill ids and costs stay stable for saves', () {
       expect(
         [for (final node in SkillTree.nodes) '${node.id}:${node.cost}'],
         [
-          'team-2:18',
-          'team-3:55',
-          'fort-2:22',
-          'fort-3:60',
-          'fort-hp-1:90',
-          'fort-hp-2:130',
-          'throw-1:16',
-          'throw-2:34',
-          'throw-3:58',
-          'throw-4:88',
-          'throw-5:124',
-          'poise-1:20',
-          'poise-2:42',
-          'poise-3:70',
-          'poise-4:105',
-          'pressure-1:20',
-          'pressure-2:42',
-          'pressure-3:70',
-          'pressure-4:105',
-          'aim-1:22',
-          'aim-2:46',
-          'aim-3:78',
-          'react-1:22',
-          'react-2:46',
-          'react-3:78',
-          'charge-1:22',
-          'charge-2:46',
-          'charge-3:78',
-          'shield-1:36',
-          'shield-2:72',
-          'shield-3:120',
-          'lanes:48',
-          'blast-1:24',
-          'blast-2:48',
-          'blast-3:80',
-          'blast-4:120',
-          'damage-1:40',
-          'damage-2:85',
-          'damage-3:140',
-          'damage-4:200',
+          'team-2:20',
+          'team-3:50',
+          'fort-2:15',
+          'fort-3:40',
+          'fort-hp-1:95',
+          'fort-hp-2:235',
+          'throw-1:10',
+          'throw-2:25',
+          'throw-3:65',
+          'throw-4:155',
+          'throw-5:390',
+          'poise-1:12',
+          'poise-2:30',
+          'poise-3:75',
+          'poise-4:190',
+          'pressure-1:12',
+          'pressure-2:30',
+          'pressure-3:75',
+          'pressure-4:190',
+          'aim-1:12',
+          'aim-2:30',
+          'aim-3:75',
+          'react-1:12',
+          'react-2:30',
+          'react-3:75',
+          'charge-1:12',
+          'charge-2:30',
+          'charge-3:75',
+          'shield-1:20',
+          'shield-2:50',
+          'shield-3:125',
+          'lanes:40',
+          'blast-1:12',
+          'blast-2:30',
+          'blast-3:75',
+          'blast-4:190',
+          'damage-1:25',
+          'damage-2:65',
+          'damage-3:155',
+          'damage-4:390',
         ],
       );
       expect(
@@ -318,14 +324,34 @@ void main() {
         0,
         (sum, node) => sum + node.cost,
       );
-      expect(total, 2620);
+      expect(total, 3242);
       var waves = 0;
       for (var wave = 1; wave <= 20; wave++) {
         waves += MetaState.coinsForWave(wave);
       }
-      expect(waves, 1920);
-      expect(waves, lessThan(total));
-      expect(MetaState.coinsForWave(1), greaterThanOrEqualTo(16));
+      expect(waves, 960);
+      expect(waves * 2, lessThan(total), reason: 'several long runs');
+      expect(MetaState.coinsForWave(1), 10);
+      expect(MetaState.coinsPerKnockout, 4);
+    });
+
+    test('each rank in a chain costs 2.5x the last, rounded to 5', () {
+      for (final branch in SkillBranch.values) {
+        final chain = SkillTree.chain(branch);
+        final base = chain.first.cost;
+        for (var i = 0; i < chain.length; i++) {
+          expect(
+            chain[i].cost,
+            SkillTree.rankCost(base, i + 1),
+            reason: chain[i].id,
+          );
+        }
+      }
+      expect(SkillTree.rankCost(10, 1), 10);
+      expect(SkillTree.rankCost(10, 2), 25);
+      expect(SkillTree.rankCost(10, 3), 65);
+      expect(SkillTree.rankCost(10, 4), 155);
+      expect(SkillTree.rankCost(10, 5), 390);
     });
 
     test('wave rewards grow and best wave only moves forward', () {

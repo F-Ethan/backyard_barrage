@@ -1372,9 +1372,6 @@ class BackyardBarrageGame extends FlameGame {
     final preview = feel.settings.difficulty.aimPreview;
     chargeHud.showPath = preview != AimPreview.none;
     chargeHud.trackStart = start;
-    // The aim line always runs the length of the yard, so the pan reads on
-    // its own. Power only moves the landing mark along it.
-    chargeHud.aimEnd = along(edge);
     chargeHud.trackEnd = along(math.min(range, edge));
     chargeHud.range = range;
     chargeHud.target = preview == AimPreview.full

@@ -62,7 +62,9 @@ enum SkillGroup {
 /// still be too expensive.
 enum SkillLock { open, parent, teammate }
 
-/// One purchase. Costs rise along a chain. Balance lives next to each node.
+/// One purchase. Each rank in a chain costs 2.5× the one before, rounded
+/// to the nearest 5 ([SkillTree.rankCost]), so the top rank is a real
+/// saving goal. Balance lives next to each node.
 class SkillNode {
   const SkillNode({
     required this.id,
@@ -102,6 +104,17 @@ class SkillTree {
   const SkillTree._();
 
   static const parentLockReason = 'Unlock the node above first.';
+
+  /// Price of the [rank]th node (1-based) in a chain that starts at [base]:
+  /// ×2.5 per rank, rounded to the nearest 5.
+  static int rankCost(int base, int rank) {
+    if (rank <= 1) return base;
+    var price = base.toDouble();
+    for (var i = 1; i < rank; i++) {
+      price *= 2.5;
+    }
+    return ((price / 5) + 0.5).floor() * 5;
+  }
   static const teammateLockReason = 'Buy a second kid first.';
 
   static const List<SkillNode> nodes = [
@@ -110,14 +123,14 @@ class SkillTree {
       branch: SkillBranch.team,
       title: 'Second kid',
       detail: 'A teammate joins the crew next wave.',
-      cost: 18,
+      cost: 20,
     ),
     SkillNode(
       id: 'team-3',
       branch: SkillBranch.team,
       title: 'Third kid',
       detail: 'The crew is full. Three kids on your side.',
-      cost: 55,
+      cost: 50,
       parentId: 'team-2',
     ),
     SkillNode(
@@ -125,14 +138,14 @@ class SkillTree {
       branch: SkillBranch.fort,
       title: 'Bigger fort',
       detail: 'Stage 2. More HP, still refills each wave.',
-      cost: 22,
+      cost: 15,
     ),
     SkillNode(
       id: 'fort-3',
       branch: SkillBranch.fort,
       title: 'Biggest fort',
       detail: 'Stage 3. The tallest wall you can build.',
-      cost: 60,
+      cost: 40,
       parentId: 'fort-2',
     ),
     SkillNode(
@@ -140,7 +153,7 @@ class SkillTree {
       branch: SkillBranch.fort,
       title: 'Packed snow',
       detail: '+4 fort HP on top of the stage.',
-      cost: 90,
+      cost: 95,
       parentId: 'fort-3',
     ),
     SkillNode(
@@ -148,7 +161,7 @@ class SkillTree {
       branch: SkillBranch.fort,
       title: 'Ice blocks',
       detail: '+4 more fort HP.',
-      cost: 130,
+      cost: 235,
       parentId: 'fort-hp-1',
     ),
     SkillNode(
@@ -156,14 +169,14 @@ class SkillTree {
       branch: SkillBranch.throwSpeed,
       title: 'Quicker throw',
       detail: 'Rank 1. A shorter charge and a harder lob.',
-      cost: 16,
+      cost: 10,
     ),
     SkillNode(
       id: 'throw-2',
       branch: SkillBranch.throwSpeed,
       title: 'Quicker throw II',
       detail: 'Rank 2.',
-      cost: 34,
+      cost: 25,
       parentId: 'throw-1',
     ),
     SkillNode(
@@ -171,7 +184,7 @@ class SkillTree {
       branch: SkillBranch.throwSpeed,
       title: 'Quicker throw III',
       detail: 'Rank 3.',
-      cost: 58,
+      cost: 65,
       parentId: 'throw-2',
     ),
     SkillNode(
@@ -179,7 +192,7 @@ class SkillTree {
       branch: SkillBranch.throwSpeed,
       title: 'Quicker throw IV',
       detail: 'Rank 4.',
-      cost: 88,
+      cost: 155,
       parentId: 'throw-3',
     ),
     SkillNode(
@@ -187,7 +200,7 @@ class SkillTree {
       branch: SkillBranch.throwSpeed,
       title: 'Quicker throw V',
       detail: 'Rank 5. The fastest charge.',
-      cost: 124,
+      cost: 390,
       parentId: 'throw-4',
     ),
     SkillNode(
@@ -195,14 +208,14 @@ class SkillTree {
       branch: SkillBranch.poise,
       title: 'Shake it off',
       detail: 'Your stun is 82% of the base lock.',
-      cost: 20,
+      cost: 12,
     ),
     SkillNode(
       id: 'poise-2',
       branch: SkillBranch.poise,
       title: 'Shake it off II',
       detail: 'Your stun is 66% of the base lock.',
-      cost: 42,
+      cost: 30,
       parentId: 'poise-1',
     ),
     SkillNode(
@@ -210,7 +223,7 @@ class SkillTree {
       branch: SkillBranch.poise,
       title: 'Shake it off III',
       detail: 'Your stun is 52% of the base lock.',
-      cost: 70,
+      cost: 75,
       parentId: 'poise-2',
     ),
     SkillNode(
@@ -218,7 +231,7 @@ class SkillTree {
       branch: SkillBranch.poise,
       title: 'Shake it off IV',
       detail: 'Your stun is 40% of the base lock.',
-      cost: 105,
+      cost: 190,
       parentId: 'poise-3',
     ),
     SkillNode(
@@ -226,14 +239,14 @@ class SkillTree {
       branch: SkillBranch.pressure,
       title: 'Heavy hit',
       detail: 'Enemy stun is 1.25× the base lock.',
-      cost: 20,
+      cost: 12,
     ),
     SkillNode(
       id: 'pressure-2',
       branch: SkillBranch.pressure,
       title: 'Heavy hit II',
       detail: 'Enemy stun is 1.55×.',
-      cost: 42,
+      cost: 30,
       parentId: 'pressure-1',
     ),
     SkillNode(
@@ -241,7 +254,7 @@ class SkillTree {
       branch: SkillBranch.pressure,
       title: 'Heavy hit III',
       detail: 'Enemy stun is 1.9×.',
-      cost: 70,
+      cost: 75,
       parentId: 'pressure-2',
     ),
     SkillNode(
@@ -249,7 +262,7 @@ class SkillTree {
       branch: SkillBranch.pressure,
       title: 'Heavy hit IV',
       detail: 'Enemy stun is 2.3×.',
-      cost: 105,
+      cost: 190,
       parentId: 'pressure-3',
     ),
     SkillNode(
@@ -257,14 +270,14 @@ class SkillTree {
       branch: SkillBranch.aim,
       title: 'Sharper aim',
       detail: 'Teammate bots scatter 72% as much.',
-      cost: 22,
+      cost: 12,
     ),
     SkillNode(
       id: 'aim-2',
       branch: SkillBranch.aim,
       title: 'Sharper aim II',
       detail: 'Teammate scatter is 48%.',
-      cost: 46,
+      cost: 30,
       parentId: 'aim-1',
     ),
     SkillNode(
@@ -272,7 +285,7 @@ class SkillTree {
       branch: SkillBranch.aim,
       title: 'Sharper aim III',
       detail: 'Teammate scatter is 28%.',
-      cost: 78,
+      cost: 75,
       parentId: 'aim-2',
     ),
     SkillNode(
@@ -280,14 +293,14 @@ class SkillTree {
       branch: SkillBranch.reaction,
       title: 'Quicker pals',
       detail: 'Teammate bots wait 84% as long between throws.',
-      cost: 22,
+      cost: 12,
     ),
     SkillNode(
       id: 'react-2',
       branch: SkillBranch.reaction,
       title: 'Quicker pals II',
       detail: 'Teammate wait is 68%.',
-      cost: 46,
+      cost: 30,
       parentId: 'react-1',
     ),
     SkillNode(
@@ -295,7 +308,7 @@ class SkillTree {
       branch: SkillBranch.reaction,
       title: 'Quicker pals III',
       detail: 'Teammate wait is 52%.',
-      cost: 78,
+      cost: 75,
       parentId: 'react-2',
     ),
     SkillNode(
@@ -303,14 +316,14 @@ class SkillTree {
       branch: SkillBranch.charge,
       title: 'Faster pals',
       detail: 'Teammate charge is 86% of the Easy windup.',
-      cost: 22,
+      cost: 12,
     ),
     SkillNode(
       id: 'charge-2',
       branch: SkillBranch.charge,
       title: 'Faster pals II',
       detail: 'Teammate charge is 72% of the Easy windup.',
-      cost: 46,
+      cost: 30,
       parentId: 'charge-1',
     ),
     SkillNode(
@@ -318,7 +331,7 @@ class SkillTree {
       branch: SkillBranch.charge,
       title: 'Faster pals III',
       detail: 'Teammate charge is 58% of the Easy windup.',
-      cost: 78,
+      cost: 75,
       parentId: 'charge-2',
     ),
     SkillNode(
@@ -326,14 +339,14 @@ class SkillTree {
       branch: SkillBranch.shield,
       title: 'Shield',
       detail: 'Each of your kids blocks 1 hit a wave. No stun, no damage.',
-      cost: 36,
+      cost: 20,
     ),
     SkillNode(
       id: 'shield-2',
       branch: SkillBranch.shield,
       title: 'Shield II',
       detail: 'Blocks 2 hits a wave.',
-      cost: 72,
+      cost: 50,
       parentId: 'shield-1',
     ),
     SkillNode(
@@ -341,7 +354,7 @@ class SkillTree {
       branch: SkillBranch.shield,
       title: 'Shield III',
       detail: 'Blocks 3 hits a wave.',
-      cost: 120,
+      cost: 125,
       parentId: 'shield-2',
     ),
     SkillNode(
@@ -349,21 +362,21 @@ class SkillTree {
       branch: SkillBranch.lanes,
       title: 'Open fort',
       detail: 'Your snowballs pass through your own fort. The base rule stays until you buy this.',
-      cost: 48,
+      cost: 40,
     ),
     SkillNode(
       id: 'blast-1',
       branch: SkillBranch.blast,
       title: 'Wider splat',
       detail: 'Snowball hit radius is 1.2×.',
-      cost: 24,
+      cost: 12,
     ),
     SkillNode(
       id: 'blast-2',
       branch: SkillBranch.blast,
       title: 'Wider splat II',
       detail: 'Hit radius is 1.45×.',
-      cost: 48,
+      cost: 30,
       parentId: 'blast-1',
     ),
     SkillNode(
@@ -371,7 +384,7 @@ class SkillTree {
       branch: SkillBranch.blast,
       title: 'Wider splat III',
       detail: 'Hit radius is 1.75×.',
-      cost: 80,
+      cost: 75,
       parentId: 'blast-2',
     ),
     SkillNode(
@@ -379,7 +392,7 @@ class SkillTree {
       branch: SkillBranch.blast,
       title: 'Wider splat IV',
       detail: 'Hit radius is 2.05×.',
-      cost: 120,
+      cost: 190,
       parentId: 'blast-3',
     ),
     SkillNode(
@@ -387,14 +400,14 @@ class SkillTree {
       branch: SkillBranch.damage,
       title: 'Harder hit',
       detail: 'Your snowballs count as 2 hits.',
-      cost: 40,
+      cost: 25,
     ),
     SkillNode(
       id: 'damage-2',
       branch: SkillBranch.damage,
       title: 'Harder hit II',
       detail: 'Your snowballs count as 3 hits.',
-      cost: 85,
+      cost: 65,
       parentId: 'damage-1',
     ),
     SkillNode(
@@ -402,7 +415,7 @@ class SkillTree {
       branch: SkillBranch.damage,
       title: 'Harder hit III',
       detail: 'Teammate bots also hit for 2.',
-      cost: 140,
+      cost: 155,
       parentId: 'damage-2',
     ),
     SkillNode(
@@ -410,7 +423,7 @@ class SkillTree {
       branch: SkillBranch.damage,
       title: 'Harder hit IV',
       detail: 'Teammate bots also hit for 3.',
-      cost: 200,
+      cost: 390,
       parentId: 'damage-3',
     ),
   ];

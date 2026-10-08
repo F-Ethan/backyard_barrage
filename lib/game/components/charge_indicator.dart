@@ -8,9 +8,8 @@ import '../throw_physics.dart';
 
 /// Aim preview near the throwing kid: charge glow at the hand, then the
 /// ball's own flight drawn as bright dots from the hand, up over the loft,
-/// and down to where it lands at the current power. Past the landing, faint
-/// dots carry the aim line on across the yard. A landing mark sits on the
-/// floor under the end; when [target] is set the arc stops at that rival
+/// and down to where it lands at the current power. A landing mark sits on
+/// the floor under the end; when [target] is set the arc stops at that rival
 /// and their feet get a lock ring. Difficulty decides how much of this
 /// shows ([showPath], [target]). The power bar lives in the HUD.
 class ChargeIndicator extends PositionComponent {
@@ -30,9 +29,6 @@ class ChargeIndicator extends PositionComponent {
 
   /// Where the ball lands at the current power.
   Vector2? trackEnd;
-
-  /// The aim line carried to the far side of the yard.
-  Vector2? aimEnd;
 
   /// How far the ball flies at the current power. Sets the loft shape, the
   /// same way [LobProjectile] draws it.
@@ -66,7 +62,7 @@ class ChargeIndicator extends PositionComponent {
     final start = trackStart;
     final end = trackEnd;
     if (showPath && start != null && end != null) {
-      _renderFlightPath(canvas, start, end, aimEnd ?? end, target);
+      _renderFlightPath(canvas, start, end, target);
     }
 
     final dir = aimDir.clone();
@@ -90,7 +86,6 @@ class ChargeIndicator extends PositionComponent {
     Canvas canvas,
     Vector2 start,
     Vector2 end,
-    Vector2 aim,
     Vector2? hit,
   ) {
     const lift = ArenaGrid.bodyLift;
@@ -121,24 +116,12 @@ class ChargeIndicator extends PositionComponent {
     const gap = 20.0;
     final dot = Paint()..color = _charge.withValues(alpha: 0.95);
     final rim = Paint()..color = _ink.withValues(alpha: 0.35);
-    final faint = Paint()..color = _ink.withValues(alpha: 0.3);
 
     // Bright arc from just past the hand to the landing (or the rival).
     for (var d = 18.0; d < stop - 6; d += gap) {
       final p = drawnAt(d);
       canvas.drawCircle(p.translate(0, 1.5), 4.5, rim);
       canvas.drawCircle(p, 4, dot);
-    }
-
-    // Faint aim line onward at throw height, so the pan reads at any power.
-    final aimReach = aim.x - start.x;
-    for (var d = reach + gap; d < aimReach - 4; d += gap) {
-      final u = aimReach <= 1 ? 1.0 : d / aimReach;
-      canvas.drawCircle(
-        Offset(start.x + d, start.y + (aim.y - start.y) * u),
-        3,
-        faint,
-      );
     }
 
     final to = Offset(end.x, end.y + lift);

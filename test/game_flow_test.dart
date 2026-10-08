@@ -846,7 +846,7 @@ void main() {
     await tester.tap(find.byKey(const Key('buy-throw')));
     await tester.pump();
     expect(game.meta.throwRank, 1);
-    expect(game.meta.coins, 24);
+    expect(game.meta.coins, 40 - SkillTree.node('throw-1')!.cost);
     expect(game.wave, 1);
 
     await tester.tap(find.byKey(const Key('next-wave')));
@@ -859,7 +859,7 @@ void main() {
     expect(game.phase, MatchPhase.entering);
     game.finishEntrance();
     expect(game.meta.throwRank, 1);
-    expect(game.meta.coins, 24);
+    expect(game.meta.coins, 40 - SkillTree.node('throw-1')!.cost);
     expect(game.meta.crewSize, 1);
     expect(game.players, hasLength(1));
     expect(game.wave, 1);
@@ -1366,7 +1366,7 @@ void main() {
     letGo();
   });
 
-  testWidgets('the aim line spans the yard from the first frame', (
+  testWidgets('the preview ends at the landing, with no line past it', (
     tester,
   ) async {
     final game = (await boot(tester, MetaState())).game;
@@ -1377,8 +1377,11 @@ void main() {
     game.pressChargeZone();
     game.update(1 / 60);
     final hud = game.chargeHud;
-    expect(hud.aimEnd!.x, closeTo(ThrowPhysics.yardFarEdge, 0.01));
-    expect(hud.trackEnd!.x, lessThan(hud.aimEnd!.x));
+    expect(hud.trackEnd!.x, lessThan(ThrowPhysics.yardFarEdge));
+    expect(
+      hud.trackEnd!.x - hud.trackStart!.x,
+      closeTo(ThrowPhysics.rangeForCharge(game.charge), 0.01),
+    );
   });
 
   testWidgets('a near miss is nudged onto the rival, a clear miss is not', (

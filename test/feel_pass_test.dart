@@ -82,6 +82,11 @@ void main() {
   testWidgets('every one-shot cue has a bundled wav', (tester) async {
     final audio = GameAudio(playback: RecordingPlayback());
     for (final cue in AudioCues.oneShots) {
+      if (AudioCues.awaitingFiles.contains(cue)) {
+        // Remove it from awaitingFiles once the file lands.
+        expect(await audio.resolvedFile(cue), isNull, reason: cue);
+        continue;
+      }
       expect(await audio.resolvedFile(cue), 'sfx/$cue.wav', reason: cue);
     }
   });

@@ -142,6 +142,11 @@ class FeelBus {
     unawaited(audio.playSfx(AudioCues.houndSnap));
   }
 
+  /// A far-off howl: a hound is coming this wave.
+  void houndHowl() {
+    unawaited(audio.playSfx(AudioCues.houndHowl));
+  }
+
   void houndWhimper() {
     unawaited(audio.playSfx(AudioCues.houndWhimper));
   }

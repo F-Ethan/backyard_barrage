@@ -2194,6 +2194,37 @@ void main() {
     expect(hound.position.x, lessThan(ArenaGrid.riverLeftX(kid.position.y)));
   });
 
+  testWidgets('a howl warns at least two seconds before the first hound', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));
+    for (var wave = 1; wave <= 40; wave++) {
+      game.wave = wave;
+      game.startWave();
+      final hound = game.houndDueAt;
+      final howl = game.howlDueAt;
+      if (hound == null) {
+        expect(howl, isNull, reason: 'wave $wave: no hound, no howl');
+        continue;
+      }
+      expect(howl, isNotNull, reason: 'wave $wave');
+      expect(howl, greaterThanOrEqualTo(BackyardBarrageGame.howlEarliest));
+      expect(
+        howl,
+        lessThanOrEqualTo(hound - BackyardBarrageGame.howlLead),
+        reason: 'wave $wave',
+      );
+    }
+    game.wave = HoundComponent.packWave;
+    game.startWave();
+    game.finishEntrance();
+    final howl = game.howlDueAt!;
+    game.update(howl + 0.01);
+    expect(game.howlDueAt, isNull, reason: 'it played');
+    expect(game.hounds, isEmpty, reason: 'the hound is still to come');
+  });
+
   testWidgets('a hound bite knocks out a full-health kid on every mode', (
     tester,
   ) async {

@@ -791,6 +791,12 @@ class BackyardBarrageGame extends FlameGame {
 
   /// Seconds into the fight when each hound still to come is released.
   final List<double> _houndTimes = [];
+
+  /// Seconds into the fight when the warning howl plays, or null.
+  double? _howlAt;
+
+  /// When this wave's warning howl plays, or null (no hound, or it played).
+  double? get howlDueAt => _howlAt;
   double _waveFight = 0;
 
   /// The most recent hound on the yard, if any.
@@ -814,9 +820,22 @@ class BackyardBarrageGame extends FlameGame {
       _houndTimes.add(at);
       at += 3 + _rng.nextDouble() * 3;
     }
+    // A howl warns that a hound is coming: at a random moment from the
+    // start of the fight to two seconds before the first one.
+    if (count > 0) {
+      final latest = _houndTimes.first - howlLead;
+      _howlAt = howlEarliest + _rng.nextDouble() * (latest - howlEarliest);
+    }
   }
 
+  /// Earliest the howl plays, in seconds into the fight.
+  static const double howlEarliest = 0.5;
+
+  /// The howl always comes at least this long before the first hound.
+  static const double howlLead = 2;
+
   void _clearHound() {
+    _howlAt = null;
     for (final hound in _hounds) {
       hound.removeFromParent();
     }
@@ -856,6 +875,11 @@ class BackyardBarrageGame extends FlameGame {
   void _tickHound(double dt) {
     if (phase != MatchPhase.fight) return;
     _waveFight += dt;
+    final howl = _howlAt;
+    if (howl != null && !_settling && _waveFight >= howl) {
+      _howlAt = null;
+      feel.houndHowl();
+    }
     _hounds.removeWhere((hound) => hound.state == HoundState.gone);
     while (_houndTimes.isNotEmpty &&
         !_settling &&

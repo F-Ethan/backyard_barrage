@@ -31,6 +31,11 @@ abstract final class AudioCues {
   static const houndLeap = 'hound_leap';
   static const houndSnap = 'hound_snap';
   static const houndWhimper = 'hound_whimper';
+  static const houndHowl = 'hound_howl';
+
+  /// Cues wired in the game whose file has not been delivered yet. They
+  /// stay silent until `assets/audio/sfx/<cue>.wav` lands.
+  static const awaitingFiles = <String>{houndHowl};
   static const menuLoop = 'menu_loop';
   static const battleWinter = 'battle_loop_winter';
   static const battleSummer = 'battle_loop_summer';
@@ -62,6 +67,7 @@ abstract final class AudioCues {
     houndLeap,
     houndSnap,
     houndWhimper,
+    houndHowl,
   ];
 
   static const loops = <String>[menuLoop, battleWinter, battleSummer];

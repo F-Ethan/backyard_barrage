@@ -32,6 +32,7 @@ Added 2026-10-08 (mono WAV, same specs). The four hound cues were replaced the s
 | hound_leap.wav | The hound jumps the river |
 | hound_snap.wav | The hound's bite lands |
 | hound_whimper.wav | The hound runs off (scared or bounced) |
+| hound_howl.wav | **Not delivered yet.** A far-off warning howl at a random moment before a wave's first hound (0.5s into the fight to 2s before it). Wired as `AudioCues.houndHowl`, silent until the file lands; then drop it from `AudioCues.awaitingFiles`. |
 
 ## Loops (`assets/audio/music/`)
 - menu_loop.wav (cozy backyard, light) — menus

@@ -603,6 +603,57 @@ void main() {
     }
   });
 
+  testWidgets('leaving through Pause bookmarks the wave and map', (
+    tester,
+  ) async {
+    final meta = MetaState();
+    final game = (await boot(tester, meta)).game;
+    game.wave = 3;
+    game.startWave();
+    game.finishEntrance();
+    final arena = game.arena;
+    game.pauseMatch();
+    game.exitToMenu();
+    expect(meta.resumeWave, 3);
+    expect(meta.resumeArena, arena.name);
+    expect(meta.canResume, isTrue);
+
+    // Back on the menu (the game is unmounted), then Play again on the same
+    // wallet: same wave and map, bookmark used up.
+    await tester.pumpWidget(const SizedBox.shrink());
+    final again = (await boot(tester, meta)).game;
+    expect(again.wave, 3);
+    expect(again.arena, arena);
+    expect(meta.canResume, isFalse);
+  });
+
+  testWidgets('leaving after a wave clear resumes on the next wave', (
+    tester,
+  ) async {
+    final meta = MetaState();
+    final game = (await boot(tester, meta)).game;
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    expect(game.phase, MatchPhase.clearing);
+    game.pauseMatch();
+    game.exitToMenu();
+    expect(meta.resumeWave, 2);
+  });
+
+  testWidgets('a defeat clears the bookmark', (tester) async {
+    final meta = MetaState(resumeWave: 4, resumeArena: 'park');
+    final game = (await boot(tester, meta)).game;
+    expect(game.wave, 4);
+    knockOut(game.players);
+    game.resolveKnockouts();
+    expect(meta.canResume, isFalse);
+    game.update(0.7);
+    game.update(1.5);
+    await tester.pump();
+    game.exitToMenu();
+    expect(meta.canResume, isFalse);
+  });
+
   testWidgets('a wiped crew can retry at full HP', (tester) async {
     final game = (await boot(
       tester,

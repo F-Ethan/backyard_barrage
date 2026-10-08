@@ -63,6 +63,8 @@ class PlayerSave {
       ..coins = snap.coins
       ..bestWave = snap.bestWave
       ..score = snap.score
+      ..resumeWave = snap.resumeWave
+      ..resumeArena = snap.resumeArena
       ..replaceSkills(snap.skills);
   }
 
@@ -153,6 +155,8 @@ class WalletSnap {
     required this.bestWave,
     required this.score,
     required this.skills,
+    this.resumeWave = 0,
+    this.resumeArena,
   });
 
   factory WalletSnap.from(MetaState state) {
@@ -163,6 +167,8 @@ class WalletSnap {
       coins: state.coins,
       bestWave: state.bestWave,
       score: state.score,
+      resumeWave: state.resumeWave,
+      resumeArena: state.resumeArena,
       skills: Set<String>.from(state.skills),
     );
   }
@@ -174,4 +180,6 @@ class WalletSnap {
   final int bestWave;
   final int score;
   final Set<String> skills;
+  final int resumeWave;
+  final String? resumeArena;
 }

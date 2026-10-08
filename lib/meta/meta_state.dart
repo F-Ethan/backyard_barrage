@@ -20,6 +20,8 @@ class MetaState {
     Season season = Season.winter,
     this.bestWave = 0,
     this.score = 0,
+    this.resumeWave = 0,
+    this.resumeArena,
     this.mode = PlayMode.arcade,
     this.difficulty = Difficulty.normal,
   }) : _season = season.orPlayable {
@@ -67,6 +69,15 @@ class MetaState {
   /// Lifetime points. Every coin earned also adds a point, but points are
   /// never spent and never reset. Arcade shows this as its score.
   int score;
+
+  /// Wave to pick up from after leaving through Pause → Menu, or 0 when
+  /// there is no run to resume. A defeat clears it.
+  int resumeWave;
+
+  /// Arena name of the run to resume, so the scenery comes back too.
+  String? resumeArena;
+
+  bool get canResume => resumeWave > 0;
 
   /// Pay [amount] coins and the matching points.
   void earn(int amount) {
@@ -254,6 +265,8 @@ class MetaState {
     'season': season.name,
     'bestWave': bestWave,
     'score': score,
+    'resumeWave': resumeWave,
+    if (resumeArena != null) 'resumeArena': resumeArena!,
     'difficulty': difficulty.name,
     'mode': mode.name,
   };
@@ -283,6 +296,10 @@ class MetaState {
       season: Season.tryParse(json['season'] as String?) ?? Season.winter,
       bestWave: _clampInt(_asInt(json['bestWave']), 0, 9999),
       score: _clampInt(_asInt(json['score']), 0, 999999999),
+      resumeWave: _clampInt(_asInt(json['resumeWave']), 0, 9999),
+      resumeArena: json['resumeArena'] is String
+          ? json['resumeArena'] as String
+          : null,
       difficulty: _readDifficulty(json['difficulty']),
       mode: PlayMode.tryParse(json['mode'] as String?) ?? PlayMode.arcade,
     );

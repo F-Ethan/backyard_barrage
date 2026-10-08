@@ -286,6 +286,7 @@ class BackyardBarrageGame extends FlameGame {
       _arenaArt[arena] = await loadSprite(arena.background);
     }
     _arena = Arena.pick(_rng);
+    _takeResume();
 
     _bg = SpriteComponent(
       sprite: _backdrop(_kit),
@@ -584,7 +585,36 @@ class BackyardBarrageGame extends FlameGame {
     startWave();
   }
 
+  /// Picks up a run left through Pause → Menu: same wave (the next one if
+  /// that wave was already cleared) and same arena. The bookmark is used
+  /// once.
+  void _takeResume() {
+    if (!meta.canResume) return;
+    wave = meta.resumeWave;
+    for (final arena in Arena.values) {
+      if (arena.name == meta.resumeArena) _arena = arena;
+    }
+    meta.resumeWave = 0;
+    meta.resumeArena = null;
+  }
+
+  /// Bookmark the run when leaving mid-run (not after a defeat).
+  void _bookmarkRun() {
+    final at = phase == MatchPhase.paused ? _resumePhase : phase;
+    switch (at) {
+      case MatchPhase.entering || MatchPhase.fight:
+        meta.resumeWave = wave;
+      case MatchPhase.clearing || MatchPhase.shop:
+        // This wave already paid out; pick up on the next one.
+        meta.resumeWave = wave + 1;
+      case MatchPhase.defeat || MatchPhase.paused:
+        meta.resumeWave = 0;
+    }
+    meta.resumeArena = meta.resumeWave > 0 ? _arena.name : null;
+  }
+
   void exitToMenu() {
+    _bookmarkRun();
     _offerEndAd();
     overlays.clear();
     if (paused) resumeEngine();
@@ -633,6 +663,8 @@ class BackyardBarrageGame extends FlameGame {
     feel.defeated();
     carriedCoins = meta.coins;
     meta.resetRun();
+    meta.resumeWave = 0;
+    meta.resumeArena = null;
     unawaited(persist());
     _publishHud();
     _showBanner(

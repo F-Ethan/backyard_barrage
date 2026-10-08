@@ -14,7 +14,6 @@ import '../feel/feel_bus.dart';
 import '../meta/difficulty.dart';
 import '../meta/game_settings.dart';
 import '../meta/meta_state.dart';
-import '../meta/play_mode.dart';
 import '../meta/power_up.dart';
 import '../meta/save_store.dart';
 import '../meta/settings_store.dart';
@@ -688,7 +687,7 @@ class BackyardBarrageGame extends FlameGame {
     hp: now,
     maxHp: CombatRules.hitsToKo,
     difficulty: feel.settings.difficulty,
-    carries: meta.mode == PlayMode.arcade,
+    carries: true,
     healBonus: meta.healPerWave,
     reviveOne: meta.reviveOne,
   );

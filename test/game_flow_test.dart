@@ -758,19 +758,72 @@ void main() {
     expect(game.players[1].isKo, isTrue);
   });
 
-  testWidgets('Easy and Arcade bring the whole crew back full', (tester) async {
+  testWidgets('Easy brings the whole crew back full in both modes', (
+    tester,
+  ) async {
     final easy = await nextWaveWithHurtCrew(
       tester,
       difficulty: Difficulty.easy,
     );
     expect(easy.players.map((k) => k.hp), [3, 3]);
     await tester.pumpWidget(const SizedBox.shrink());
-    final arcade = await nextWaveWithHurtCrew(
+    final arcadeEasy = await nextWaveWithHurtCrew(
+      tester,
+      difficulty: Difficulty.easy,
+      mode: PlayMode.campaign,
+    );
+    expect(arcadeEasy.players.map((k) => k.hp), [3, 3]);
+  });
+
+  testWidgets('Arcade carries health by difficulty too', (tester) async {
+    final hard = await nextWaveWithHurtCrew(
       tester,
       difficulty: Difficulty.hard,
       mode: PlayMode.campaign,
     );
-    expect(arcade.players.map((k) => k.hp), [3, 3]);
+    expect(hard.players[0].hp, 1, reason: 'Hard: no heal');
+    expect(hard.players[1].isKo, isTrue, reason: 'Hard: no revive');
+    await tester.pumpWidget(const SizedBox.shrink());
+    final normal = await nextWaveWithHurtCrew(
+      tester,
+      difficulty: Difficulty.normal,
+      mode: PlayMode.campaign,
+    );
+    expect(normal.players[0].hp, 2, reason: 'Normal: +1');
+    expect(normal.players[1].isKo, isTrue, reason: 'Normal: no revive');
+  });
+
+  testWidgets('a teammate looks up and down the yard while winding up', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState(skills: {'team-2'}))).game;
+    for (final rival in game.enemies) {
+      for (final b in rival.children.whereType<EnemyController>()) {
+        b.removeFromParent();
+      }
+    }
+    game.update(0);
+    final mate = game.players[1];
+    expect(identical(game.selectedKid, mate), isFalse);
+    final brain = mate.children.whereType<EnemyController>().single;
+    final seen = <ChargeYaw>{};
+    var charged = false;
+    for (var i = 0; i < 1200; i++) {
+      brain.update(1 / 60);
+      if (mate.sprite != mate.idleSprite && mate.sprite != mate.throwSprite) {
+        if (mate.sprite == mate.chargeSprite ||
+            mate.sprite == mate.turn15lSprite ||
+            mate.sprite == mate.turn30lSprite ||
+            mate.sprite == mate.turn15rSprite ||
+            mate.sprite == mate.turn30rSprite) {
+          charged = true;
+          seen.add(mate.chargeYaw);
+        }
+      }
+      if (charged && mate.sprite == mate.throwSprite) break;
+    }
+    expect(charged, isTrue, reason: 'the teammate wound up');
+    expect(seen.length, greaterThanOrEqualTo(3), reason: 'it turned: $seen');
   });
 
   testWidgets('Patch up and Second wind soften Hard', (tester) async {

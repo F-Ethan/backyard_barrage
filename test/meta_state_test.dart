@@ -673,10 +673,10 @@ void main() {
       }
     });
 
-    test('Arcade and Easy lock them with a reason', () {
+    test('both modes can buy them; Easy locks them with a reason', () {
       final arcade = MetaState(coins: 999, mode: PlayMode.campaign);
-      expect(arcade.lockReason('mend-1'), SkillTree.campaignOnlyReason);
-      expect(arcade.buy('mend-1'), isFalse);
+      expect(arcade.lockReason('mend-1'), isNull);
+      expect(arcade.buy('mend-1'), isTrue);
       final easy = MetaState(coins: 999, difficulty: Difficulty.easy);
       expect(easy.lockReason('mend-1'), SkillTree.easyHealsReason);
       expect(easy.buy('mend-1'), isFalse);

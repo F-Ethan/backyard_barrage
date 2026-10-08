@@ -138,6 +138,7 @@ class EnemyController extends Component {
       host.showChargePose();
       _lockAim();
     }
+    if (_phase == _AiPhase.telegraph) _lookDuringWindup();
     if (_phase == _AiPhase.telegraph && _elapsed >= _cycle) {
       _fire();
     }
@@ -182,6 +183,33 @@ class EnemyController extends Component {
     }
     _retreats -= 1;
     _applyStep(next);
+  }
+
+  /// Teammates turn their head and body like the player's sweep while they
+  /// wind up: a look up and down the yard that settles on their locked aim
+  /// by the release. Rival art has no separate turn frames, so only the
+  /// player's side does this.
+  void _lookDuringWindup() {
+    if (side != KidSide.player) return;
+    final aim = _lockedAim;
+    final hold = _telegraph;
+    if (aim == null || hold <= 0) return;
+    final start = Vector2(host.throwOrigin.x, host.hitCenter.y);
+    final dx = (aim.x - start.x).abs();
+    final target = dx < 1
+        ? 0.0
+        : math
+              .atan((start.y - aim.y) / dx)
+              .clamp(-ThrowPhysics.maxAimRadians, ThrowPhysics.maxAimRadians);
+    final t = ((_elapsed - (_cycle - hold)) / hold).clamp(0.0, 1.0);
+    // One look up and back down, fading out onto the target.
+    final look =
+        math.sin(2 * math.pi * t) * (1 - t) * ThrowPhysics.maxAimRadians * 0.9;
+    final elevation = (target + look).clamp(
+      -ThrowPhysics.maxAimRadians,
+      ThrowPhysics.maxAimRadians,
+    );
+    host.showChargeYaw(ThrowPhysics.chargeYaw(elevation));
   }
 
   KidComponent? _pickTarget() {

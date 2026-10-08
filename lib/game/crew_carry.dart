@@ -2,9 +2,8 @@ import '../meta/difficulty.dart';
 
 /// How the crew's health carries from one wave into the next.
 ///
-/// Only Campaign carries (`PlayMode.arcade`, the run that wipes skills on
-/// defeat). Arcade, Easy, and the first wave of a run start everyone at
-/// full health.
+/// Applies in both Campaign and Arcade. Easy and the first wave of a run
+/// start everyone at full health. [carries] false skips it (tests).
 ///
 /// | Difficulty | Standing kids | Knocked-out kids |
 /// | --- | --- | --- |

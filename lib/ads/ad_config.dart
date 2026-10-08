@@ -1,26 +1,36 @@
 import 'package:flutter/foundation.dart';
 
-/// Google's official sample IDs. Swap these, the iOS
-/// `GADApplicationIdentifier`, and the Android `APPLICATION_ID` together
-/// before a store build. The native SDKs read the app ID before Dart starts,
-/// so it cannot live only in this file. Unit IDs are read from here.
+/// AdMob ids and the Remove Ads product.
+///
+/// The native SDKs read the app id before Dart starts, so it also lives in
+/// iOS `GADApplicationIdentifier` (Info.plist) and the Android
+/// `APPLICATION_ID` (AndroidManifest). Keep them in sync with this file.
+///
+/// Ad *units* switch on build type: release builds use the live unit, and
+/// debug and profile builds use Google's test unit, so playtesting never
+/// taps a live ad (AdMob treats that as invalid traffic). A release build
+/// with no live unit set loads no ads at all rather than test ads.
 ///
 /// Source: https://developers.google.com/admob/flutter/interstitial
 /// and https://developers.google.com/admob/flutter/quick-start
 class AdConfig {
   const AdConfig._();
 
-  /// Sample iOS app ID.
-  static const String iosAppId = 'ca-app-pub-3940256099942544~1458002511';
+  /// Live iOS app id (Backyard Barrage, AdMob account 7671007992790429).
+  static const String iosAppId = 'ca-app-pub-7671007992790429~3358046608';
 
-  /// Sample Android app ID.
+  /// Sample Android app id. Android is not a store target yet.
   static const String androidAppId = 'ca-app-pub-3940256099942544~3347511713';
 
-  /// Sample iOS interstitial.
+  /// Live iOS interstitial unit, used by release builds. Empty until the
+  /// AdMob unit is created; a release build then shows no ads.
+  static const String iosInterstitialLiveId = '';
+
+  /// Google's sample iOS interstitial, used by debug and profile builds.
   static const String iosInterstitialId =
       'ca-app-pub-3940256099942544/4411468910';
 
-  /// Sample Android interstitial.
+  /// Google's sample Android interstitial.
   static const String androidInterstitialId =
       'ca-app-pub-3940256099942544/1033173712';
 
@@ -28,15 +38,19 @@ class AdConfig {
   /// The timer is for the app session. It is not saved.
   static const Duration interstitialCooldown = Duration(minutes: 3);
 
-  /// Non-consumable Remove Ads product. Create this same id in App Store
-  /// Connect (and sign the Paid Apps agreement) before a store build.
+  /// Non-consumable Remove Ads product. Its price is set in App Store
+  /// Connect; the game shows the store's localized price.
   static const String removeAdsProductId =
       'dev.gamelogic.backyardbarrage.removeads';
 
-  static String get interstitialId {
+  /// The unit to load, or empty for none. [release] defaults to
+  /// [kReleaseMode]; tests pass it to check both builds.
+  static String interstitialIdFor({bool release = kReleaseMode}) {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       return androidInterstitialId;
     }
-    return iosInterstitialId;
+    return release ? iosInterstitialLiveId : iosInterstitialId;
   }
+
+  static String get interstitialId => interstitialIdFor();
 }

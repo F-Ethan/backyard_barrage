@@ -58,7 +58,7 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 | Walk | Left two-thirds of the screen. Drag and the selected kid follows the finger inside their half, out to about 60px from the river bank (the limit slants with the bank, so the back rows reach further), at the locked rate of six times the old cell walk. Difficulty does not change that speed. A tap on a kid selects them |
 | Active thrower | One kid is selected and shows a soft glow. The others throw on Easy |
 | Enemy count | Waves 1–6 climb: 1, 2, 3, then 3 with faster throws and steps, then 3 with those buffs plus 1 HP on the difficulty base, then 4. Wave 7+ holds at 5 with the buffs |
-| Win | All enemies KO’d |
+| Win | All enemies KO’d. If snowballs are still in the air when the last kid on either side goes down, the result waits (up to 4s) for them to land, and their hits still count; nobody starts a new throw meanwhile |
 | Lose | All player kids KO’d |
 
 ### 3.3 Controls (touch, landscape)

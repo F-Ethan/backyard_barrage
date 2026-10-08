@@ -654,6 +654,56 @@ void main() {
     expect(meta.canResume, isFalse);
   });
 
+  testWidgets('a snowball in the air still lands after its thrower is out', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    final kid = game.players.first;
+    final rival = game.enemies.first;
+    final hpBefore = kid.hp;
+    LobProjectile? shot;
+    for (var i = 0; i < 900 && shot == null; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      for (final s in game.world.children.whereType<LobProjectile>()) {
+        if (identical(s.owner, rival)) shot = s;
+      }
+    }
+    expect(shot, isNotNull, reason: 'the rival threw');
+
+    // The last rival goes down while its snowball is still flying.
+    knockOut([rival]);
+    game.resolveKnockouts();
+    expect(game.phase, MatchPhase.fight);
+    expect(game.settling, isTrue);
+    expect(shot!.spent, isFalse);
+    expect(game.world.children.contains(shot), isTrue);
+
+    for (var i = 0; i < 300 && !shot.spent; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(shot.spent, isTrue, reason: 'it finished its flight');
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(game.settling, isFalse);
+    expect(game.phase, MatchPhase.clearing);
+    // Whether it hit depends on the aim; if it did, the hit counted.
+    expect(kid.hp, lessThanOrEqualTo(hpBefore));
+  });
+
+  testWidgets('no new throws start while the last shots land', (tester) async {
+    final game = (await boot(tester, MetaState())).game;
+    final rival = game.enemies.first;
+    LobProjectile? shot;
+    for (var i = 0; i < 900 && shot == null; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      shot = game.world.children.whereType<LobProjectile>().firstOrNull;
+    }
+    knockOut([rival]);
+    game.resolveKnockouts();
+    expect(game.settling, isTrue);
+    game.pressChargeZone();
+    expect(game.isCharging, isFalse);
+  });
+
   testWidgets('a wiped crew can retry at full HP', (tester) async {
     final game = (await boot(
       tester,

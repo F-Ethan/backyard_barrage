@@ -7,6 +7,7 @@ import 'barrage_theme.dart';
 import 'coin_amount.dart';
 import 'draft_button.dart';
 import 'match_banner.dart';
+import 'power_up_ui.dart';
 import 'ui_assets.dart';
 
 /// Screen-space fight chrome. Hearts, coins, the fort meter, pause, and the
@@ -49,6 +50,28 @@ class MatchHud extends StatelessWidget {
             if (fighting && charge > 0)
               Positioned.fill(
                 child: IgnorePointer(child: _ChargeGlow(charge: charge)),
+              ),
+            if (fighting)
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                child: SafeArea(
+                  child: Padding(
+                    // Below the status chips and the hint, clear of the
+                    // thumbs lower down.
+                    padding: EdgeInsets.fromLTRB(
+                      0,
+                      120,
+                      tokens.space.md,
+                      tokens.space.sm,
+                    ),
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: PowerUpBar(game: game),
+                    ),
+                  ),
+                ),
               ),
             SafeArea(
               child: Padding(

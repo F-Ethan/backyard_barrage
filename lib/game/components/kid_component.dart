@@ -118,6 +118,29 @@ class KidComponent extends SpriteComponent {
     return cycle == null || cycle.isEmpty ? [walkSprite] : cycle;
   }
 
+  /// Frost armor: a cold bubble around the kid while it lasts.
+  bool armored = false;
+
+  /// Freeze all: frozen in place, tinted icy, for this long.
+  double _frozenTimer = 0;
+  static final Paint _icePaint = Paint()
+    ..colorFilter = const ColorFilter.mode(
+      Color(0x8C9FE3FF),
+      BlendMode.srcATop,
+    );
+
+  bool get isFrozen => _frozenTimer > 0;
+
+  /// Freeze for [seconds]: no throwing or stepping (a stun) and an icy tint.
+  void freeze(double seconds) {
+    if (isKo) return;
+    _frozenTimer = math.max(_frozenTimer, seconds);
+    _stunTimer = math.max(_stunTimer, seconds);
+    _chargingPose = false;
+    _walking = false;
+    _refreshSprite();
+  }
+
   /// Shows a glint while winding up (long-range rivals).
   bool glint = false;
 
@@ -331,6 +354,8 @@ class KidComponent extends SpriteComponent {
 
   void revive() {
     hp = maxHp;
+    _frozenTimer = 0;
+    armored = false;
     _chargingPose = false;
     _walking = false;
     _throwPoseTimer = 0;
@@ -455,6 +480,7 @@ class KidComponent extends SpriteComponent {
       if (_throwPoseTimer <= 0) refresh = true;
     }
     if (_flashTimer > 0) _flashTimer -= dt;
+    if (_frozenTimer > 0) _frozenTimer -= dt;
     final cycle = _walkCycle;
     if (_walking && cycle != null && cycle.length > 1) {
       _walkClock += dt;
@@ -522,6 +548,27 @@ class KidComponent extends SpriteComponent {
     if (moved) canvas.restore();
     if (scaled) canvas.restore();
     if (glint && _chargingPose && !isKo && !isStunned) _drawGlint(canvas);
+    if (armored && !isKo) _drawArmor(canvas);
+  }
+
+  void _drawArmor(Canvas canvas) {
+    final center = Offset(size.x / 2, size.y * 0.55);
+    final r = size.x * 0.5;
+    canvas.drawCircle(
+      center,
+      r,
+      Paint()
+        ..color = const Color(0x339FE3FF)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    );
+    canvas.drawCircle(
+      center,
+      r,
+      Paint()
+        ..color = const Color(0xB3DFF6FF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3,
+    );
   }
 
   /// A pulsing four-point sparkle on the ball.
@@ -594,6 +641,9 @@ class KidComponent extends SpriteComponent {
     super.render(canvas);
     if (_flashTimer > 0 && !isKo) {
       sprite?.render(canvas, size: size, overridePaint: _flashPaint);
+    }
+    if (_frozenTimer > 0 && !isKo) {
+      sprite?.render(canvas, size: size, overridePaint: _icePaint);
     }
     if (isKo) {
       _drawKnockoutMark(canvas);

@@ -1,5 +1,6 @@
 import '../seasons/season.dart';
 import 'difficulty.dart';
+import 'power_up.dart';
 import 'play_mode.dart';
 import 'skill_tree.dart';
 
@@ -23,9 +24,11 @@ class MetaState {
     this.resumeWave = 0,
     this.resumeArena,
     this.resumeCrewHp,
+    Map<PowerUp, int>? items,
     this.mode = PlayMode.arcade,
     this.difficulty = Difficulty.normal,
   }) : _season = season.orPlayable {
+    if (items != null) replaceItems(items);
     if (skills != null) {
       _skills.addAll(_closed(skills));
     } else {
@@ -94,6 +97,43 @@ class MetaState {
 
   /// One knocked-out teammate rejoins each wave at 1 HP (Second wind).
   bool get reviveOne => owns('revive-1');
+  final Map<PowerUp, int> _items = {};
+
+  /// One-use power-ups in this wallet. They stay until used; a defeat
+  /// keeps them, like unspent coins.
+  Map<PowerUp, int> get items => Map.unmodifiable(_items);
+
+  int itemCount(PowerUp item) => _items[item] ?? 0;
+
+  void replaceItems(Map<PowerUp, int> next) {
+    _items.clear();
+    for (final entry in next.entries) {
+      final n = entry.value.clamp(0, PowerUp.maxStack);
+      if (n > 0) _items[entry.key] = n;
+    }
+  }
+
+  bool canBuyItem(PowerUp item) =>
+      coins >= item.cost && itemCount(item) < PowerUp.maxStack;
+
+  bool buyItem(PowerUp item) {
+    if (!canBuyItem(item)) return false;
+    coins -= item.cost;
+    _items[item] = itemCount(item) + 1;
+    return true;
+  }
+
+  /// Spend one. False when there is none.
+  bool useItem(PowerUp item) {
+    final n = itemCount(item);
+    if (n <= 0) return false;
+    if (n == 1) {
+      _items.remove(item);
+    } else {
+      _items[item] = n - 1;
+    }
+    return true;
+  }
 
   /// Pay [amount] coins and the matching points.
   void earn(int amount) {
@@ -288,6 +328,7 @@ class MetaState {
     'bestWave': bestWave,
     'score': score,
     'resumeWave': resumeWave,
+    'items': {for (final e in _items.entries) e.key.name: e.value},
     'resumeArena': ?resumeArena,
     'resumeCrewHp': ?resumeCrewHp,
     'difficulty': difficulty.name,
@@ -320,6 +361,7 @@ class MetaState {
       bestWave: _clampInt(_asInt(json['bestWave']), 0, 9999),
       score: _clampInt(_asInt(json['score']), 0, 999999999),
       resumeWave: _clampInt(_asInt(json['resumeWave']), 0, 9999),
+      items: _readItems(json['items']),
       resumeArena: json['resumeArena'] is String
           ? json['resumeArena'] as String
           : null,
@@ -332,6 +374,15 @@ class MetaState {
       difficulty: _readDifficulty(json['difficulty']),
       mode: PlayMode.tryParse(json['mode'] as String?) ?? PlayMode.arcade,
     );
+  }
+
+  static Map<PowerUp, int>? _readItems(Object? raw) {
+    if (raw is! Map) return null;
+    return {
+      for (final entry in raw.entries)
+        ?PowerUp.tryParse(entry.key is String ? entry.key as String : null):
+            _clampInt(_asInt(entry.value), 0, PowerUp.maxStack),
+    };
   }
 
   static Difficulty _readDifficulty(Object? raw) {

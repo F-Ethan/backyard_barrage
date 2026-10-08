@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../feel/feel_bus.dart';
 import '../game/backyard_barrage_game.dart';
+import '../meta/power_up.dart';
 import '../meta/skill_tree.dart';
 import '../seasons/season.dart';
 import 'barrage_colors.dart';
@@ -12,6 +13,7 @@ import 'barrage_theme.dart';
 import 'coin_amount.dart';
 import 'draft_button.dart';
 import 'motion.dart';
+import 'power_up_ui.dart';
 import 'season_toggle.dart';
 
 /// Between-wave skill tree.
@@ -39,6 +41,9 @@ class _Purchase {
 
 class _ShopOverlayState extends State<ShopOverlay> {
   SkillGroup _group = SkillGroup.fight;
+
+  /// The Items tab (one-use power-ups) is showing instead of a skill group.
+  bool _items = false;
   SkillBranch _branch = SkillBranch.throwSpeed;
   _Purchase? _lastPurchase;
   int _purchaseSerial = 0;
@@ -58,10 +63,26 @@ class _ShopOverlayState extends State<ShopOverlay> {
     setState(() {});
   }
 
+  Future<void> _buyItem(PowerUp item) async {
+    if (!widget.game.meta.buyItem(item)) return;
+    widget.game.feel.purchased();
+    setState(() {
+      _lastPurchase = _Purchase(item.name, item.cost, ++_purchaseSerial);
+    });
+    await widget.game.persist();
+  }
+
+  void _selectItems() {
+    if (_items) return;
+    widget.game.feel.uiTap();
+    setState(() => _items = true);
+  }
+
   void _selectGroup(SkillGroup group) {
-    if (group == _group) return;
+    if (group == _group && !_items) return;
     widget.game.feel.uiTap();
     setState(() {
+      _items = false;
       _group = group;
       if (!group.branches.contains(_branch)) {
         _branch = group.branches.first;
@@ -111,76 +132,93 @@ class _ShopOverlayState extends State<ShopOverlay> {
                         compact: compact,
                       ),
                       SizedBox(height: tokens.space.sm),
-                      _GroupTabs(selected: _group, onSelect: _selectGroup),
+                      _GroupTabs(
+                        selected: _items ? null : _group,
+                        onSelect: _selectGroup,
+                        onItems: _selectItems,
+                      ),
                       SizedBox(height: tokens.space.sm),
                       Expanded(
-                        child: LayoutBuilder(
-                          builder: (context, body) {
-                            final side = (body.maxWidth * 0.30).clamp(
-                              128.0,
-                              210.0,
-                            );
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                SizedBox(
-                                  width: side,
-                                  child: MotionSwitcher(
-                                    child: _BranchList(
-                                      key: ValueKey(_group),
-                                      group: _group,
-                                      selected: _branch,
-                                      onSelect: _selectBranch,
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(width: tokens.space.md),
-                                Expanded(
-                                  child: MotionSwitcher(
-                                    slide: const Offset(0.04, 0),
-                                    child: ListView(
-                                      key: ValueKey(_branch),
-                                      padding: EdgeInsets.zero,
-                                      children: [
-                                        Text(
-                                          _branch.label,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: BarrageType.heading,
-                                        ),
-                                        Text(
-                                          'Each rank unlocks the next.',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: BarrageType.muted,
-                                        ),
-                                        SizedBox(height: tokens.space.sm),
-                                        for (var i = 0; i < chain.length; i++)
-                                          _NodeRow(
-                                            node: chain[i],
-                                            owned: meta.owns(chain[i].id),
-                                            lockReason: meta.lockReason(
-                                              chain[i].id,
-                                            ),
-                                            affordable: meta.canBuy(
-                                              chain[i].id,
-                                            ),
-                                            continues: i < chain.length - 1,
-                                            feel: game.feel,
-                                            celebrate:
-                                                _lastPurchase?.id == chain[i].id
-                                                ? _lastPurchase!.serial
-                                                : null,
-                                            onBuy: () => _buy(chain[i]),
+                        child: _items
+                            ? _ItemsPanel(
+                                game: game,
+                                celebrate: _lastPurchase,
+                                onBuy: _buyItem,
+                              )
+                            : LayoutBuilder(
+                                builder: (context, body) {
+                                  final side = (body.maxWidth * 0.30).clamp(
+                                    128.0,
+                                    210.0,
+                                  );
+                                  return Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      SizedBox(
+                                        width: side,
+                                        child: MotionSwitcher(
+                                          child: _BranchList(
+                                            key: ValueKey(_group),
+                                            group: _group,
+                                            selected: _branch,
+                                            onSelect: _selectBranch,
                                           ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
+                                        ),
+                                      ),
+                                      SizedBox(width: tokens.space.md),
+                                      Expanded(
+                                        child: MotionSwitcher(
+                                          slide: const Offset(0.04, 0),
+                                          child: ListView(
+                                            key: ValueKey(_branch),
+                                            padding: EdgeInsets.zero,
+                                            children: [
+                                              Text(
+                                                _branch.label,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: BarrageType.heading,
+                                              ),
+                                              Text(
+                                                'Each rank unlocks the next.',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: BarrageType.muted,
+                                              ),
+                                              SizedBox(height: tokens.space.sm),
+                                              for (
+                                                var i = 0;
+                                                i < chain.length;
+                                                i++
+                                              )
+                                                _NodeRow(
+                                                  node: chain[i],
+                                                  owned: meta.owns(chain[i].id),
+                                                  lockReason: meta.lockReason(
+                                                    chain[i].id,
+                                                  ),
+                                                  affordable: meta.canBuy(
+                                                    chain[i].id,
+                                                  ),
+                                                  continues:
+                                                      i < chain.length - 1,
+                                                  feel: game.feel,
+                                                  celebrate:
+                                                      _lastPurchase?.id ==
+                                                          chain[i].id
+                                                      ? _lastPurchase!.serial
+                                                      : null,
+                                                  onBuy: () => _buy(chain[i]),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
                       ),
                       SizedBox(height: tokens.space.sm),
                       Align(
@@ -303,17 +341,25 @@ class _Header extends StatelessWidget {
 
 /// Crew / Fight / Defense tabs with a sliding selected pill.
 class _GroupTabs extends StatelessWidget {
-  const _GroupTabs({required this.selected, required this.onSelect});
+  const _GroupTabs({
+    required this.selected,
+    required this.onSelect,
+    required this.onItems,
+  });
 
-  final SkillGroup selected;
+  /// Null while the Items tab is showing.
+  final SkillGroup? selected;
   final ValueChanged<SkillGroup> onSelect;
+  final VoidCallback onItems;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     final motion = context.motion;
     const groups = SkillGroup.values;
-    final index = groups.indexOf(selected);
+    final tabCount = groups.length + 1;
+    final current = selected;
+    final index = current == null ? groups.length : groups.indexOf(current);
     return Container(
       height: 44,
       padding: const EdgeInsets.all(3),
@@ -323,7 +369,7 @@ class _GroupTabs extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, box) {
-          final tabWidth = box.maxWidth / groups.length;
+          final tabWidth = box.maxWidth / tabCount;
           return Stack(
             children: [
               AnimatedPositioned(
@@ -371,6 +417,29 @@ class _GroupTabs extends StatelessWidget {
                         ),
                       ),
                     ),
+                  Expanded(
+                    child: Semantics(
+                      button: true,
+                      selected: current == null,
+                      child: GestureDetector(
+                        key: const Key('shop-tab-items'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onItems,
+                        child: Center(
+                          child: AnimatedDefaultTextStyle(
+                            duration: motion.fast,
+                            style: BarrageType.button.copyWith(
+                              fontSize: 15,
+                              color: current == null
+                                  ? tokens.onPrimary
+                                  : tokens.inkMuted,
+                            ),
+                            child: const Text('Items', maxLines: 1),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -706,6 +775,143 @@ class _NodeRow extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One-use power-ups: buy up to [PowerUp.maxStack] of each, then fire them
+/// from the fight HUD.
+class _ItemsPanel extends StatelessWidget {
+  const _ItemsPanel({
+    required this.game,
+    required this.celebrate,
+    required this.onBuy,
+  });
+
+  final BackyardBarrageGame game;
+  final _Purchase? celebrate;
+  final ValueChanged<PowerUp> onBuy;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final meta = game.meta;
+    return ListView(
+      key: const Key('shop-items'),
+      padding: EdgeInsets.zero,
+      children: [
+        const Text('Items', style: BarrageType.heading),
+        const Text(
+          'One use each. Tap its button in a fight.',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: BarrageType.muted,
+        ),
+        SizedBox(height: tokens.space.sm),
+        for (final item in PowerUp.values)
+          Padding(
+            padding: EdgeInsets.only(bottom: tokens.space.sm),
+            child: _ItemRow(
+              item: item,
+              owned: meta.itemCount(item),
+              affordable: meta.canBuyItem(item),
+              onBuy: () => onBuy(item),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ItemRow extends StatelessWidget {
+  const _ItemRow({
+    required this.item,
+    required this.owned,
+    required this.affordable,
+    required this.onBuy,
+  });
+
+  final PowerUp item;
+  final int owned;
+  final bool affordable;
+  final VoidCallback onBuy;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final full = owned >= PowerUp.maxStack;
+    return Container(
+      key: Key('item-${item.name}'),
+      padding: EdgeInsets.all(tokens.space.sm),
+      decoration: BoxDecoration(
+        color: tokens.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: tokens.hairline),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: tokens.primaryGradient,
+            ),
+            child: Icon(powerUpIcon(item), color: tokens.onPrimary, size: 22),
+          ),
+          SizedBox(width: tokens.space.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${item.label}  ·  $owned/${PowerUp.maxStack}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: BarrageType.body.copyWith(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  item.detail,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: BarrageType.muted.copyWith(fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: tokens.space.sm),
+          PressScale(
+            key: Key('buy-item-${item.name}'),
+            enabled: affordable,
+            onTap: onBuy,
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: tokens.space.md,
+                vertical: tokens.space.sm,
+              ),
+              decoration: BoxDecoration(
+                gradient: affordable ? tokens.primaryGradient : null,
+                color: affordable ? null : tokens.lockedFill,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: full
+                  ? Text(
+                      'Full',
+                      style: BarrageType.button.copyWith(
+                        fontSize: 14,
+                        color: tokens.inkMuted,
+                      ),
+                    )
+                  : CoinAmount(
+                      amount: item.cost,
+                      fontSize: 14,
+                      color: affordable ? tokens.onPrimary : tokens.inkMuted,
+                    ),
+            ),
           ),
         ],
       ),

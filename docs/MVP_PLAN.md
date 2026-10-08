@@ -106,6 +106,10 @@ Each rival KO pays 4 coins. Clearing the wave pays a bonus on top (`6 + wave * 4
 
 Fort cover shelters 1–2 kids on the cover columns. The blocking box is under half of that side and about one row tall, so the rows above and below and the columns beside the fort stay open. On Easy and Normal a lob that peaks past your own fort clears it. Hard skips that clear, so a full lob from behind your own fort can still chip it. The other side's fort still stops a ball that flies through its box. The fort's row is random inside the mid band (not flush with the top or bottom of the yard, and not on the back line). Enough hits collapse it. A collapsed fort does not block shots from either side. HP refills, and the row is rolled again, at the start of the next wave.
 
+### 3.5a Power-ups (one-use items)
+
+The shop's Items tab sells one-use power-ups (up to 3 of each per wallet): Frost armor (crew takes no damage for 3s, 25), Fort cracker (next throw knocks down a rival fort it hits, 30), Freeze all (every rival frozen 2.5s, 35), Power throw (next charge starts full, 15), Big splat (next throw splats 3× as wide, 20), and Hot cocoa (+1 HP to every standing kid, 30). In a fight, a round button per owned item sits down the right edge under the hint; it lights while armed. Items stay until used, including through a defeat.
+
 ### 3.6 Seasons
 Same rules; swap:
 - Projectile art + VFX + SFX  

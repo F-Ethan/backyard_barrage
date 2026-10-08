@@ -19,6 +19,7 @@ import 'package:backyard_barrage/game/rival_type.dart';
 import 'package:backyard_barrage/game/throw_physics.dart';
 import 'package:backyard_barrage/meta/difficulty.dart';
 import 'package:backyard_barrage/meta/meta_state.dart';
+import 'package:backyard_barrage/meta/power_up.dart';
 import 'package:backyard_barrage/meta/play_mode.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
 import 'package:backyard_barrage/meta/settings_store.dart';
@@ -802,6 +803,144 @@ void main() {
     expect(again.players[0].hp, 1);
     expect(again.players[1].isKo, isTrue);
     expect(meta.resumeCrewHp, isNull);
+  });
+
+  MetaState stocked() =>
+      MetaState(items: {for (final item in PowerUp.values) item: 1});
+
+  testWidgets('power-up buttons show only for items the wallet holds', (
+    tester,
+  ) async {
+    final empty = (await boot(tester, MetaState())).game;
+    await tester.pump();
+    expect(empty.phase, MatchPhase.fight);
+    expect(find.byKey(const Key('power-up-bar')), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    final game = (await boot(
+      tester,
+      MetaState(items: {PowerUp.freezeAll: 2}),
+    )).game;
+    await tester.pump();
+    expect(find.byKey(const Key('power-freezeAll')), findsOneWidget);
+    expect(find.byKey(const Key('power-hotCocoa')), findsNothing);
+    await tester.tap(find.byKey(const Key('power-freezeAll')));
+    await tester.pump();
+    expect(game.meta.itemCount(PowerUp.freezeAll), 1);
+    expect(game.enemies.every((e) => e.isFrozen && e.isStunned), isTrue);
+  });
+
+  testWidgets('Frost armor blocks hits on the crew while it lasts', (
+    tester,
+  ) async {
+    final game = (await boot(tester, stocked())).game;
+    final kid = game.players.first;
+    final rival = game.enemies.first;
+    expect(game.usePowerUp(PowerUp.frostArmor), isTrue);
+    expect(kid.armored, isTrue);
+    final shot = LobProjectile(
+      sprite: kid.sprite!,
+      position: rival.throwOrigin,
+      velocity: Vector2(-100, 0),
+      targets: game.players,
+      owner: rival,
+      onHit: (_, _) {},
+    );
+    final hp = kid.hp;
+    game.applySnowballHit(shot: shot, target: kid);
+    expect(kid.hp, hp);
+    game.update(PowerUp.armorSeconds + 0.1);
+    expect(kid.armored, isFalse);
+    game.applySnowballHit(shot: shot, target: kid);
+    expect(kid.hp, lessThan(hp));
+  });
+
+  testWidgets('Hot cocoa heals and Power throw starts the bar full', (
+    tester,
+  ) async {
+    final game = (await boot(tester, stocked())).game;
+    final kid = game.players.first;
+    kid.hp = 1;
+    expect(game.usePowerUp(PowerUp.hotCocoa), isTrue);
+    expect(kid.hp, 2);
+    expect(game.usePowerUp(PowerUp.powerThrow), isTrue);
+    expect(game.isPowerUpLive(PowerUp.powerThrow), isTrue);
+    expect(
+      game.usePowerUp(PowerUp.powerThrow),
+      isFalse,
+      reason: 'already armed',
+    );
+    game.pressMoveZone(kid.hitCenter);
+    game.releaseMoveZone();
+    game.pressChargeZone();
+    expect(game.charge, 1);
+    // A cancelled charge keeps it armed; it spends when the throw leaves.
+    game.pauseMatch();
+    game.resumeMatch();
+    expect(game.isPowerUpLive(PowerUp.powerThrow), isTrue);
+    game.pressChargeZone();
+    expect(game.charge, 1);
+    game.releaseChargeZone();
+    expect(game.isPowerUpLive(PowerUp.powerThrow), isFalse);
+  });
+
+  testWidgets('Hot cocoa is kept when nobody needs healing', (tester) async {
+    final game = (await boot(tester, stocked())).game;
+    expect(game.players.every((k) => k.hp == k.maxHp), isTrue);
+    expect(game.usePowerUp(PowerUp.hotCocoa), isFalse);
+    expect(game.meta.itemCount(PowerUp.hotCocoa), 1);
+  });
+
+  testWidgets('Big splat and Fort cracker ride on the next throw', (
+    tester,
+  ) async {
+    final game = (await boot(tester, stocked())).game;
+    final kid = game.players.first;
+    expect(game.usePowerUp(PowerUp.bigSplat), isTrue);
+    expect(game.usePowerUp(PowerUp.fortCracker), isTrue);
+    game.pressMoveZone(kid.hitCenter);
+    game.releaseMoveZone();
+    game.pressChargeZone();
+    game.update(0.1);
+    game.releaseChargeZone();
+    game.update(0);
+    final shot = game.world.children.whereType<LobProjectile>().singleWhere(
+      (s) => identical(s.owner, kid),
+    );
+    expect(
+      shot.radius,
+      closeTo(
+        MetaState.baseBlastRadius * game.meta.blastScale * PowerUp.splatScale,
+        0.01,
+      ),
+    );
+    expect(shot.cracker, isTrue);
+    expect(game.isPowerUpLive(PowerUp.bigSplat), isFalse);
+    expect(game.isPowerUpLive(PowerUp.fortCracker), isFalse);
+    // A cracker strike knocks the rival fort flat in one go.
+    shot.struckFort = game.enemyFort;
+    shot.fortDamage = true;
+    expect(game.enemyFort.isCollapsed, isFalse);
+    game.debugFortHit(shot);
+    expect(game.enemyFort.isCollapsed, isTrue);
+  });
+
+  testWidgets('the shop Items tab buys a power-up', (tester) async {
+    await _useSurface(tester, const Size(1280, 720));
+    final game = (await boot(tester, MetaState(coins: 100))).game;
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('shop-tab-items')));
+    await tester.pump();
+    expect(find.byKey(const Key('shop-items')), findsOneWidget);
+    final coins = game.meta.coins;
+    await tester.tap(find.byKey(const Key('buy-item-powerThrow')));
+    await tester.pump();
+    expect(game.meta.itemCount(PowerUp.powerThrow), 1);
+    expect(game.meta.coins, coins - PowerUp.powerThrow.cost);
   });
 
   testWidgets('a wiped crew can retry at full HP', (tester) async {

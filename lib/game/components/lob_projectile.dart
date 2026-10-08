@@ -104,6 +104,9 @@ class LobProjectile extends SpriteComponent {
 
   /// The kid the player was controlling when this shot left their hand.
   final bool manualThrow;
+
+  /// Fort cracker: knocks down any rival fort this shot strikes.
+  bool cracker = false;
   final bool scripted;
 
   /// Straight depth line for hits. The sprite climbs and drops above it.

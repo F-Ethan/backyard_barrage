@@ -15,6 +15,7 @@ import '../meta/difficulty.dart';
 import '../meta/game_settings.dart';
 import '../meta/meta_state.dart';
 import '../meta/play_mode.dart';
+import '../meta/power_up.dart';
 import '../meta/save_store.dart';
 import '../meta/settings_store.dart';
 import '../seasons/arena.dart';
@@ -229,6 +230,71 @@ class BackyardBarrageGame extends FlameGame {
 
   KidComponent? get selectedKid => _selected;
 
+  // Power-ups waiting on the next throw, and Frost armor time left.
+  bool _crackerArmed = false;
+  bool _splatArmed = false;
+  bool _powerArmed = false;
+  double _armorTime = 0;
+
+  /// True while that power-up is armed for the next throw (or Frost armor
+  /// is up). The HUD lights its button.
+  bool isPowerUpLive(PowerUp item) => switch (item) {
+    PowerUp.frostArmor => _armorTime > 0,
+    PowerUp.fortCracker => _crackerArmed,
+    PowerUp.bigSplat => _splatArmed,
+    PowerUp.powerThrow => _powerArmed,
+    PowerUp.freezeAll || PowerUp.hotCocoa => false,
+  };
+
+  /// Fire one [item] from the wallet. False outside a live fight, when the
+  /// wallet has none, or when that item is already armed.
+  bool usePowerUp(PowerUp item) {
+    if (phase != MatchPhase.fight) return false;
+    if (isPowerUpLive(item)) return false;
+    if (item == PowerUp.hotCocoa &&
+        !players.any((kid) => !kid.isKo && kid.hp < kid.maxHp)) {
+      return false; // nobody to heal; keep the cocoa
+    }
+    if (!meta.useItem(item)) return false;
+    switch (item) {
+      case PowerUp.frostArmor:
+        _armorTime = PowerUp.armorSeconds;
+        for (final kid in players) {
+          kid.armored = !kid.isKo;
+        }
+      case PowerUp.fortCracker:
+        _crackerArmed = true;
+      case PowerUp.freezeAll:
+        for (final rival in enemies) {
+          rival.freeze(PowerUp.freezeSeconds);
+        }
+      case PowerUp.powerThrow:
+        _powerArmed = true;
+      case PowerUp.bigSplat:
+        _splatArmed = true;
+      case PowerUp.hotCocoa:
+        for (final kid in players) {
+          if (!kid.isKo) {
+            kid.hp = math.min(kid.hp + 1, kid.maxHp);
+          }
+        }
+    }
+    feel.powerUpUsed();
+    hudRevision.value++;
+    unawaited(persist());
+    return true;
+  }
+
+  void _clearPowerUps() {
+    _crackerArmed = false;
+    _splatArmed = false;
+    _powerArmed = false;
+    _armorTime = 0;
+    for (final kid in players) {
+      kid.armored = false;
+    }
+  }
+
   /// The rival the current charge would hit if released now. Null when the
   /// line misses or falls short.
   KidComponent? get aimTarget => _aimTarget;
@@ -391,6 +457,7 @@ class BackyardBarrageGame extends FlameGame {
     _clearBanner();
     _clearCoinCarry();
     _endActiveThrow();
+    _clearPowerUps();
     _clearShots();
     _clearEnemies();
     _paidKills.clear();
@@ -1118,6 +1185,12 @@ class BackyardBarrageGame extends FlameGame {
     _charging = true;
     _chargeHeld = 0;
     _charge = ThrowPhysics.minThrowCharge;
+    if (_powerArmed) {
+      // Power throw: the bar starts full. It stays armed until the throw
+      // leaves the hand, so a cancelled charge does not waste it.
+      _chargeHeld = _playerChargeSeconds();
+      _charge = 1;
+    }
     _swivel = 0;
     _sweepElev = 0;
     _sweepDir = 1;
@@ -1178,42 +1251,50 @@ class BackyardBarrageGame extends FlameGame {
     bool manualThrow = false,
   }) {
     final fromPlayer = owner.side == KidSide.player;
-    world.add(
-      LobProjectile(
-        sprite: _kit.projectile,
-        position: owner.throwOrigin.clone(),
-        velocity: lob.velocity.clone(),
-        targets: targets,
-        owner: owner,
-        blockedByFort: true,
-        forts: [fort, enemyFort],
-        friendlyFortDamage: _tuning().friendlyFortDamage,
-        passOwnFort: fromPlayer && meta.passesOwnFort,
-        manualThrow: manualThrow,
-        radius: fromPlayer
-            ? MetaState.baseBlastRadius * meta.blastScale
-            : MetaState.baseBlastRadius,
-        groundTrack: lob.groundTrack,
-        throwerRow: lob.throwerRow,
-        throwerColumn: lob.throwerColumn,
-        peakRow: lob.peakRow,
-        landingRow: lob.landingRow,
-        apexRise: lob.apexRise,
-        landingDrop: lob.landingDrop,
-        launchVy: lob.velocity.y,
-        scripted: lob.scripted,
-        travelSpeed: lob.travelSpeed,
-        flightRange: lob.range,
-        apexFraction: lob.apexFraction,
-        settleFraction: lob.settleFraction,
-        landingY: lob.landingY,
-        apexY: lob.apexY,
-        trackY: lob.trackY,
-        onHit: _onKidHit,
-        onFortHit: _onFortHit,
-        onGround: _onGroundMiss,
-      ),
+    final shot = LobProjectile(
+      sprite: _kit.projectile,
+      position: owner.throwOrigin.clone(),
+      velocity: lob.velocity.clone(),
+      targets: targets,
+      owner: owner,
+      blockedByFort: true,
+      forts: [fort, enemyFort],
+      friendlyFortDamage: _tuning().friendlyFortDamage,
+      passOwnFort: fromPlayer && meta.passesOwnFort,
+      manualThrow: manualThrow,
+      radius: fromPlayer
+          ? MetaState.baseBlastRadius *
+                meta.blastScale *
+                (manualThrow && _splatArmed ? PowerUp.splatScale : 1)
+          : MetaState.baseBlastRadius,
+      groundTrack: lob.groundTrack,
+      throwerRow: lob.throwerRow,
+      throwerColumn: lob.throwerColumn,
+      peakRow: lob.peakRow,
+      landingRow: lob.landingRow,
+      apexRise: lob.apexRise,
+      landingDrop: lob.landingDrop,
+      launchVy: lob.velocity.y,
+      scripted: lob.scripted,
+      travelSpeed: lob.travelSpeed,
+      flightRange: lob.range,
+      apexFraction: lob.apexFraction,
+      settleFraction: lob.settleFraction,
+      landingY: lob.landingY,
+      apexY: lob.apexY,
+      trackY: lob.trackY,
+      onHit: _onKidHit,
+      onFortHit: _onFortHit,
+      onGround: _onGroundMiss,
     );
+    if (manualThrow && fromPlayer) {
+      shot.cracker = _crackerArmed;
+      _crackerArmed = false;
+      _splatArmed = false;
+      _powerArmed = false;
+      hudRevision.value++;
+    }
+    world.add(shot);
   }
 
   void _onKidHit(LobProjectile shot, KidComponent target) {
@@ -1250,8 +1331,9 @@ class BackyardBarrageGame extends FlameGame {
     if (phase != MatchPhase.fight || target.isKo) return;
     final owner = shot.owner;
     final fromPlayer = owner != null && owner.side == KidSide.player;
-    final hits = fromPlayer ? meta.hitsFor(manualThrow: shot.manualThrow) : 1;
     final ally = target.side == KidSide.player;
+    if (ally && _armorTime > 0) return; // Frost armor
+    final hits = fromPlayer ? meta.hitsFor(manualThrow: shot.manualThrow) : 1;
     var scale = meta.stunScaleFor(ally: ally);
     // Difficulty shortens ally stun only. Rival brush-off and knockdown
     // stay the same length on Easy, Normal, and Hard.
@@ -1261,12 +1343,24 @@ class BackyardBarrageGame extends FlameGame {
     }
   }
 
+  @visibleForTesting
+  void debugFortHit(LobProjectile shot) => _onFortHit(shot);
+
   void _onFortHit(LobProjectile shot) {
     _burst(shot.position, power: 0.75);
     feel.impact(meta.season);
     if (phase != MatchPhase.fight) return;
     final cover = shot.struckFort;
-    if (shot.fortDamage && cover != null) cover.takeHit();
+    if (cover == null) return;
+    if (shot.cracker && cover.side == KidSide.enemy) {
+      cover.collapse();
+      // A whole fort coming down lands harder than a chip.
+      _burst(shot.position, power: 1.6);
+      _punch(knockedOut: true);
+      feel.fortCollapsed();
+      return;
+    }
+    if (shot.fortDamage) cover.takeHit();
   }
 
   void _onGroundMiss(LobProjectile shot) {
@@ -1626,6 +1720,15 @@ class BackyardBarrageGame extends FlameGame {
       _settleTime += dt;
       if (!_shotsInFlight || _settleTime >= settleCapSeconds) {
         resolveKnockouts();
+      }
+    }
+    if (_armorTime > 0) {
+      _armorTime -= dt;
+      if (_armorTime <= 0) {
+        for (final kid in players) {
+          kid.armored = false;
+        }
+        hudRevision.value++;
       }
     }
     _tickMove(dt);

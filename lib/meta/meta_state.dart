@@ -380,8 +380,8 @@ class MetaState {
     if (raw is! Map) return null;
     return {
       for (final entry in raw.entries)
-        if (PowerUp.tryParse(entry.key as String?) case final item?)
-          item: _clampInt(_asInt(entry.value), 0, PowerUp.maxStack),
+        ?PowerUp.tryParse(entry.key is String ? entry.key as String : null):
+            _clampInt(_asInt(entry.value), 0, PowerUp.maxStack),
     };
   }
 

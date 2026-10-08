@@ -53,6 +53,7 @@ void main() {
           for (final pose in SeasonAssets.poseNames)
             SeasonAssets.pose(player: player, season: season, pose: pose),
       ],
+      ...?SeasonAssets.walkCycle(player: true, season: Season.winter),
       for (final type in RivalType.values)
         for (final pose in SeasonAssets.poseNames)
           ?SeasonAssets.rivalPose(type, pose),
@@ -146,7 +147,7 @@ void main() {
     expect(kid.selected, isTrue);
     expect(kid.sprite, kid.pickupSprite);
     kid.setWalking(true);
-    expect(kid.sprite, kid.walkSprite);
+    expect(kid.walkFrames, contains(kid.sprite));
     kid.showChargePose();
     expect(kid.sprite, kid.chargeSprite);
     expect(
@@ -1615,6 +1616,23 @@ void main() {
     _expectFullBackyard(game);
   });
 
+  testWidgets('the player kid runs on a looping two-frame cycle', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    final kid = game.players.first;
+    expect(kid.walkFrames, hasLength(2));
+    kid.setWalking(true);
+    final seen = <Sprite>{};
+    for (var i = 0; i < 6; i++) {
+      kid.update(KidComponent.walkFrameSeconds);
+      seen.add(kid.sprite!);
+    }
+    expect(seen, kid.walkFrames.toSet());
+    kid.setWalking(false);
+    expect(kid.walkFrames, isNot(contains(kid.sprite)));
+  });
+
   testWidgets('both crews walk on before the fight takes input', (
     tester,
   ) async {
@@ -1624,7 +1642,7 @@ void main() {
       settle: false,
     )).game;
     expect(game.phase, MatchPhase.entering);
-    expect(game.players.first.sprite, game.players.first.walkSprite);
+    expect(game.players.first.walkFrames, contains(game.players.first.sprite));
     expect(game.players.first.position.x, lessThan(0));
     expect(
       game.enemies.first.position.x,

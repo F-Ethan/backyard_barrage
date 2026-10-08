@@ -62,52 +62,63 @@ class SeasonAssets {
     Season.summer => 'vfx/impact_splash_draft.png',
   };
 
-  /// Player-winter poses. Every one is from the 3D pack so the kid does
-  /// not switch art styles between standing, walking, and charging.
+  /// Player-winter poses: Ethan's 3D kid (`characters/player/ethan3d/`).
   ///
-  /// The aim sweep is 30l, 15l, sheet charge, 15r, 30r. The center is the
-  /// sheet-matched charge (`from_sheet`), not the hero still
-  /// `player_charge_winter_3d_v1.png`. The pack has no idle, walk, throw,
-  /// hit, or KO frames yet, so those reuse the sheet charge. KO tips it over
-  /// in [KidComponent].
-  static const _playerWinter3dCenter =
-      'characters/player/player_charge_winter_3d_from_sheet.png';
+  /// One wind-up pose seen from profile through 3/4 front, all facing the
+  /// rivals. Straight across (and idle, throw, hit, KO, which have no
+  /// approved frames yet) is `aim_01`. Aiming up-screen turns away from the
+  /// camera, so it holds the profile; aiming down-screen turns toward the
+  /// camera through `aim_02` to the 3/4 front. Walking runs [walkCycle].
+  static const ethan3dDir = 'characters/player/ethan3d/';
+  static const _ethanAcross = '${ethan3dDir}aim_01_512.png';
 
   static const _playerWinterAim = {
-    'turn_30l': 'characters/player/player_turn_30l_winter_3d_v1.png',
-    'turn_15l': 'characters/player/player_turn_15l_winter_3d_v1.png',
-    'charge': _playerWinter3dCenter,
-    'turn_15r': 'characters/player/player_turn_15r_winter_3d_v1.png',
-    'turn_30r': 'characters/player/player_turn_30r_winter_3d_v1.png',
-    'idle': _playerWinter3dCenter,
-    'walk': _playerWinter3dCenter,
-    'throw': _playerWinter3dCenter,
-    'hit': _playerWinter3dCenter,
-    'ko': _playerWinter3dCenter,
-    'pickup': _playerWinter3dCenter,
+    'turn_30l': '${ethan3dDir}aim_00_profile_512.png',
+    'turn_15l': '${ethan3dDir}aim_00_profile_512.png',
+    'charge': _ethanAcross,
+    'turn_15r': '${ethan3dDir}aim_02_512.png',
+    'turn_30r': '${ethan3dDir}aim_03_34front_512.png',
+    'idle': _ethanAcross,
+    'walk': '${ethan3dDir}run_00_flipped_512.png',
+    'throw': _ethanAcross,
+    'hit': _ethanAcross,
+    'ko': _ethanAcross,
+    'pickup': _ethanAcross,
   };
+
+  /// Frames that loop while the kid walks, or null for a single frame.
+  static List<String>? walkCycle({
+    required bool player,
+    required Season season,
+  }) {
+    if (!player || season != Season.winter) return null;
+    return const [
+      '${ethan3dDir}run_00_flipped_512.png',
+      '${ethan3dDir}run_01_flipped_512.png',
+    ];
+  }
+
+  /// Drawn size of the player's art relative to the 152px body box. The
+  /// Ethan 3D renders leave headroom above the hat.
+  static double playerDrawScale(Season season) =>
+      season == Season.winter ? 1.15 : 1;
 
   /// True when every pose for this side and season comes from the 3D pack.
   /// That pack has no lying-down KO frame.
   static bool uprightKo({required bool player, required Season season}) =>
       player && season == Season.winter;
 
-  /// Source square inside a 1024² 3D frame, in pixels: left, top, side.
+  /// Source square for a render, in pixels: left, top, side. Null for the
+  /// 2D drafts, which fill their frame and stand on the bottom edge.
   ///
-  /// Studio frames keep the kid at about 77% of the square with the boots
-  /// about 12% above the bottom. The 2D drafts fill the frame and stand on
-  /// the bottom edge. This crop (hat top at y≈118, boots at y≈909 on every
-  /// 3D frame) puts the 3D kid on the same bottom-center anchor at the same
-  /// height. Null for 2D drafts, which use the whole image.
+  /// Rival and Ethan 3D renders are 512² with the feet on y≈471 (941/1024).
+  /// A square as tall as the feet line sits them on the bottom-center
+  /// anchor. The widest frames lose a few pixels at the edges.
   static (double, double, double)? crop(String path) {
-    if (path.startsWith(rivalDir)) {
-      // Rival renders are 512² with the feet on y≈471 (941/1024). A square
-      // as tall as the feet line sits them on the bottom-center anchor. The
-      // widest frames (throw, KO) lose a few pixels at the edges.
+    if (path.startsWith(rivalDir) || path.startsWith(ethan3dDir)) {
       return (20.5, 0, 471);
     }
-    if (!path.contains('_3d_')) return null;
-    return (116, 118, 792);
+    return null;
   }
 
   static const rivalDir = 'characters/rivals/';
@@ -158,18 +169,6 @@ class SeasonAssets {
     RivalType.frostKid => 1.18,
     RivalType.rusher => 1,
   };
-
-  /// 3D player frames whose lead arm points screen-left, at the kid's own
-  /// fort. The player faces right toward the rivals (`docs/TURN_YAWS.md`),
-  /// so these draw mirrored. `15r` and `30r` already point right.
-  static const _pointsLeft = {
-    'characters/player/player_turn_30l_winter_3d_v1.png',
-    'characters/player/player_turn_15l_winter_3d_v1.png',
-    _playerWinter3dCenter,
-  };
-
-  /// True when [path] should draw flipped left-to-right.
-  static bool mirror(String path) => _pointsLeft.contains(path);
 
   static String pose({
     required bool player,

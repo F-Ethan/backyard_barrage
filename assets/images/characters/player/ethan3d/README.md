@@ -1,6 +1,6 @@
 # Ethan 3D kid sprites (raw)
 
-Approved stills of Ethan's own 3D kid. Nothing in the game loads this folder. It is not listed in `pubspec.yaml`, and `SeasonAssets` does not point here. Idle and throw are not included because they are not approved yet.
+Approved stills of Ethan's own 3D kid. **The winter player uses these.** `pubspec.yaml` lists only the six `*_512.png` frames the game draws (the four aim frames and the two flipped run frames); the 1024s, unflipped runs, and review sheets are reference only. `SeasonAssets` maps them (see `lib/seasons/season.dart`). Idle and throw are not included because they are not approved yet, so the game reuses `aim_01` for those.
 
 Full frames are 1024×1024 transparent PNGs. Feet sit on a shared baseline at about y=941. Each `*_512.png` is a 512×512 preview of the frame with the same stem (feet at about y=470).
 

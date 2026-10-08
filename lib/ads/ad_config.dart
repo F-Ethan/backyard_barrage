@@ -22,9 +22,9 @@ class AdConfig {
   /// Sample Android app id. Android is not a store target yet.
   static const String androidAppId = 'ca-app-pub-3940256099942544~3347511713';
 
-  /// Live iOS interstitial unit, used by release builds. Empty until the
-  /// AdMob unit is created; a release build then shows no ads.
-  static const String iosInterstitialLiveId = '';
+  /// Live iOS interstitial unit (run end), used by release builds only.
+  static const String iosInterstitialLiveId =
+      'ca-app-pub-7671007992790429/2173544178';
 
   /// Google's sample iOS interstitial, used by debug and profile builds.
   static const String iosInterstitialId =

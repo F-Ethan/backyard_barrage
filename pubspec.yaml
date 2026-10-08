@@ -42,6 +42,7 @@ flutter:
     - assets/images/characters/player/ethan3d/run_01_flipped_512.png
     - assets/images/characters/rivals/ghost/
     - assets/images/characters/rivals/frostkid/
+    - assets/images/characters/rivals/hellhound/
     - assets/images/forts/
     - assets/images/projectiles/
     - assets/images/props/

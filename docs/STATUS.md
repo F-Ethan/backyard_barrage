@@ -125,7 +125,9 @@ Owner renders, 512² RGBA with the feet on y≈471, facing screen-left. Wired wi
 | `ghost/` (snow ghost, standard rival) | `aim_00`, `aim_15a`, `aim_15b`, `aim_30a`, `aim_30b`, `idle`, `windup` (v1, rescaled), `throw`, `hit`, `ko` |
 | `frostkid/` (long range) | same set plus `windup` |
 
-Both rivals charge on `windup` (snowball raised); the `aim_*` frames are a smoother sculpt and are not drawn. `ghost/ghost_windup_draft.png` is the v1 `characters/enemy/ghost/ghost_windup_512.png` rescaled ×0.961 onto the v2 feet line. The rusher type uses the 2D enemy drafts until its art lands.
+Both rivals charge on `windup` (snowball raised); the `aim_*` frames are a smoother sculpt and are not drawn. `ghost/ghost_windup_draft.png` is the v1 `characters/enemy/ghost/ghost_windup_512.png` rescaled ×0.961 onto the v2 feet line. The rusher type draws the ghost frames with a red tint and glow (`RivalProfile.aura`) until its art lands.
+
+`hellhound/` (Ice hound event, 2026-10-08): `idle`, `run_00`–`run_03`, `jump_00` (crouch), `jump_01` (air), `bite_00`, `bite_01`, the 512 versions with the same square crop. `jump_02` (same as `idle`) and `look` are not copied; the landing uses `idle`.
 
 ## Non-character MVP (world / forts / VFX)
 

@@ -1,59 +1,45 @@
+import 'dart:math' as math;
+
 import 'package:backyard_barrage/game/arena_grid.dart';
 import 'package:backyard_barrage/game/rival_type.dart';
-import 'package:backyard_barrage/meta/difficulty.dart';
 import 'package:backyard_barrage/seasons/season.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('RivalRoster', () {
-    test('wave 1 is ghosts only on every difficulty', () {
-      for (final d in Difficulty.values) {
-        expect(RivalRoster.forWave(wave: 1, count: 1, difficulty: d), [
+    test('one rival is always a snowman', () {
+      for (var seed = 0; seed < 20; seed++) {
+        expect(RivalRoster.forWave(count: 1, rng: math.Random(seed)), [
           RivalType.snowGhost,
         ]);
       }
     });
 
-    test('harder modes meet the special rivals sooner', () {
-      int firstWave(RivalType type, Difficulty d) {
-        for (var wave = 1; wave < 30; wave++) {
-          final lineup = RivalRoster.forWave(
-            wave: wave,
-            count: 5,
-            difficulty: d,
-          );
-          if (lineup.contains(type)) return wave;
+    test('snowman, random special, snowman... for every slot', () {
+      for (var seed = 0; seed < 50; seed++) {
+        final lineup = RivalRoster.forWave(count: 5, rng: math.Random(seed));
+        expect(lineup, hasLength(5));
+        for (var i = 0; i < lineup.length; i++) {
+          if (i.isEven) {
+            expect(lineup[i], RivalType.snowGhost, reason: 'slot $i');
+          } else {
+            expect(
+              RivalRoster.specials,
+              contains(lineup[i]),
+              reason: 'slot $i',
+            );
+          }
         }
-        return -1;
-      }
-
-      for (final type in [RivalType.frostKid, RivalType.rusher]) {
-        expect(
-          firstWave(type, Difficulty.hard),
-          lessThan(firstWave(type, Difficulty.normal)),
-        );
-        expect(
-          firstWave(type, Difficulty.normal),
-          lessThan(firstWave(type, Difficulty.easy)),
-        );
       }
     });
 
-    test('slot 0 stays a ghost and the special share keeps growing', () {
-      var lastShare = 0;
-      for (var wave = 1; wave <= 20; wave++) {
-        final lineup = RivalRoster.forWave(
-          wave: wave,
-          count: 5,
-          difficulty: Difficulty.normal,
-        );
-        expect(lineup, hasLength(5));
-        expect(lineup.first, RivalType.snowGhost);
-        final share = lineup.where((t) => t != RivalType.snowGhost).length;
-        expect(share, greaterThanOrEqualTo(lastShare));
-        lastShare = share;
+    test('the special slots are re-rolled and use both specials', () {
+      final seen = <RivalType>{};
+      final rng = math.Random(7);
+      for (var wave = 0; wave < 40; wave++) {
+        seen.addAll(RivalRoster.forWave(count: 2, rng: rng).skip(1));
       }
-      expect(lastShare, 4, reason: 'long runs keep changing past wave 7');
+      expect(seen, RivalRoster.specials.toSet());
     });
   });
 
@@ -83,7 +69,13 @@ void main() {
   });
 
   group('rival art', () {
-    test('ghost and frost kid have their own renders; rusher uses 2D', () {
+    test('only the rusher glows', () {
+      expect(RivalProfile.of(RivalType.rusher).aura, isNotNull);
+      expect(RivalProfile.of(RivalType.snowGhost).aura, isNull);
+      expect(RivalProfile.of(RivalType.frostKid).aura, isNull);
+    });
+
+    test('ghost and frost kid have renders; rusher wears the snowman', () {
       for (final pose in SeasonAssets.poseNames) {
         expect(
           SeasonAssets.rivalPose(RivalType.snowGhost, pose),
@@ -93,7 +85,10 @@ void main() {
           SeasonAssets.rivalPose(RivalType.frostKid, pose),
           startsWith('characters/rivals/frostkid/'),
         );
-        expect(SeasonAssets.rivalPose(RivalType.rusher, pose), isNull);
+        expect(
+          SeasonAssets.rivalPose(RivalType.rusher, pose),
+          SeasonAssets.rivalPose(RivalType.snowGhost, pose),
+        );
       }
     });
 

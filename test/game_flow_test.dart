@@ -12,6 +12,7 @@ import 'package:backyard_barrage/game/combat_rules.dart';
 import 'package:backyard_barrage/game/components/coin_pop.dart';
 import 'package:backyard_barrage/game/components/enemy_controller.dart';
 import 'package:backyard_barrage/game/components/fort_component.dart';
+import 'package:backyard_barrage/game/components/hound_component.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
 import 'package:backyard_barrage/game/components/lob_projectile.dart';
 import 'package:backyard_barrage/game/components/splash_particles.dart';
@@ -63,6 +64,8 @@ void main() {
         'forts/fort_stage_${stage}_damaged_draft.png',
       ],
       'forts/fort_collapsed_draft.png',
+      for (final frame in HoundComponent.frames)
+        HoundComponent.framePath(frame),
       for (final arena in Arena.values) arena.background,
       'vfx/charge_glow_draft.png',
       'ui/heart_draft.png',
@@ -570,39 +573,47 @@ void main() {
     expect(game.arena, kept);
   });
 
-  testWidgets('a Hard wave mixes rival types and each takes its post', (
-    tester,
-  ) async {
-    final game = (await boot(tester, MetaState())).game;
-    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));
-    game.wave = 5;
-    game.startWave();
-    game.finishEntrance();
-    final types = [for (final e in game.enemies) game.rivalTypeOf(e)];
-    expect(types.first, RivalType.snowGhost);
-    expect(types, containsAll([RivalType.frostKid, RivalType.rusher]));
-    final base = DifficultyTuning.of(
-      Difficulty.hard,
-      wave: 5,
-      rivalCurve: true,
-    ).enemyHitsToKo;
-    for (final e in game.enemies) {
-      final type = game.rivalTypeOf(e);
-      final profile = RivalProfile.of(type);
-      expect(e.maxHp, profile.hitsToKo(base), reason: type.name);
-      expect(e.glint, profile.glint, reason: type.name);
-      final hold = profile.holdColumn;
-      if (hold != null) {
-        expect(
-          ArenaGrid.nearestCell(KidSide.enemy, e.position).column,
-          hold,
-          reason: '${type.name} walks on to its post',
-        );
+  testWidgets(
+    'a wave alternates snowmen and specials and each takes its post',
+    (tester) async {
+      final game = (await boot(tester, MetaState())).game;
+      game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));
+      game.wave = 5;
+      game.startWave();
+      game.finishEntrance();
+      final types = [for (final e in game.enemies) game.rivalTypeOf(e)];
+      for (var i = 0; i < types.length; i += 2) {
+        expect(types[i], RivalType.snowGhost, reason: 'slot $i');
       }
-      final brain = e.children.whereType<EnemyController>().single;
-      expect(brain.profile.gapScale, profile.gapScale);
-    }
-  });
+      expect(
+        types.where((t) => t != RivalType.snowGhost),
+        isNotEmpty,
+        reason: 'every other slot is a special',
+      );
+      final base = DifficultyTuning.of(
+        Difficulty.hard,
+        wave: 5,
+        rivalCurve: true,
+      ).enemyHitsToKo;
+      for (final e in game.enemies) {
+        final type = game.rivalTypeOf(e);
+        final profile = RivalProfile.of(type);
+        expect(e.maxHp, profile.hitsToKo(base), reason: type.name);
+        expect(e.glint, profile.glint, reason: type.name);
+        expect(e.aura, profile.aura, reason: type.name);
+        final hold = profile.holdColumn;
+        if (hold != null) {
+          expect(
+            ArenaGrid.nearestCell(KidSide.enemy, e.position).column,
+            hold,
+            reason: '${type.name} walks on to its post',
+          );
+        }
+        final brain = e.children.whereType<EnemyController>().single;
+        expect(brain.profile.gapScale, profile.gapScale);
+      }
+    },
+  );
 
   testWidgets('leaving through Pause bookmarks the wave and map', (
     tester,
@@ -2140,6 +2151,137 @@ void main() {
     game.finishEntrance();
     game.updateTree(0);
     _expectFullBackyard(game);
+  });
+
+  void runHound(HoundComponent hound, bool Function() until) {
+    for (var t = 0.0; t < 10 && !until(); t += 1 / 60) {
+      hound.update(1 / 60);
+    }
+  }
+
+  testWidgets('the hound runs in, leaps the river, and lands on our side', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    final kid = game.players.first;
+    final hound = game.releaseHound(kid);
+    expect(hound.state, HoundState.warn);
+    expect(hound.position.x, greaterThan(BackyardBarrageGame.worldWidth));
+    runHound(hound, () => hound.state == HoundState.approach);
+    expect(hound.sprite, hound.sprites.idle, reason: 'stands to warn first');
+    runHound(hound, () => hound.state == HoundState.jump);
+    expect(
+      hound.position.x,
+      greaterThan(ArenaGrid.riverRightX(kid.position.y)),
+    );
+    var airborne = false;
+    runHound(hound, () {
+      if (hound.sprite == hound.sprites.leap) airborne = true;
+      return hound.state != HoundState.jump;
+    });
+    expect(airborne, isTrue);
+    expect(hound.position.x, lessThan(ArenaGrid.riverLeftX(kid.position.y)));
+  });
+
+  testWidgets('a hound bite knocks out a full-health kid on every mode', (
+    tester,
+  ) async {
+    for (final difficulty in Difficulty.values) {
+      await tester.pumpWidget(const SizedBox.shrink());
+      final game = (await boot(tester, MetaState())).game;
+      game.feel.apply(game.feel.settings.copyWith(difficulty: difficulty));
+      final kid = game.players.first;
+      expect(kid.hp, kid.maxHp);
+      final hound = game.releaseHound(kid);
+      runHound(hound, () => kid.isKo);
+      expect(kid.isKo, isTrue, reason: difficulty.name);
+      expect(hound.state, isNot(HoundState.flee), reason: difficulty.name);
+    }
+  });
+
+  testWidgets('the hound catch box grows with difficulty', (tester) async {
+    for (final (easier, harder) in [
+      (Difficulty.easy, Difficulty.normal),
+      (Difficulty.normal, Difficulty.hard),
+    ]) {
+      expect(
+        HoundComponent.laneHalfRows(harder),
+        greaterThan(HoundComponent.laneHalfRows(easier)),
+      );
+      expect(
+        HoundComponent.pounceReach(harder),
+        greaterThan(HoundComponent.pounceReach(easier)),
+      );
+    }
+
+    // A kid most of a row off the hound's lane: passed on Normal, caught
+    // on Hard.
+    Future<bool> caughtOn(Difficulty difficulty) async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      final game = (await boot(tester, MetaState())).game;
+      game.feel.apply(game.feel.settings.copyWith(difficulty: difficulty));
+      final kid = game.players.first;
+      final hound = game.releaseHound(kid);
+      kid.position.y += ArenaGrid.rowStep * 0.85;
+      runHound(hound, () => kid.isKo || hound.state == HoundState.gone);
+      return kid.isKo;
+    }
+
+    expect(await caughtOn(Difficulty.normal), isFalse);
+    expect(await caughtOn(Difficulty.hard), isTrue);
+  });
+
+  testWidgets('a snowball scares the hound off only before it jumps', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    final kid = game.players.first;
+    var hound = game.releaseHound(kid);
+    expect(hound.scareable, isTrue);
+    hound.scare();
+    expect(hound.state, HoundState.flee);
+    runHound(hound, () => hound.state == HoundState.gone);
+    expect(hound.state, HoundState.gone);
+    expect(kid.isKo, isFalse);
+
+    hound = game.releaseHound(kid);
+    runHound(hound, () => hound.state == HoundState.hunt);
+    expect(hound.scareable, isFalse);
+    hound.scare();
+    expect(hound.state, isNot(HoundState.flee));
+  });
+
+  testWidgets('Frost armor turns the hound away', (tester) async {
+    final game = (await boot(
+      tester,
+      MetaState(items: {PowerUp.frostArmor: 1}),
+    )).game;
+    final kid = game.players.first;
+    expect(game.usePowerUp(PowerUp.frostArmor), isTrue);
+    final hound = game.releaseHound(kid);
+    runHound(hound, () => hound.state == HoundState.flee);
+    expect(hound.state, HoundState.flee);
+    expect(kid.isKo, isFalse);
+    expect(kid.hp, kid.maxHp);
+  });
+
+  testWidgets('hounds only come from wave 3', (tester) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));
+    var rolled = 0;
+    for (var wave = 1; wave <= 60; wave++) {
+      game.wave = wave;
+      game.startWave();
+      game.finishEntrance();
+      final due = game.houndDueAt;
+      if (wave < HoundComponent.firstWave) {
+        expect(due, isNull, reason: 'wave $wave');
+      } else if (due != null) {
+        rolled++;
+      }
+    }
+    expect(rolled, greaterThan(0));
+    expect(rolled, lessThan(40), reason: 'rare');
   });
 
   testWidgets('the player kid runs on a looping two-frame cycle', (

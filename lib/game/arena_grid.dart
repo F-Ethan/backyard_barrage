@@ -215,6 +215,17 @@ class ArenaGrid {
   static const double playerReachBack = 519;
   static const double playerReachFront = 398;
 
+  /// River banks at feet height [y] on both winter arenas (measured from
+  /// the art): the left bank runs 579 → 458 and the right bank 730 → 808
+  /// from the back row to the front.
+  static double riverLeftX(double y) => _lerpRow(y, 579, 458);
+  static double riverRightX(double y) => _lerpRow(y, 730, 808);
+
+  static double _lerpRow(double y, double back, double front) {
+    final t = ((y - rowBack) / (rowFront - rowBack)).clamp(0.0, 1.0);
+    return back + (front - back) * t;
+  }
+
   /// Furthest right the player's feet may go at feet height [y].
   static double playerReachX(double y) {
     final t = ((y - rowBack) / (rowFront - rowBack)).clamp(0.0, 1.0);

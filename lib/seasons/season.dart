@@ -131,7 +131,8 @@ class SeasonAssets {
   /// rescaled to the v2 framing.
   static String? rivalPose(RivalType type, String pose) {
     final (folder, frame) = switch (type) {
-      RivalType.snowGhost => (
+      // Rushers share the snowman art; [RivalProfile.aura] tells them apart.
+      RivalType.snowGhost || RivalType.rusher => (
         'ghost',
         switch (pose) {
           'charge' ||
@@ -155,9 +156,7 @@ class SeasonAssets {
           _ => pose,
         },
       ),
-      RivalType.rusher => (null, null),
     };
-    if (folder == null) return null;
     return '$rivalDir$folder/${folder}_${frame}_draft.png';
   }
 
@@ -165,9 +164,8 @@ class SeasonAssets {
   /// leave headroom above the hat, so they draw a little larger to stand
   /// about as tall as the player kid. Hit circles do not change.
   static double rivalDrawScale(RivalType type) => switch (type) {
-    RivalType.snowGhost => 1.12,
+    RivalType.snowGhost || RivalType.rusher => 1.12,
     RivalType.frostKid => 1.18,
-    RivalType.rusher => 1,
   };
 
   static String pose({

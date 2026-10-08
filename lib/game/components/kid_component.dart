@@ -148,6 +148,23 @@ class KidComponent extends SpriteComponent {
   /// (x forward-right, y up is negative). Null uses the throwing hand.
   Vector2? glintAt;
   double _glintAge = 0;
+
+  /// A tint and pulsing glow in this color (rushers), or none.
+  Color? get aura => _aura;
+  set aura(Color? color) {
+    _aura = color;
+    _auraPaint = color == null
+        ? null
+        : (Paint()
+            ..colorFilter = ColorFilter.mode(
+              color.withValues(alpha: 0.32),
+              BlendMode.srcATop,
+            ));
+  }
+
+  Color? _aura;
+  Paint? _auraPaint;
+  double _auraAge = 0;
   final int maxHp;
   int hp;
 
@@ -376,6 +393,19 @@ class KidComponent extends SpriteComponent {
 
   /// Out for this whole wave: knocked out in an earlier one and not
   /// brought back. Already faded and off the yard.
+  /// Knocked out in one go (the Ice hound's bite), whatever HP is left.
+  void knockOutNow() {
+    if (isKo) return;
+    hp = 0;
+    shieldHits = 0;
+    _stunTimer = 0;
+    _downTimer = 0;
+    _fragile = false;
+    _frozenTimer = 0;
+    armored = false;
+    _applyKoLook();
+  }
+
   void benchOut() {
     revive();
     hp = 0;
@@ -494,6 +524,7 @@ class KidComponent extends SpriteComponent {
       _walkFrame = 0;
     }
     _glintAge = _chargingPose ? _glintAge + dt : 0;
+    if (_aura != null) _auraAge += dt;
     if (_recoilTimer > 0) _recoilTimer -= dt;
     if (isKo) {
       _koAge += dt;
@@ -625,6 +656,17 @@ class KidComponent extends SpriteComponent {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
       canvas.drawCircle(Offset(size.x / 2, size.y * 0.58), size.x * 0.46, glow);
     }
+    final aura = _aura;
+    if (aura != null && !isKo) {
+      final pulse = 0.75 + 0.25 * math.sin(_auraAge * 5);
+      canvas.drawCircle(
+        Offset(size.x / 2, size.y * 0.58),
+        size.x * 0.42,
+        Paint()
+          ..color = aura.withValues(alpha: 0.45 * pulse)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16),
+      );
+    }
     if (isKo && _uprightKo) {
       _renderTippedOver(canvas);
       return;
@@ -639,6 +681,10 @@ class KidComponent extends SpriteComponent {
       canvas.translate(0, down);
     }
     super.render(canvas);
+    final auraPaint = _auraPaint;
+    if (auraPaint != null && !isKo) {
+      sprite?.render(canvas, size: size, overridePaint: auraPaint);
+    }
     if (_flashTimer > 0 && !isKo) {
       sprite?.render(canvas, size: size, overridePaint: _flashPaint);
     }

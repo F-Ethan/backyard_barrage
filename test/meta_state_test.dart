@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:backyard_barrage/meta/difficulty.dart';
 import 'package:backyard_barrage/meta/meta_state.dart';
+import 'package:backyard_barrage/meta/power_up.dart';
 import 'package:backyard_barrage/meta/play_mode.dart';
 import 'package:backyard_barrage/meta/player_save.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
@@ -705,5 +706,35 @@ void main() {
       2,
       0,
     ]);
+  });
+  group('power-ups', () {
+    test('buy up to the stack cap, spend one at a time', () {
+      final meta = MetaState(coins: 500);
+      for (var i = 0; i < PowerUp.maxStack; i++) {
+        expect(meta.buyItem(PowerUp.freezeAll), isTrue);
+      }
+      expect(meta.buyItem(PowerUp.freezeAll), isFalse, reason: 'stack full');
+      expect(meta.itemCount(PowerUp.freezeAll), PowerUp.maxStack);
+      expect(meta.coins, 500 - PowerUp.freezeAll.cost * PowerUp.maxStack);
+      expect(meta.useItem(PowerUp.freezeAll), isTrue);
+      expect(meta.itemCount(PowerUp.freezeAll), PowerUp.maxStack - 1);
+      expect(meta.useItem(PowerUp.hotCocoa), isFalse, reason: 'none owned');
+      expect(MetaState(coins: 1).buyItem(PowerUp.powerThrow), isFalse);
+    });
+
+    test('items survive a save, the wallet split, and a defeat', () {
+      final meta = MetaState(coins: 100)..buyItem(PowerUp.bigSplat);
+      final back = MetaState.fromJson(meta.toJson());
+      expect(back.itemCount(PowerUp.bigSplat), 1);
+      final save = PlayerSave()..apply(WalletSnap.from(meta));
+      expect(
+        save
+            .wallet(PlayMode.arcade, Difficulty.normal)
+            .itemCount(PowerUp.bigSplat),
+        1,
+      );
+      meta.resetRun();
+      expect(meta.itemCount(PowerUp.bigSplat), 1);
+    });
   });
 }

@@ -76,6 +76,13 @@ class FortComponent extends SpriteComponent {
     _syncSprite();
   }
 
+  /// Knocked flat in one go (Fort cracker).
+  void collapse() {
+    if (hp <= 0) return;
+    hp = 0;
+    _syncSprite();
+  }
+
   void takeHit() {
     if (hp <= 0) return;
     hp -= 1;

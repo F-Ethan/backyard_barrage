@@ -66,6 +66,18 @@ class FeelBus {
     impact(season);
   }
 
+  /// A power-up fired from the HUD. Distinct from buying one.
+  void powerUpUsed() {
+    unawaited(haptics.hit());
+    unawaited(audio.playSfx(AudioCues.throwWhoosh));
+  }
+
+  /// A fort knocked flat in one go (Fort cracker).
+  void fortCollapsed() {
+    unawaited(haptics.ko());
+    unawaited(audio.playSfx(AudioCues.koCollapse));
+  }
+
   void purchased() {
     unawaited(haptics.purchase());
     unawaited(audio.playSfx(AudioCues.purchaseCoin));

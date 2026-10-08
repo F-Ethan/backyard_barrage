@@ -22,10 +22,26 @@ Playable MVP loop on the gameplay branch:
 - **Audio.** Studio procedural pack is wired through `flame_audio` (not stubbed): throw whoosh, seasonal impact (snow / wet), hit, KO, win / lose stingers, UI tap, purchase coin, menu loop, `battle_loop_winter.wav` in winter, and `battle_loop_summer.wav` in summer. Toggles gate playback. Music beds were refreshed in place (menu ~7.83s, winter battle ~6.92s, summer battle ~6.67s). Filenames and playback paths are unchanged. All 12 files are present (9 sfx, 3 music).
 - **App icon.** Locked summer|winter clash master (1947595 bytes, SHA-256 `86621c0890c82418a4260b93b956927495c01653ae08034704f5e377d992ff1f`) at `assets/images/ui/app_icon_1024.png` and `app_icon_1024_draft.png`. Those bytes stay. Launcher slots (iOS AppIcon, Android `ic_launcher` mipmaps, macOS AppIcon) are resizes of `assets/images/ui/app_icon_1024_fill.png`, the same clash with the navy side bars cropped out. The 1024 platform slots are that fill file's bytes.
 
+## Balance numbers
+
+| What | Number |
+| --- | --- |
+| Rival KO | 4 coins (`MetaState.coinsPerKnockout`) |
+| Wave clear bonus | `6 + 4 × wave` coins (`MetaState.coinsForWave`) |
+| Skill rank price | ×2.5 per rank, rounded to the nearest 5 (`SkillTree.rankCost`). Chains start at Team 20, Recovery 20, Fort 15, Throw 10, Poise / Pressure / Aim / Reaction / Charge / Blast 12, Shield 20, Lanes 40, Damage 25 |
+| Frost armor | 25 coins, crew takes no damage for 3s |
+| Fort cracker | 30 coins, next throw collapses a rival fort it hits |
+| Freeze all | 35 coins, every rival frozen 2.5s |
+| Power throw | 15 coins, next charge starts full (spent when the throw leaves) |
+| Big splat | 20 coins, next throw splats ×3 wide |
+| Hot cocoa | 30 coins, +1 HP to every standing kid (not spent if nobody is hurt) |
+| Item stack | 3 of each per wallet (`PowerUp.maxStack`) |
+
 ## Known gaps
 
 Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you notice something you are not fixing in the current PR. Remove or rewrite a row when it is actually fixed.
 
+- **Power-ups use Material icons, not art.** The six items and their HUD buttons draw Material glyphs until item art lands. Prices and durations are first-pass. Fort cracker only affects rival forts (only one rival fort exists so far). Items are kept through a Campaign defeat (unlike skills).
 - **River reach is tuned to the current arenas.** `ArenaGrid.playerReachBack/Front` (519 / 398) are 60px short of the bank both winter maps share. A map with a different river needs its own limit. Rivals still stay inside their grid columns.
 - **Arena river is scenery only.** Both winter maps (`world/arena_backyard_draft.png`, `world/arena_park_draft.png`, 16:9 centre crops of the owner's 2796×1290 art) have a river in the neutral band. Balls fly over it and nothing interacts with it. `world/backyard_bg_winter_draft.png` is no longer drawn in winter.
 - **Rival art gaps.** The rusher is a stand-in on the original 2D rival kid. Both rivals charge on their windup; their `aim_*` frames (a smoother sculpt) are not drawn. The ghost windup is the v1 frame from `characters/enemy/ghost/` rescaled to the v2 framing, since v2 has none. The throw frames have the ball drawn leaving the hand, so for about a quarter second it shows beside the real projectile (the raw README suggests hiding one). Rival renders are 512²; the widest frames lose a few edge pixels to the square crop. The ✕ KO mark still draws over the rival KO frames, which have their own dizzy stars. Rivals have no walk frames (idle stands in).

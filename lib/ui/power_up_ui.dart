@@ -17,7 +17,7 @@ IconData powerUpIcon(PowerUp item) => switch (item) {
 };
 
 /// Fight HUD: one round button per power-up the wallet holds, with its
-/// count. Items the player has none of do not show. A live item (armed for
+/// count, in the bottom-left corner within reach of the left thumb. Items the player has none of do not show. A live item (armed for
 /// the next throw, or Frost armor running) glows.
 class PowerUpBar extends StatelessWidget {
   const PowerUpBar({super.key, required this.game});
@@ -32,12 +32,13 @@ class PowerUpBar extends StatelessWidget {
         if (meta.itemCount(item) > 0 || game.isPowerUpLive(item)) item,
     ];
     if (shown.isEmpty) return const SizedBox.shrink();
-    // A column down the right edge that wraps into a second column to its
-    // left on short screens, so six buttons never run off the bottom.
+    // A column up from the bottom-left corner, under the left thumb, that
+    // wraps into a second column to its right on short screens, so six
+    // buttons never run into the status chips.
     return Wrap(
       key: const Key('power-up-bar'),
       direction: Axis.vertical,
-      textDirection: TextDirection.rtl,
+      verticalDirection: VerticalDirection.up,
       spacing: 8,
       runSpacing: 8,
       children: [

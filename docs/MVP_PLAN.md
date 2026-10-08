@@ -108,7 +108,7 @@ Fort cover shelters 1–2 kids on the cover columns. The blocking box is under h
 
 ### 3.5a Power-ups (one-use items)
 
-The shop's Items tab sells one-use power-ups (up to 3 of each per wallet): Frost armor (crew takes no damage for 3s, 25), Fort cracker (next throw knocks down a rival fort it hits, 30), Freeze all (every rival frozen 2.5s, 35), Power throw (next charge starts full, 15), Big splat (next throw splats 3× as wide, 20), and Hot cocoa (+1 HP to every standing kid, 30). In a fight, a round button per owned item sits down the right edge under the hint; it lights while armed. Items stay until used, including through a defeat.
+The shop's Items tab sells one-use power-ups (up to 3 of each per wallet): Frost armor (crew takes no damage for 3s, 25), Fort cracker (next throw knocks down a rival fort it hits, 30), Freeze all (every rival frozen 2.5s, 35), Power throw (next charge starts full, 15), Big splat (next throw splats 3× as wide, 20), and Hot cocoa (+1 HP to every standing kid, 30). In a fight, a round button per owned item sits in the bottom-left corner within reach of the left thumb (stacking upward, then into a second column); it lights while armed. Items stay until used, including through a defeat.
 
 ### 3.6 Seasons
 Same rules; swap:

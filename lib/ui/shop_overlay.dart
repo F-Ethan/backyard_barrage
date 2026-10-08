@@ -226,6 +226,7 @@ class _ShopOverlayState extends State<ShopOverlay> {
                         child: DraftImageButton(
                           key: const Key('next-wave'),
                           label: fromDefeat ? 'Back' : 'Next wave',
+                          back: fromDefeat,
                           trailingIcon: fromDefeat
                               ? null
                               : Icons.arrow_forward_rounded,

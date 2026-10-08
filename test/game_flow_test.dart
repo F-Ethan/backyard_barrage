@@ -2265,6 +2265,72 @@ void main() {
     expect(kid.hp, kid.maxHp);
   });
 
+  testWidgets('the hound growls, leaps, and snaps with sound', (tester) async {
+    final booted = await boot(tester, MetaState());
+    final game = booted.game;
+    final kid = game.players.first;
+    booted.playback.sfx.clear();
+    final hound = game.releaseHound(kid);
+    runHound(hound, () => kid.isKo);
+    await tester.pump();
+    expect(
+      booted.playback.sfx,
+      containsAll([
+        'sfx/hound_growl.wav',
+        'sfx/hound_leap.wav',
+        'sfx/hound_snap.wav',
+      ]),
+    );
+
+    booted.playback.sfx.clear();
+    final next = game.releaseHound(game.players.first);
+    next.scare();
+    await tester.pump();
+    expect(booted.playback.sfx, contains('sfx/hound_whimper.wav'));
+  });
+
+  testWidgets('a blocked hit plays the armor sound, not the ouch', (
+    tester,
+  ) async {
+    final booted = await boot(
+      tester,
+      MetaState(items: {PowerUp.frostArmor: 1}),
+    );
+    final game = booted.game;
+    final kid = game.players.first;
+    final rival = game.enemies.first;
+    expect(game.usePowerUp(PowerUp.frostArmor), isTrue);
+    await tester.pump();
+    expect(booted.playback.sfx, contains('sfx/powerup_armor.wav'));
+    booted.playback.sfx.clear();
+    final shot = LobProjectile(
+      sprite: kid.sprite!,
+      position: rival.throwOrigin,
+      velocity: Vector2(-100, 0),
+      targets: game.players,
+      owner: rival,
+      onHit: (_, _) {},
+    );
+    expect(game.applySnowballHit(shot: shot, target: kid), isFalse);
+    game.debugKidHit(shot, kid);
+    await tester.pump();
+    expect(booted.playback.sfx, contains('sfx/armor_block.wav'));
+    expect(booted.playback.sfx, isNot(contains('sfx/hit_ouch.wav')));
+  });
+
+  testWidgets('the charge hum runs while the player holds a throw', (
+    tester,
+  ) async {
+    final booted = await boot(tester, MetaState());
+    final game = booted.game;
+    game.pressChargeZone();
+    await tester.pump();
+    expect(booted.playback.sfxLoops, ['sfx/charge_hum.wav']);
+    game.releaseChargeZone();
+    await tester.pump();
+    expect(booted.playback.sfxLoopStops, 1);
+  });
+
   testWidgets('hounds only come from wave 3', (tester) async {
     final game = (await boot(tester, MetaState())).game;
     game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));

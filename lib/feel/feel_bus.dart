@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../audio/game_audio.dart';
 import '../meta/game_settings.dart';
 import '../seasons/season.dart';
+import '../meta/power_up.dart';
 import 'game_haptics.dart';
 
 /// Settings-aware SFX, music, and haptics for menus and the arena.
@@ -42,9 +43,26 @@ class FeelBus {
     unawaited(audio.playSfx(AudioCues.uiTap));
   }
 
-  void playerReleased() {
+  /// Closing a sheet or heading back to the menu.
+  void uiBack() {
+    unawaited(audio.playSfx(AudioCues.uiBack));
+  }
+
+  /// [fullPower] swaps the whoosh for the full-power throw.
+  void playerReleased({bool fullPower = false}) {
     unawaited(haptics.chargeRelease());
-    unawaited(audio.playSfx(AudioCues.throwWhoosh));
+    unawaited(
+      audio.playSfx(
+        fullPower ? AudioCues.throwFullPower : AudioCues.throwWhoosh,
+      ),
+    );
+  }
+
+  /// The hum while the player holds a charge. Idempotent.
+  void chargeHum(bool on) {
+    unawaited(
+      on ? audio.startSfxLoop(AudioCues.chargeHum) : audio.stopSfxLoop(),
+    );
   }
 
   void enemyReleased() {
@@ -67,15 +85,65 @@ class FeelBus {
   }
 
   /// A power-up fired from the HUD. Distinct from buying one.
-  void powerUpUsed() {
+  void powerUpUsed(PowerUp item) {
     unawaited(haptics.hit());
-    unawaited(audio.playSfx(AudioCues.throwWhoosh));
+    unawaited(
+      audio.playSfx(switch (item) {
+        PowerUp.frostArmor => AudioCues.powerUpArmor,
+        PowerUp.freezeAll => AudioCues.powerUpFreeze,
+        PowerUp.hotCocoa => AudioCues.powerUpCocoa,
+        PowerUp.fortCracker ||
+        PowerUp.powerThrow ||
+        PowerUp.bigSplat => AudioCues.powerUpPower,
+      }),
+    );
   }
 
-  /// A fort knocked flat in one go (Fort cracker).
+  /// A snowball thumps a fort that is still standing.
+  void fortHit() {
+    unawaited(audio.playSfx(AudioCues.fortHit));
+  }
+
+  /// A fort comes down (worn out, or Fort cracker).
   void fortCollapsed() {
     unawaited(haptics.ko());
-    unawaited(audio.playSfx(AudioCues.koCollapse));
+    unawaited(audio.playSfx(AudioCues.fortCollapse));
+  }
+
+  /// Frost armor turns a hit away.
+  void armorBlocked() {
+    unawaited(audio.playSfx(AudioCues.armorBlock));
+  }
+
+  /// Coins pop over a knocked-out rival.
+  void coinPop() {
+    unawaited(audio.playSfx(AudioCues.coinPop));
+  }
+
+  /// The "Wave N" banner.
+  void waveStart() {
+    unawaited(audio.playSfx(AudioCues.waveStart));
+  }
+
+  /// A frost kid's glint as it winds up.
+  void frostGlint() {
+    unawaited(audio.playSfx(AudioCues.frostGlint));
+  }
+
+  void houndGrowl() {
+    unawaited(audio.playSfx(AudioCues.houndGrowl));
+  }
+
+  void houndLeap() {
+    unawaited(audio.playSfx(AudioCues.houndLeap));
+  }
+
+  void houndSnap() {
+    unawaited(audio.playSfx(AudioCues.houndSnap));
+  }
+
+  void houndWhimper() {
+    unawaited(audio.playSfx(AudioCues.houndWhimper));
   }
 
   void purchased() {

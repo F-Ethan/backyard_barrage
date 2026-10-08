@@ -5,6 +5,7 @@ import 'package:backyard_barrage/feel/feel_bus.dart';
 import 'package:backyard_barrage/feel/game_haptics.dart';
 import 'package:backyard_barrage/meta/difficulty.dart';
 import 'package:backyard_barrage/meta/game_settings.dart';
+import 'package:backyard_barrage/meta/power_up.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
 import 'package:backyard_barrage/meta/settings_store.dart';
 import 'package:backyard_barrage/seasons/season.dart';
@@ -75,6 +76,63 @@ void main() {
     await haptics.ko();
     await haptics.purchase();
     expect(pulse.kinds, ['light', 'medium', 'heavy', 'medium']);
+  });
+
+  testWidgets('every one-shot cue has a bundled wav', (tester) async {
+    final audio = GameAudio(playback: RecordingPlayback());
+    for (final cue in AudioCues.oneShots) {
+      expect(await audio.resolvedFile(cue), 'sfx/$cue.wav', reason: cue);
+    }
+  });
+
+  testWidgets('power-ups and throws pick their own sounds', (tester) async {
+    final playback = RecordingPlayback();
+    final feel = FeelBus(
+      audio: GameAudio(playback: playback),
+      haptics: GameHaptics(pulse: RecordingPulse()),
+    );
+    for (final item in PowerUp.values) {
+      feel.powerUpUsed(item);
+    }
+    feel.playerReleased(fullPower: true);
+    feel.uiBack();
+    await tester.pump();
+    expect(
+      playback.sfx,
+      containsAll([
+        'sfx/powerup_armor.wav',
+        'sfx/powerup_freeze.wav',
+        'sfx/powerup_cocoa.wav',
+        'sfx/powerup_power.wav',
+        'sfx/throw_full_power.wav',
+        'sfx/ui_back.wav',
+      ]),
+    );
+    expect(playback.sfx, isNot(contains('sfx/throw_whoosh.wav')));
+  });
+
+  testWidgets('the charge hum loops until stopped; a quick stop wins', (
+    tester,
+  ) async {
+    final playback = RecordingPlayback();
+    final audio = GameAudio(playback: playback);
+    await audio.warmUp();
+    await audio.startSfxLoop(AudioCues.chargeHum);
+    await audio.startSfxLoop(AudioCues.chargeHum);
+    expect(playback.sfxLoops, ['sfx/charge_hum.wav'], reason: 'idempotent');
+    await audio.stopSfxLoop();
+    expect(playback.sfxLoopStops, 1);
+
+    // Stop lands while the start is still in flight.
+    final start = audio.startSfxLoop(AudioCues.chargeHum);
+    final stop = audio.stopSfxLoop();
+    await Future.wait([start, stop]);
+    expect(playback.sfxLoopStops, greaterThanOrEqualTo(2));
+
+    audio.sfxEnabled = false;
+    playback.sfxLoops.clear();
+    await audio.startSfxLoop(AudioCues.chargeHum);
+    expect(playback.sfxLoops, isEmpty);
   });
 
   testWidgets('studio wavs resolve and toggles gate playback', (tester) async {

@@ -61,6 +61,7 @@ class PauseOverlay extends StatelessWidget {
                     DraftImageButton(
                       key: const Key('pause-menu'),
                       label: 'Menu',
+                      back: true,
                       secondary: true,
                       leadingIcon: Icons.home_rounded,
                       width: 140,

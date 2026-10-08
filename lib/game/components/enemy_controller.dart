@@ -42,6 +42,7 @@ class EnemyController extends Component {
     this.playerChargeSeconds,
     this.aimJitterScale,
     this.profile = const RivalProfile(),
+    this.onWindup,
   }) : _cycle = initialDelay,
        _seenHp = host.hp;
 
@@ -76,6 +77,9 @@ class EnemyController extends Component {
 
   /// What kind of rival this is: pace, accuracy, and home column.
   final RivalProfile profile;
+
+  /// Called as each windup starts (the frost kid glint sound).
+  final void Function()? onWindup;
 
   _AiPhase _phase = _AiPhase.wait;
   double _cycle;
@@ -136,6 +140,7 @@ class EnemyController extends Component {
     if (_phase == _AiPhase.wait && _elapsed >= telegraphAt) {
       _phase = _AiPhase.telegraph;
       host.showChargePose();
+      onWindup?.call();
       _lockAim();
     }
     if (_phase == _AiPhase.telegraph) _lookDuringWindup();

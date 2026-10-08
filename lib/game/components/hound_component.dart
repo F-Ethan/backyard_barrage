@@ -49,6 +49,7 @@ class HoundComponent extends SpriteComponent {
     required this.onCatch,
     required this.isLive,
     required this.difficulty,
+    this.onState,
   }) : super(
          sprite: sprites.run.first,
          size: Vector2.all(drawSize),
@@ -71,6 +72,9 @@ class HoundComponent extends SpriteComponent {
   /// False outside a live fight; the hound stops catching.
   final bool Function() isLive;
   final Difficulty difficulty;
+
+  /// Called on each state change (for sound).
+  final void Function(HoundState state)? onState;
 
   /// Art frame names under the hellhound folder.
   static const frames = [
@@ -243,6 +247,7 @@ class HoundComponent extends SpriteComponent {
   void _go(HoundState next) {
     _state = next;
     _clock = 0;
+    onState?.call(next);
   }
 
   void _cycleRun() {

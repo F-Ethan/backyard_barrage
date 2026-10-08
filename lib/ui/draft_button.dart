@@ -44,6 +44,7 @@ class DraftImageButton extends StatelessWidget {
     this.leadingIcon,
     this.trailingIcon,
     this.fontSize = 16,
+    this.back = false,
   });
 
   final String label;
@@ -58,6 +59,9 @@ class DraftImageButton extends StatelessWidget {
   final IconData? leadingIcon;
   final IconData? trailingIcon;
   final double fontSize;
+
+  /// Plays the back sound instead of the tap (closing, leaving).
+  final bool back;
 
   bool get _canTap => enabled && onPressed != null;
 
@@ -138,7 +142,7 @@ class DraftImageButton extends StatelessWidget {
         enabled: live,
         onTap: live
             ? () {
-                feel?.uiTap();
+                back ? feel?.uiBack() : feel?.uiTap();
                 onPressed?.call();
               }
             : null,
@@ -175,7 +179,7 @@ class KitIconButton extends StatelessWidget {
       child: PressScale(
         pressedScale: 0.88,
         onTap: () {
-          feel?.uiTap();
+          kind == UiIconKind.close ? feel?.uiBack() : feel?.uiTap();
           onPressed();
         },
         child: UiGlyph(kind: kind, size: size),

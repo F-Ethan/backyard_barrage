@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:backyard_barrage/ads/ad_config.dart';
 import 'package:backyard_barrage/ads/ad_policy.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -40,7 +41,27 @@ void main() {
     ).readAsStringSync();
     expect(plist, contains('<string>${AdConfig.iosAppId}</string>'));
     expect(manifest, contains(AdConfig.androidAppId));
+    expect(AdConfig.iosAppId, startsWith('ca-app-pub-7671007992790429~'));
+    // Debug and profile builds stay on Google's test unit; release uses the
+    // live unit (empty until it is created, which means no ads).
     expect(AdConfig.iosInterstitialId, contains('4411468910'));
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      expect(
+        AdConfig.interstitialIdFor(release: false),
+        AdConfig.iosInterstitialId,
+      );
+      expect(
+        AdConfig.interstitialIdFor(release: true),
+        AdConfig.iosInterstitialLiveId,
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+    expect(
+      AdConfig.iosInterstitialLiveId,
+      anyOf(isEmpty, startsWith('ca-app-pub-7671007992790429/')),
+    );
     expect(AdConfig.androidInterstitialId, contains('1033173712'));
     expect(
       AdConfig.removeAdsProductId,

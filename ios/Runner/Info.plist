@@ -43,7 +43,7 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<string>ca-app-pub-7671007992790429~3358046608</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Backyard Barrage uses this to show ads. The game still works if you say no.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

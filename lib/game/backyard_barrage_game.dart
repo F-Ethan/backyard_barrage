@@ -956,6 +956,17 @@ class BackyardBarrageGame extends FlameGame {
     }
   }
 
+  /// Arcade: wipe this wallet back to nothing and play from wave 1, for a
+  /// new build and a new score.
+  void startOverFromDefeat() {
+    if (phase != MatchPhase.defeat) return;
+    meta.startOver();
+    lastDefeat = null;
+    carriedCoins = 0;
+    unawaited(persist());
+    retryFromDefeat();
+  }
+
   void retryFromDefeat() {
     if (overlays.isActive('defeat')) overlays.remove('defeat');
     if (paused) resumeEngine();

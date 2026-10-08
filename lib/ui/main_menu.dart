@@ -756,7 +756,9 @@ class _ModeCard extends StatelessWidget {
                         Flexible(
                           child: Text(
                             mode.showsScore
-                                ? 'Score ${wallet.score}'
+                                ? (wallet.bestScore > wallet.score
+                                      ? 'Score ${wallet.score} · best ${wallet.bestScore}'
+                                      : 'Score ${wallet.score}')
                                 : 'Best wave ${wallet.bestWave}',
                             key: Key('${mode.name}-wallet'),
                             maxLines: 1,

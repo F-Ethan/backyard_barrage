@@ -43,7 +43,7 @@ void main() {
     expect(manifest, contains(AdConfig.androidAppId));
     expect(AdConfig.iosAppId, startsWith('ca-app-pub-7671007992790429~'));
     // Debug and profile builds stay on Google's test unit; release uses the
-    // live unit (empty until it is created, which means no ads).
+    // live unit.
     expect(AdConfig.iosInterstitialId, contains('4411468910'));
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     try {
@@ -60,7 +60,7 @@ void main() {
     }
     expect(
       AdConfig.iosInterstitialLiveId,
-      anyOf(isEmpty, startsWith('ca-app-pub-7671007992790429/')),
+      'ca-app-pub-7671007992790429/2173544178',
     );
     expect(AdConfig.androidInterstitialId, contains('1033173712'));
     expect(

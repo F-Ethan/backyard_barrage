@@ -13,13 +13,13 @@ Studio's procedural MVP pack is in the repo and played by `flame_audio`. Replace
 - ui_tap.wav
 - purchase_coin.wav
 
-Added 2026-10-08 (mono WAV, same specs). Where each plays:
+Added 2026-10-08 (mono WAV, same specs). The four hound cues were replaced the same day with the owner's picks. Mix: `throw_whoosh`, `throw_full_power`, `impact_snow`, `impact_wet`, and `hit_ouch` play at 0.75; other one-shots at 1.0 (`AudioCues.volumeOf`). Where each plays:
 
 | File | Plays when |
 |---|---|
 | ui_back.wav | Settings close, Menu (pause / defeat), shop Back |
 | throw_full_power.wav | Player release at full charge (instead of the whoosh) |
-| charge_hum.wav | Loops while the player holds a charge (volume 0.6) |
+| charge_hum.wav | Loops while the player holds a charge (volume 0.75) |
 | fort_hit.wav | A snowball hits a fort that stays up |
 | fort_collapse.wav | A fort falls (worn out, or Fort cracker) |
 | coin_pop.wav | Coins pop over a knocked-out rival |

@@ -1282,7 +1282,7 @@ void main() {
     await tester.tap(find.byKey(const Key('skill-branch-aim')));
     await tester.pump();
     expect(find.byKey(const Key('locked-aim-1')), findsOneWidget);
-    expect(find.text('Buy a second kid first.'), findsWidgets);
+    expect(find.text(SkillTree.teammateLockReason), findsWidgets);
     expect(find.text('Locked'), findsWidgets);
     await tester.tap(find.byKey(const Key('skill-aim-1')));
     await tester.pump();

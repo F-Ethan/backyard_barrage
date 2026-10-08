@@ -22,6 +22,7 @@ class MetaState {
     this.score = 0,
     this.resumeWave = 0,
     this.resumeArena,
+    this.resumeCrewHp,
     this.mode = PlayMode.arcade,
     this.difficulty = Difficulty.normal,
   }) : _season = season.orPlayable {
@@ -77,7 +78,22 @@ class MetaState {
   /// Arena name of the run to resume, so the scenery comes back too.
   String? resumeArena;
 
+  /// Each kid's HP going into the resumed wave, so leaving cannot heal the
+  /// crew in Campaign. 0 means that kid sits the wave out. Null starts
+  /// everyone at full health.
+  List<int>? resumeCrewHp;
+
   bool get canResume => resumeWave > 0;
+
+  /// Extra HP each standing kid regains between waves (Patch up).
+  int get healPerWave {
+    if (owns('mend-2')) return 2;
+    if (owns('mend-1')) return 1;
+    return 0;
+  }
+
+  /// One knocked-out teammate rejoins each wave at 1 HP (Second wind).
+  bool get reviveOne => owns('revive-1');
 
   /// Pay [amount] coins and the matching points.
   void earn(int amount) {
@@ -191,6 +207,10 @@ class MetaState {
     if (node == null || owns(id)) return SkillLock.open;
     final parent = node.parentId;
     if (parent != null && !owns(parent)) return SkillLock.parent;
+    if (node.branch == SkillBranch.recovery) {
+      if (mode != PlayMode.arcade) return SkillLock.campaignOnly;
+      if (difficulty == Difficulty.easy) return SkillLock.easyHeals;
+    }
     if (node.needsTeammate && crewSize < 2) return SkillLock.teammate;
     return SkillLock.open;
   }
@@ -200,6 +220,8 @@ class MetaState {
     SkillLock.open => null,
     SkillLock.parent => SkillTree.parentLockReason,
     SkillLock.teammate => SkillTree.teammateLockReason,
+    SkillLock.campaignOnly => SkillTree.campaignOnlyReason,
+    SkillLock.easyHeals => SkillTree.easyHealsReason,
   };
 
   bool buy(String id) {
@@ -267,6 +289,7 @@ class MetaState {
     'score': score,
     'resumeWave': resumeWave,
     'resumeArena': ?resumeArena,
+    'resumeCrewHp': ?resumeCrewHp,
     'difficulty': difficulty.name,
     'mode': mode.name,
   };
@@ -299,6 +322,12 @@ class MetaState {
       resumeWave: _clampInt(_asInt(json['resumeWave']), 0, 9999),
       resumeArena: json['resumeArena'] is String
           ? json['resumeArena'] as String
+          : null,
+      resumeCrewHp: json['resumeCrewHp'] is List
+          ? [
+              for (final v in json['resumeCrewHp'] as List)
+                _clampInt(_asInt(v), 0, 99),
+            ]
           : null,
       difficulty: _readDifficulty(json['difficulty']),
       mode: PlayMode.tryParse(json['mode'] as String?) ?? PlayMode.arcade,

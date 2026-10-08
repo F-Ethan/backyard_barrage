@@ -151,6 +151,9 @@ void main() {
         [
           'team-2:20',
           'team-3:50',
+          'mend-1:20',
+          'mend-2:50',
+          'revive-1:125',
           'fort-2:15',
           'fort-3:40',
           'fort-hp-1:95',
@@ -197,6 +200,7 @@ void main() {
             if (node.needsTeammate) node.id,
         ],
         [
+          'revive-1',
           'aim-1',
           'aim-2',
           'aim-3',
@@ -324,7 +328,7 @@ void main() {
         0,
         (sum, node) => sum + node.cost,
       );
-      expect(total, 3242);
+      expect(total, 3437);
       var waves = 0;
       for (var wave = 1; wave <= 20; wave++) {
         waves += MetaState.coinsForWave(wave);
@@ -646,5 +650,60 @@ void main() {
     final snap = WalletSnap.from(hard);
     final other = PlayerSave()..apply(snap);
     expect(other.wallet(PlayMode.arcade, Difficulty.hard).resumeWave, 5);
+  });
+
+  group('Recovery skills', () {
+    test('Campaign on Normal and Hard can buy them', () {
+      for (final d in [Difficulty.normal, Difficulty.hard]) {
+        final meta = MetaState(coins: 999, difficulty: d);
+        expect(meta.lockReason('mend-1'), isNull, reason: d.name);
+        expect(meta.buy('mend-1'), isTrue);
+        expect(meta.healPerWave, 1);
+        expect(meta.buy('mend-2'), isTrue);
+        expect(meta.healPerWave, 2);
+        expect(
+          meta.lockReason('revive-1'),
+          SkillTree.teammateLockReason,
+          reason: 'a revive needs a teammate',
+        );
+        expect(meta.buy('team-2'), isTrue);
+        expect(meta.buy('revive-1'), isTrue);
+        expect(meta.reviveOne, isTrue);
+      }
+    });
+
+    test('Arcade and Easy lock them with a reason', () {
+      final arcade = MetaState(coins: 999, mode: PlayMode.campaign);
+      expect(arcade.lockReason('mend-1'), SkillTree.campaignOnlyReason);
+      expect(arcade.buy('mend-1'), isFalse);
+      final easy = MetaState(coins: 999, difficulty: Difficulty.easy);
+      expect(easy.lockReason('mend-1'), SkillTree.easyHealsReason);
+      expect(easy.buy('mend-1'), isFalse);
+    });
+
+    test('Recovery sits in the Crew tab after Team', () {
+      expect(SkillGroup.crew.branches.take(2), [
+        SkillBranch.team,
+        SkillBranch.recovery,
+      ]);
+      expect(SkillTree.chain(SkillBranch.recovery).map((n) => n.id), [
+        'mend-1',
+        'mend-2',
+        'revive-1',
+      ]);
+    });
+  });
+
+  test('a resume bookmark keeps the crew health', () {
+    final meta = MetaState()
+      ..resumeWave = 3
+      ..resumeCrewHp = [2, 0];
+    final back = MetaState.fromJson(meta.toJson());
+    expect(back.resumeCrewHp, [2, 0]);
+    final save = PlayerSave()..apply(WalletSnap.from(meta));
+    expect(save.wallet(PlayMode.arcade, Difficulty.normal).resumeCrewHp, [
+      2,
+      0,
+    ]);
   });
 }

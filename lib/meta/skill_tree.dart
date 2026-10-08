@@ -2,6 +2,7 @@
 /// a node can be bought only after its parent.
 enum SkillBranch {
   team('Team'),
+  recovery('Recovery'),
   fort('Fort'),
   throwSpeed('Throw'),
   poise('Poise'),
@@ -32,6 +33,7 @@ enum SkillGroup {
   List<SkillBranch> get branches => switch (this) {
     SkillGroup.crew => const [
       SkillBranch.team,
+      SkillBranch.recovery,
       SkillBranch.aim,
       SkillBranch.reaction,
       SkillBranch.charge,
@@ -60,7 +62,7 @@ enum SkillGroup {
 
 /// Why a node cannot be bought yet. Coins are separate: an open node can
 /// still be too expensive.
-enum SkillLock { open, parent, teammate }
+enum SkillLock { open, parent, teammate, campaignOnly, easyHeals }
 
 /// One purchase. Each rank in a chain costs 2.5× the one before, rounded
 /// to the nearest 5 ([SkillTree.rankCost]), so the top rank is a real
@@ -86,6 +88,7 @@ class SkillNode {
   /// This is not a [parentId]: an older save can own the node without `team-2`.
   bool get needsTeammate => switch (branch) {
     SkillBranch.aim || SkillBranch.reaction || SkillBranch.charge => true,
+    SkillBranch.recovery => id == 'revive-1',
     SkillBranch.damage => id == 'damage-3' || id == 'damage-4',
     SkillBranch.team ||
     SkillBranch.fort ||
@@ -106,6 +109,9 @@ class SkillTree {
   static const parentLockReason = 'Unlock the node above first.';
 
   static const teammateLockReason = 'Buy a second kid first.';
+  static const campaignOnlyReason =
+      'Campaign only. Arcade starts every wave at full health.';
+  static const easyHealsReason = 'Easy already heals everyone between waves.';
 
   /// Price of the [rank]th node (1-based) in a chain that starts at [base]:
   /// ×2.5 per rank, rounded to the nearest 5.
@@ -133,6 +139,31 @@ class SkillTree {
       detail: 'The crew is full. Three kids on your side.',
       cost: 50,
       parentId: 'team-2',
+    ),
+    // Recovery: Campaign carries health between waves on Normal and Hard
+    // (see CrewCarry). These soften that.
+    SkillNode(
+      id: 'mend-1',
+      branch: SkillBranch.recovery,
+      title: 'Patch up',
+      detail: 'Every standing kid regains 1 HP between waves.',
+      cost: 20,
+    ),
+    SkillNode(
+      id: 'mend-2',
+      branch: SkillBranch.recovery,
+      title: 'Patch up II',
+      detail: 'Every standing kid regains 2 HP between waves.',
+      cost: 50,
+      parentId: 'mend-1',
+    ),
+    SkillNode(
+      id: 'revive-1',
+      branch: SkillBranch.recovery,
+      title: 'Second wind',
+      detail: 'One knocked-out teammate rejoins each wave at 1 HP.',
+      cost: 125,
+      parentId: 'mend-2',
     ),
     SkillNode(
       id: 'fort-2',

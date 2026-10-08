@@ -65,6 +65,7 @@ class PlayerSave {
       ..score = snap.score
       ..resumeWave = snap.resumeWave
       ..resumeArena = snap.resumeArena
+      ..resumeCrewHp = snap.resumeCrewHp
       ..replaceSkills(snap.skills);
   }
 
@@ -157,6 +158,7 @@ class WalletSnap {
     required this.skills,
     this.resumeWave = 0,
     this.resumeArena,
+    this.resumeCrewHp,
   });
 
   factory WalletSnap.from(MetaState state) {
@@ -169,6 +171,9 @@ class WalletSnap {
       score: state.score,
       resumeWave: state.resumeWave,
       resumeArena: state.resumeArena,
+      resumeCrewHp: state.resumeCrewHp == null
+          ? null
+          : List<int>.of(state.resumeCrewHp!),
       skills: Set<String>.from(state.skills),
     );
   }
@@ -182,4 +187,5 @@ class WalletSnap {
   final Set<String> skills;
   final int resumeWave;
   final String? resumeArena;
+  final List<int>? resumeCrewHp;
 }

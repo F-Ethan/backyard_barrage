@@ -62,7 +62,7 @@ enum SkillGroup {
 
 /// Why a node cannot be bought yet. Coins are separate: an open node can
 /// still be too expensive.
-enum SkillLock { open, parent, teammate, campaignOnly, easyHeals }
+enum SkillLock { open, parent, teammate, easyHeals }
 
 /// One purchase. Each rank in a chain costs 2.5× the one before, rounded
 /// to the nearest 5 ([SkillTree.rankCost]), so the top rank is a real
@@ -109,8 +109,6 @@ class SkillTree {
   static const parentLockReason = 'Unlock the node above first.';
 
   static const teammateLockReason = 'Buy a second kid first.';
-  static const campaignOnlyReason =
-      'Campaign only. Arcade starts every wave at full health.';
   static const easyHealsReason = 'Easy already heals everyone between waves.';
 
   /// Price of the [rank]th node (1-based) in a chain that starts at [base]:
@@ -140,7 +138,7 @@ class SkillTree {
       cost: 50,
       parentId: 'team-2',
     ),
-    // Recovery: Campaign carries health between waves on Normal and Hard
+    // Recovery: both modes carry health between waves on Normal and Hard
     // (see CrewCarry). These soften that.
     SkillNode(
       id: 'mend-1',

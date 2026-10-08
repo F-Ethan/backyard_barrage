@@ -248,7 +248,6 @@ class MetaState {
     final parent = node.parentId;
     if (parent != null && !owns(parent)) return SkillLock.parent;
     if (node.branch == SkillBranch.recovery) {
-      if (mode != PlayMode.arcade) return SkillLock.campaignOnly;
       if (difficulty == Difficulty.easy) return SkillLock.easyHeals;
     }
     if (node.needsTeammate && crewSize < 2) return SkillLock.teammate;
@@ -260,7 +259,6 @@ class MetaState {
     SkillLock.open => null,
     SkillLock.parent => SkillTree.parentLockReason,
     SkillLock.teammate => SkillTree.teammateLockReason,
-    SkillLock.campaignOnly => SkillTree.campaignOnlyReason,
     SkillLock.easyHeals => SkillTree.easyHealsReason,
   };
 

@@ -1,4 +1,6 @@
-import '../meta/difficulty.dart';
+import 'dart:math' as math;
+import 'dart:ui' show Color;
+
 import 'arena_grid.dart';
 
 /// Kinds of rival. People vs snowmen: the snow crew is the rival side.
@@ -11,7 +13,7 @@ enum RivalType {
   frostKid,
 
   /// Up close. Holds the front line and throws quick, loose lobs.
-  /// Stand-in art: the original 2D rival kid.
+  /// Drawn as a snowman with a red tint and glow until it gets its own art.
   rusher,
 }
 
@@ -26,7 +28,12 @@ class RivalProfile {
     this.holdColumn,
     this.glint = false,
     this.glintAt,
+    this.aura,
   });
+
+  /// A colored tint and pulsing glow that marks this rival out from the
+  /// snowmen it shares art with. Null draws the art as is.
+  final Color? aura;
 
   /// Multiplier on the time between throws.
   final double gapScale;
@@ -74,6 +81,7 @@ class RivalProfile {
       jitterScale: 1.5,
       stepScale: 1.3,
       holdColumn: 0,
+      aura: Color(0xFFFF4D4D),
     ),
   };
 
@@ -85,42 +93,22 @@ class RivalProfile {
 
 /// Which rivals make up a wave.
 ///
-/// Slot 0 is always a snow ghost. Frost kids and rushers join from a wave
-/// that depends on difficulty, and their share grows every couple of waves
-/// after that. The head count caps (the yard holds five), but the mix keeps
-/// shifting, so a long run keeps changing after the count stops.
+/// Snowmen in the even slots, a random special in each odd slot.
 class RivalRoster {
   const RivalRoster._();
 
-  static int unlockWave(RivalType type, Difficulty difficulty) =>
-      switch ((type, difficulty)) {
-        (RivalType.snowGhost, _) => 1,
-        (RivalType.frostKid, Difficulty.easy) => 4,
-        (RivalType.frostKid, Difficulty.normal) => 3,
-        (RivalType.frostKid, Difficulty.hard) => 2,
-        (RivalType.rusher, Difficulty.easy) => 6,
-        (RivalType.rusher, Difficulty.normal) => 5,
-        (RivalType.rusher, Difficulty.hard) => 3,
-      };
+  /// Rivals that can fill the in-between slots.
+  static const specials = [RivalType.frostKid, RivalType.rusher];
 
+  /// The line-up alternates: snowman, a random special, snowman, a random
+  /// special... So one rival is always a snowman, the second is a surprise,
+  /// the third is a snowman again, and every new slot changes the mix. The
+  /// specials are re-rolled each wave.
   static List<RivalType> forWave({
-    required int wave,
     required int count,
-    required Difficulty difficulty,
-  }) {
-    if (count <= 0) return const [];
-    final specials = [
-      for (final type in [RivalType.frostKid, RivalType.rusher])
-        if (wave >= unlockWave(type, difficulty)) type,
-    ];
-    final lineup = List.filled(count, RivalType.snowGhost);
-    if (specials.isEmpty) return lineup;
-    final firstUnlock = unlockWave(specials.first, difficulty);
-    final share = (1 + (wave - firstUnlock) ~/ 2).clamp(0, count - 1);
-    // Fill from the back slots so the first rival stays a ghost.
-    for (var i = 0; i < share; i++) {
-      lineup[count - 1 - i] = specials[i % specials.length];
-    }
-    return lineup;
-  }
+    required math.Random rng,
+  }) => [
+    for (var i = 0; i < count; i++)
+      i.isEven ? RivalType.snowGhost : specials[rng.nextInt(specials.length)],
+  ];
 }

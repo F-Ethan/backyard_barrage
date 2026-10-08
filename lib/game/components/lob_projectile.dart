@@ -141,6 +141,14 @@ class LobProjectile extends SpriteComponent {
 
   bool _spent = false;
 
+  /// Spend this shot where it is (it hit something outside the kid and fort
+  /// checks, such as the Ice hound).
+  void absorb() {
+    if (_spent) return;
+    _spent = true;
+    removeFromParent();
+  }
+
   /// True once this shot has hit, been blocked, or landed.
   bool get spent => _spent;
   final Set<FortComponent> _clearedForts = {};

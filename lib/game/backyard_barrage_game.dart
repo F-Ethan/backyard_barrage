@@ -29,6 +29,7 @@ import 'components/coin_pop.dart';
 import 'components/coin_carry.dart';
 import 'components/enemy_controller.dart';
 import 'components/fort_component.dart';
+import 'components/hound_component.dart';
 import 'components/impact_burst.dart';
 import 'components/kid_component.dart';
 import 'components/lob_projectile.dart';
@@ -351,6 +352,25 @@ class BackyardBarrageGame extends FlameGame {
 
     final glow = await loadSprite('vfx/charge_glow_draft.png');
     _coinSprite = await loadSprite('ui/coin_draft.png');
+    Future<Sprite> hound(String frame) {
+      final path = HoundComponent.framePath(frame);
+      final crop = SeasonAssets.crop(path)!;
+      return loadSprite(
+        path,
+        srcPosition: Vector2(crop.$1, crop.$2),
+        srcSize: Vector2.all(crop.$3),
+      );
+    }
+
+    _houndSprites = HoundSprites(
+      idle: await hound('idle'),
+      run: [
+        for (final i in ['00', '01', '02', '03']) await hound('run_$i'),
+      ],
+      crouch: await hound('jump_00'),
+      leap: await hound('jump_01'),
+      bite: [await hound('bite_00'), await hound('bite_01')],
+    );
     for (final arena in Arena.values) {
       _arenaArt[arena] = await loadSprite(arena.background);
     }
@@ -457,6 +477,7 @@ class BackyardBarrageGame extends FlameGame {
     _clearCoinCarry();
     _endActiveThrow();
     _clearPowerUps();
+    _rollHound();
     _clearShots();
     _clearEnemies();
     _paidKills.clear();
@@ -495,11 +516,7 @@ class BackyardBarrageGame extends FlameGame {
     _ensureAllyBrains();
 
     final count = CombatRules.enemyCountForWave(wave);
-    final lineup = RivalRoster.forWave(
-      wave: wave,
-      count: count,
-      difficulty: feel.settings.difficulty,
-    );
+    final lineup = RivalRoster.forWave(count: count, rng: _rng);
     for (var i = 0; i < count; i++) {
       final type = lineup[i];
       final rival = RivalProfile.of(type);
@@ -605,6 +622,7 @@ class BackyardBarrageGame extends FlameGame {
     );
     final profile = RivalProfile.of(type);
     kid.glint = profile.glint;
+    kid.aura = profile.aura;
     final at = profile.glintAt;
     if (at != null) kid.glintAt = Vector2(at.$1, at.$2);
     _rivalTypes[kid] = type;
@@ -617,6 +635,104 @@ class BackyardBarrageGame extends FlameGame {
     }
     enemies.clear();
     _rivalTypes.clear();
+  }
+
+  // Ice hound: rolled at wave start, released partway into the fight.
+  HoundSprites? _houndSprites;
+  HoundComponent? _hound;
+  double? _houndAt;
+  double _waveFight = 0;
+
+  /// The hound on the yard, if any.
+  HoundComponent? get hound => _hound;
+
+  /// Seconds into the fight when this wave's hound comes, or null.
+  double? get houndDueAt => _houndAt;
+
+  void _rollHound() {
+    _clearHound();
+    _waveFight = 0;
+    final difficulty = feel.settings.difficulty;
+    _houndAt =
+        wave >= HoundComponent.firstWave &&
+            _rng.nextDouble() < HoundComponent.chanceFor(difficulty)
+        ? 4 + _rng.nextDouble() * 5
+        : null;
+  }
+
+  void _clearHound() {
+    _hound?.removeFromParent();
+    _hound = null;
+  }
+
+  /// Sends the hound down [target]'s lane now.
+  @visibleForTesting
+  HoundComponent releaseHound(KidComponent target) {
+    _clearHound();
+    _houndAt = null;
+    final hound = HoundComponent(
+      sprites: _houndSprites!,
+      laneY: target.position.y,
+      players: players,
+      onCatch: _houndCaught,
+      isLive: () => phase == MatchPhase.fight,
+      difficulty: feel.settings.difficulty,
+    );
+    _hound = hound;
+    world.add(hound);
+    return hound;
+  }
+
+  void _tickHound(double dt) {
+    if (phase != MatchPhase.fight) return;
+    _waveFight += dt;
+    final due = _houndAt;
+    if (due != null && !_settling && _waveFight >= due) {
+      final living = [
+        for (final kid in players)
+          if (!kid.isKo) kid,
+      ];
+      _houndAt = null;
+      if (living.isNotEmpty) {
+        releaseHound(living[_rng.nextInt(living.length)]);
+      }
+    }
+    // A player snowball that meets the hound before it crosses scares it.
+    final hound = _hound;
+    if (hound == null || !hound.scareable) return;
+    for (final shot in world.children.whereType<LobProjectile>()) {
+      if (shot.spent || shot.owner?.side != KidSide.player) continue;
+      if (!ThrowPhysics.snowballContacts(
+        ground: shot.hitPosition,
+        shotRadius: shot.radius,
+        kidCenter: hound.hitCenter,
+        kidRadius: HoundComponent.hitRadius,
+      )) {
+        continue;
+      }
+      _burst(shot.position, power: 0.8);
+      shot.absorb();
+      hound.scare();
+      return;
+    }
+  }
+
+  /// The hound's bite: a one-hit knockout on every difficulty. Frost armor
+  /// is the only thing that turns it away.
+  bool _houndCaught(KidComponent kid) {
+    if (phase != MatchPhase.fight || kid.isKo) return false;
+    if (_armorTime > 0) return false;
+    final selected = identical(kid, _selected);
+    kid.knockOutNow();
+    _burst(kid.hitCenter, depthY: kid.hitCenter.y, power: 1.3);
+    feel.kidHit(knockedOut: true, season: meta.season);
+    _punch(knockedOut: true);
+    if (selected) {
+      _endActiveThrow();
+      _setSelected(_firstReady(players) ?? _firstLiving(players));
+    }
+    resolveKnockouts();
+    return true;
   }
 
   void _clearShots() {
@@ -787,6 +903,8 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   void _beginWaveClear() {
+    _clearHound();
+    _houndAt = null;
     if (phase != MatchPhase.fight) return;
     phase = MatchPhase.clearing;
     _endActiveThrow();
@@ -802,6 +920,8 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   void _beginDefeat() {
+    _clearHound();
+    _houndAt = null;
     if (phase == MatchPhase.defeat || phase == MatchPhase.shop) return;
     phase = MatchPhase.defeat;
     _endActiveThrow();
@@ -1721,6 +1841,7 @@ class BackyardBarrageGame extends FlameGame {
         resolveKnockouts();
       }
     }
+    _tickHound(dt);
     if (_armorTime > 0) {
       _armorTime -= dt;
       if (_armorTime <= 0) {

@@ -88,11 +88,12 @@ Backyard Barrage is a short-session landscape arena game: charge-and-lob project
 - Per-wave: slightly shorter gaps and tighter landing scatter  
 
 ### 3.5 Skill tree (between waves, and from the defeat screen)
-Each rival KO pays 4 coins. Clearing the wave pays a bonus on top (`6 + wave * 4`), about 66 coins by the end of wave 3. Spend that soft currency in the tree, which replaces the three-card shop. The shop has three tabs: Crew (Team, Recovery, Aim, Reaction, Charge), Fight (Throw, Poise, Pressure, Blast, Damage), and Defense (Fort, Shield, Lanes). One chain shows at a time. Aim, Reaction, Charge, and Damage ranks that only help teammates stay locked until the player owns a second kid. Each branch is a short chain: a node unlocks after its parent, and each rank costs 2.5× the one before, rounded to the nearest 5 (for example Quicker throw 10 → 25 → 65 → 155 → 390), so the top rank is a real saving goal. The full tree is 3,242 coins. Balance numbers live in `PROGRESS.md`.
+Each rival KO pays 4 coins. Clearing the wave pays a bonus on top (`6 + wave * 4`), about 66 coins by the end of wave 3. Spend that soft currency in the tree, which replaces the three-card shop. The shop has three tabs: Crew (Team, Recovery, Aim, Reaction, Charge), Fight (Throw, Poise, Pressure, Blast, Damage), and Defense (Fort, Shield, Lanes). One chain shows at a time. Aim, Reaction, Charge, and Damage ranks that only help teammates stay locked until the player owns a second kid. Each branch is a short chain: a node unlocks after its parent, and each rank costs 2.5× the one before, rounded to the nearest 5 (for example Quicker throw 10 → 25 → 65 → 155 → 390), so the top rank is a real saving goal. The full tree is 3,437 coins. Balance numbers live in `PROGRESS.md`.
 
 | Branch | Effect |
 | --- | --- |
 | Team | Crew 1→2→3 |
+| Recovery | Campaign on Normal and Hard only: Patch up +1 HP, Patch up II +2 HP to every standing kid between waves; Second wind brings one knocked-out teammate back at 1 HP each wave (needs a second kid) |
 | Fort | Stages 2 and 3, then extra HP |
 | Throw | Faster charge / harder lob, 5 ranks |
 | Poise | Shorter stun on your kids |

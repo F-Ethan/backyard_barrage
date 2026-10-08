@@ -598,9 +598,6 @@ class BackyardBarrageGame extends FlameGame {
     startWave();
   }
 
-  /// Picks up a run left through Pause → Menu: same wave (the next one if
-  /// that wave was already cleared) and same arena. The bookmark is used
-  /// once.
   /// HP each player kid starts the wave on. A resumed run uses its saved
   /// crew; the first wave of a run starts full; later waves carry per
   /// [CrewCarry]. A kid bought in the shop joins at full health.
@@ -630,6 +627,9 @@ class BackyardBarrageGame extends FlameGame {
   List<int>? _resumeCrewHp;
   List<int> _waveStartHp = const [];
 
+  /// Picks up a run left through Pause → Menu: same wave (the next one if
+  /// that wave was already cleared), same arena, and in Campaign the saved
+  /// crew health. The bookmark is used once.
   void _takeResume() {
     if (!meta.canResume) return;
     wave = meta.resumeWave;

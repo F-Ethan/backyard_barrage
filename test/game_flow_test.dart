@@ -1289,9 +1289,10 @@ void main() {
     expect(kid.position.x, closeTo(ArenaGrid.playerReachX(y), 1));
   });
 
-  /// Hold the charge until power is full. The aim pans only after this,
-  /// starting straight ahead on the next frame.
-  void holdToFull(BackyardBarrageGame game) {
+  /// Hold the charge until it reaches [ThrowPhysics.sweepStartCharge]
+  /// (85%). The aim pans only after this, starting straight ahead on the
+  /// next frame.
+  void holdToPanStart(BackyardBarrageGame game) {
     for (
       var i = 0;
       i < 400 && game.charge < ThrowPhysics.sweepStartCharge;
@@ -1319,7 +1320,7 @@ void main() {
     game.pressMoveZone(kid.hitCenter);
     game.releaseMoveZone();
     game.pressChargeZone();
-    holdToFull(game);
+    holdToPanStart(game);
     final (low, high) = ThrowPhysics.sweepLimits(
       Vector2(kid.throwOrigin.x, kid.hitCenter.y),
     );
@@ -1418,7 +1419,7 @@ void main() {
     expect(game.selectedKid, kid);
 
     game.pressChargeZone();
-    holdToFull(game);
+    holdToPanStart(game);
     game.update(ThrowPhysics.swivelPeriod / 4);
     game.releaseChargeZone();
     expect(game.isCharging, isFalse);
@@ -1443,7 +1444,7 @@ void main() {
     game.pressMoveZone(kid.hitCenter);
     game.releaseMoveZone();
     game.pressChargeZone();
-    holdToFull(game);
+    holdToPanStart(game);
     game.update(step);
     final open = ThrowPhysics.aimElevation(
       game.chargeHud.aimDir,
@@ -1459,7 +1460,7 @@ void main() {
     // Dead on the flat line: the sweep slows by the friction factor.
     rival.position = Vector2(1000, kid.position.y);
     game.pressChargeZone();
-    holdToFull(game);
+    holdToPanStart(game);
     game.update(step);
     final sticky = ThrowPhysics.aimElevation(
       game.chargeHud.aimDir,
@@ -1669,7 +1670,7 @@ void main() {
     expect(kid.sprite, kid.chargeSprite);
     expect(kid.angle, closeTo(0, 0.001));
     expect(kid.scale.x, greaterThan(0));
-    holdToFull(game);
+    holdToPanStart(game);
     expect(kid.chargeYaw, ChargeYaw.across);
 
     // Follow the pan for a full there-and-back and record each pose change.

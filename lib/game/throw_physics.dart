@@ -246,18 +246,6 @@ class ThrowPhysics {
     return minThrowCharge + (1 - minThrowCharge) * u;
   }
 
-  /// Aim sweep position in [-1, 1] for a [phase] in radians (2π per full
-  /// back-and-forth). A triangle wave: constant speed, so the pan never
-  /// eases to a stop at the ends. Phase 0 is straight across, heading
-  /// up-screen first.
-  static double sweepWave(double phase) {
-    var t = (phase / (2 * math.pi)) % 1.0;
-    if (t < 0) t += 1;
-    if (t < 0.25) return 4 * t;
-    if (t < 0.75) return 2 - 4 * t;
-    return 4 * t - 4;
-  }
-
   /// Charge at which the pan starts: just before power tops out, so the
   /// start is gentle but the aim is live by the time the bar is full.
   static const double sweepStartCharge = 0.85;

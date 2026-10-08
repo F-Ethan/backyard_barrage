@@ -27,6 +27,7 @@ class KidPoseSprites {
     this.uprightKo = false,
     this.koDrop = 40,
     this.drawScale = 1,
+    this.walkCycle,
   });
 
   Sprite idle;
@@ -51,6 +52,9 @@ class KidPoseSprites {
   /// Art drawn this much larger than the body box, from the feet. Hit
   /// circles and depth do not change.
   double drawScale;
+
+  /// Frames that loop while walking. Null or one frame uses [walk].
+  List<Sprite>? walkCycle;
 }
 
 /// Kid sprite with idle / walk / charge / throw / hit / KO poses.
@@ -76,6 +80,7 @@ class KidComponent extends SpriteComponent {
        _uprightKo = poses.uprightKo,
        _koDrop = poses.koDrop,
        _drawScale = poses.drawScale,
+       _walkCycle = poses.walkCycle,
        super(
          sprite: poses.idle,
          position: position,
@@ -100,6 +105,18 @@ class KidComponent extends SpriteComponent {
   bool _uprightKo;
   double _koDrop;
   double _drawScale;
+  List<Sprite>? _walkCycle;
+  double _walkClock = 0;
+  int _walkFrame = 0;
+
+  /// Seconds each run frame shows.
+  static const double walkFrameSeconds = 0.13;
+
+  /// Every frame this kid may show while walking.
+  List<Sprite> get walkFrames {
+    final cycle = _walkCycle;
+    return cycle == null || cycle.isEmpty ? [walkSprite] : cycle;
+  }
 
   /// Shows a glint while winding up (long-range rivals).
   bool glint = false;
@@ -214,6 +231,7 @@ class KidComponent extends SpriteComponent {
     _uprightKo = poses.uprightKo;
     _koDrop = poses.koDrop;
     _drawScale = poses.drawScale;
+    _walkCycle = poses.walkCycle;
     _refreshSprite();
   }
 
@@ -369,7 +387,10 @@ class KidComponent extends SpriteComponent {
       return;
     }
     if (_walking) {
-      sprite = walkSprite;
+      final cycle = _walkCycle;
+      sprite = cycle == null || cycle.isEmpty
+          ? walkSprite
+          : cycle[_walkFrame % cycle.length];
       return;
     }
     sprite = _selected ? pickupSprite : idleSprite;
@@ -424,6 +445,18 @@ class KidComponent extends SpriteComponent {
       if (_throwPoseTimer <= 0) refresh = true;
     }
     if (_flashTimer > 0) _flashTimer -= dt;
+    final cycle = _walkCycle;
+    if (_walking && cycle != null && cycle.length > 1) {
+      _walkClock += dt;
+      final frame = (_walkClock / walkFrameSeconds).floor() % cycle.length;
+      if (frame != _walkFrame) {
+        _walkFrame = frame;
+        refresh = true;
+      }
+    } else {
+      _walkClock = 0;
+      _walkFrame = 0;
+    }
     _glintAge = _chargingPose ? _glintAge + dt : 0;
     if (_recoilTimer > 0) _recoilTimer -= dt;
     if (isKo) {

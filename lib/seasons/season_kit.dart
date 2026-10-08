@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 
@@ -34,6 +32,12 @@ class SeasonKit {
 }
 
 Future<SeasonKit> loadSeasonKit(FlameGame game, Season season) async {
+  Future<List<Sprite>?> walkCycle(bool player) async {
+    final frames = SeasonAssets.walkCycle(player: player, season: season);
+    if (frames == null) return null;
+    return Future.wait([for (final path in frames) _loadPose(game, path)]);
+  }
+
   Future<KidPoseSprites> poses(bool player, {RivalType? rival}) async {
     String path(String pose) =>
         (rival == null ? null : SeasonAssets.rivalPose(rival, pose)) ??
@@ -62,7 +66,10 @@ Future<SeasonKit> loadSeasonKit(FlameGame game, Season season) async {
           SeasonAssets.uprightKo(player: player, season: season),
       // Rival renders lie flat on the feet line already.
       koDrop: rival == null ? 40 : 0,
-      drawScale: rival == null ? 1 : SeasonAssets.rivalDrawScale(rival),
+      drawScale: rival != null
+          ? SeasonAssets.rivalDrawScale(rival)
+          : (player ? SeasonAssets.playerDrawScale(season) : 1),
+      walkCycle: rival != null ? null : await walkCycle(player),
     );
   }
 
@@ -89,45 +96,12 @@ Future<SeasonKit> loadSeasonKit(FlameGame game, Season season) async {
   );
 }
 
-Future<Sprite> _loadPose(FlameGame game, String path) async {
+Future<Sprite> _loadPose(FlameGame game, String path) {
   final crop = SeasonAssets.crop(path);
-  final srcPosition = crop == null ? null : Vector2(crop.$1, crop.$2);
-  final srcSize = crop == null ? null : Vector2.all(crop.$3);
-  if (!SeasonAssets.mirror(path)) {
-    return game.loadSprite(path, srcPosition: srcPosition, srcSize: srcSize);
-  }
-  final image = await game.images.load(path);
-  return MirroredSprite(image, srcPosition: srcPosition, srcSize: srcSize);
-}
-
-/// A sprite drawn flipped left-to-right inside its own destination box.
-class MirroredSprite extends Sprite {
-  MirroredSprite(super.image, {super.srcPosition, super.srcSize});
-
-  @override
-  void render(
-    Canvas canvas, {
-    Vector2? position,
-    Vector2? size,
-    Anchor anchor = Anchor.topLeft,
-    Paint? overridePaint,
-    double? bleed,
-  }) {
-    final drawSize = size ?? srcSize;
-    final left = (position?.x ?? 0) - anchor.x * drawSize.x;
-    final centerX = left + drawSize.x / 2;
-    canvas.save();
-    canvas.translate(centerX, 0);
-    canvas.scale(-1, 1);
-    canvas.translate(-centerX, 0);
-    super.render(
-      canvas,
-      position: position,
-      size: size,
-      anchor: anchor,
-      overridePaint: overridePaint,
-      bleed: bleed,
-    );
-    canvas.restore();
-  }
+  if (crop == null) return game.loadSprite(path);
+  return game.loadSprite(
+    path,
+    srcPosition: Vector2(crop.$1, crop.$2),
+    srcSize: Vector2.all(crop.$3),
+  );
 }

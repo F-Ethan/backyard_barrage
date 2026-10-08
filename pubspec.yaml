@@ -33,6 +33,13 @@ flutter:
     - assets/images/characters/
     - assets/images/characters/enemy/
     - assets/images/characters/player/
+    # Ethan's 3D kid: only the 512 frames the game draws (not the 1024s or review sheets).
+    - assets/images/characters/player/ethan3d/aim_00_profile_512.png
+    - assets/images/characters/player/ethan3d/aim_01_512.png
+    - assets/images/characters/player/ethan3d/aim_02_512.png
+    - assets/images/characters/player/ethan3d/aim_03_34front_512.png
+    - assets/images/characters/player/ethan3d/run_00_flipped_512.png
+    - assets/images/characters/player/ethan3d/run_01_flipped_512.png
     - assets/images/characters/rivals/ghost/
     - assets/images/characters/rivals/frostkid/
     - assets/images/forts/

@@ -35,7 +35,7 @@ abstract final class AudioCues {
 
   /// Cues wired in the game whose file has not been delivered yet. They
   /// stay silent until `assets/audio/sfx/<cue>.wav` lands.
-  static const awaitingFiles = <String>{houndHowl};
+  static const awaitingFiles = <String>{};
   static const menuLoop = 'menu_loop';
   static const battleWinter = 'battle_loop_winter';
   static const battleSummer = 'battle_loop_summer';

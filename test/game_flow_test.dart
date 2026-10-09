@@ -2197,7 +2197,8 @@ void main() {
   testWidgets('a howl warns at least two seconds before the first hound', (
     tester,
   ) async {
-    final game = (await boot(tester, MetaState())).game;
+    final booted = await boot(tester, MetaState());
+    final game = booted.game;
     game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));
     for (var wave = 1; wave <= 40; wave++) {
       game.wave = wave;
@@ -2222,6 +2223,8 @@ void main() {
     final howl = game.howlDueAt!;
     game.update(howl + 0.01);
     expect(game.howlDueAt, isNull, reason: 'it played');
+    await tester.pump();
+    expect(booted.playback.sfx, contains('sfx/hound_howl.wav'));
     expect(game.hounds, isEmpty, reason: 'the hound is still to come');
   });
 

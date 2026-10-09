@@ -41,7 +41,6 @@ Playable MVP loop on the gameplay branch:
 
 Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you notice something you are not fixing in the current PR. Remove or rewrite a row when it is actually fixed.
 
-- **Hound howl has no sound file yet.** The warning howl is wired (`AudioCues.houndHowl`) and silent until `assets/audio/sfx/hound_howl.wav` lands; remove it from `AudioCues.awaitingFiles` then.
 - **Second SFX pack is first-pass.** The 17 sounds added 2026-10-08 (`docs/AUDIO_HANDOFF.md`) need an on-device listen. The designer flagged `hound_growl`, `charge_hum`, and `fort_collapse` as possibly too soft or synthetic; by level, the quietest are `armor_block` and `hound_snap` (about 6dB under the rest). The original nine placeholders are unchanged. `CLAUDE.md` still says audio is not shipped.
 
 - **Power-ups use Material icons, not art.** The six items and their HUD buttons draw Material glyphs until item art lands. Prices and durations are first-pass. Fort cracker only affects rival forts (only one rival fort exists so far). Items are kept through a Campaign defeat (unlike skills).

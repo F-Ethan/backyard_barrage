@@ -1282,7 +1282,7 @@ void main() {
     await tester.tap(find.byKey(const Key('skill-branch-aim')));
     await tester.pump();
     expect(find.byKey(const Key('locked-aim-1')), findsOneWidget);
-    expect(find.text('Buy a second kid first.'), findsWidgets);
+    expect(find.text(SkillTree.teammateLockReason), findsWidgets);
     expect(find.text('Locked'), findsWidgets);
     await tester.tap(find.byKey(const Key('skill-aim-1')));
     await tester.pump();
@@ -2192,6 +2192,40 @@ void main() {
     });
     expect(airborne, isTrue);
     expect(hound.position.x, lessThan(ArenaGrid.riverLeftX(kid.position.y)));
+  });
+
+  testWidgets('a howl warns at least two seconds before the first hound', (
+    tester,
+  ) async {
+    final booted = await boot(tester, MetaState());
+    final game = booted.game;
+    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));
+    for (var wave = 1; wave <= 40; wave++) {
+      game.wave = wave;
+      game.startWave();
+      final hound = game.houndDueAt;
+      final howl = game.howlDueAt;
+      if (hound == null) {
+        expect(howl, isNull, reason: 'wave $wave: no hound, no howl');
+        continue;
+      }
+      expect(howl, isNotNull, reason: 'wave $wave');
+      expect(howl, greaterThanOrEqualTo(BackyardBarrageGame.howlEarliest));
+      expect(
+        howl,
+        lessThanOrEqualTo(hound - BackyardBarrageGame.howlLead),
+        reason: 'wave $wave',
+      );
+    }
+    game.wave = HoundComponent.packWave;
+    game.startWave();
+    game.finishEntrance();
+    final howl = game.howlDueAt!;
+    game.update(howl + 0.01);
+    expect(game.howlDueAt, isNull, reason: 'it played');
+    await tester.pump();
+    expect(booted.playback.sfx, contains('sfx/hound_howl.wav'));
+    expect(game.hounds, isEmpty, reason: 'the hound is still to come');
   });
 
   testWidgets('a hound bite knocks out a full-health kid on every mode', (

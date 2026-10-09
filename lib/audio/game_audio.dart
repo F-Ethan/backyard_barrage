@@ -31,6 +31,11 @@ abstract final class AudioCues {
   static const houndLeap = 'hound_leap';
   static const houndSnap = 'hound_snap';
   static const houndWhimper = 'hound_whimper';
+  static const houndHowl = 'hound_howl';
+
+  /// Cues wired in the game whose file has not been delivered yet. They
+  /// stay silent until `assets/audio/sfx/<cue>.wav` lands.
+  static const awaitingFiles = <String>{};
   static const menuLoop = 'menu_loop';
   static const battleWinter = 'battle_loop_winter';
   static const battleSummer = 'battle_loop_summer';
@@ -62,9 +67,20 @@ abstract final class AudioCues {
     houndLeap,
     houndSnap,
     houndWhimper,
+    houndHowl,
   ];
 
   static const loops = <String>[menuLoop, battleWinter, battleSummer];
+
+  /// Mix level for one-shots (0–1). Throws and hits sit at 0.75 so they do
+  /// not drown out the rest; everything else plays at full.
+  static double volumeOf(String cue) => switch (cue) {
+    throwWhoosh || throwFullPower || impactSnow || impactWet || hitOuch => 0.75,
+    _ => 1,
+  };
+
+  /// The charge hum loop: 1.25× its old 0.6 so it can be heard.
+  static const double chargeHumVolume = 0.75;
 }
 
 abstract class AudioAssetLookup {
@@ -105,7 +121,7 @@ class EmptyAudioLookup extends AudioAssetLookup {
 abstract class AudioPlayback {
   const AudioPlayback();
 
-  Future<void> playSfx(String relativePath);
+  Future<void> playSfx(String relativePath, {double volume = 1});
   Future<void> playLoop(String relativePath, {double volume = 0.5});
   Future<void> stopLoop();
 
@@ -121,13 +137,16 @@ class FlameAudioPlayback extends AudioPlayback {
   AudioPlayer? _sfxLoop;
 
   @override
-  Future<void> playSfx(String relativePath) {
-    return FlameAudio.play(relativePath);
+  Future<void> playSfx(String relativePath, {double volume = 1}) {
+    return FlameAudio.play(relativePath, volume: volume);
   }
 
   @override
   Future<void> startSfxLoop(String relativePath) async {
-    final player = await FlameAudio.loop(relativePath, volume: 0.6);
+    final player = await FlameAudio.loop(
+      relativePath,
+      volume: AudioCues.chargeHumVolume,
+    );
     final old = _sfxLoop;
     _sfxLoop = player;
     if (old != null) await _dispose(old);
@@ -165,7 +184,7 @@ class SilentAudioPlayback extends AudioPlayback {
   const SilentAudioPlayback();
 
   @override
-  Future<void> playSfx(String relativePath) async {}
+  Future<void> playSfx(String relativePath, {double volume = 1}) async {}
 
   @override
   Future<void> playLoop(String relativePath, {double volume = 0.5}) async {}
@@ -234,7 +253,7 @@ class GameAudio {
     final file = _resolved[cue];
     if (file == null) return;
     try {
-      await _playback.playSfx(file);
+      await _playback.playSfx(file, volume: AudioCues.volumeOf(cue));
     } catch (_) {}
   }
 

@@ -6,9 +6,13 @@ class RecordingPlayback extends AudioPlayback {
   final loops = <String>[];
   int stops = 0;
 
+  /// Volume of each one-shot, by file.
+  final volumes = <String, double>{};
+
   @override
-  Future<void> playSfx(String relativePath) async {
+  Future<void> playSfx(String relativePath, {double volume = 1}) async {
     sfx.add(relativePath);
+    volumes[relativePath] = volume;
   }
 
   @override

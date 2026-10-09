@@ -8,6 +8,7 @@ import 'package:backyard_barrage/meta/game_settings.dart';
 import 'package:backyard_barrage/meta/power_up.dart';
 import 'package:backyard_barrage/meta/save_store.dart';
 import 'package:backyard_barrage/meta/settings_store.dart';
+import 'package:backyard_barrage/meta/skill_tree.dart';
 import 'package:backyard_barrage/seasons/season.dart';
 import 'package:backyard_barrage/ui/settings_panel.dart';
 import 'package:flutter/material.dart';
@@ -81,6 +82,11 @@ void main() {
   testWidgets('every one-shot cue has a bundled wav', (tester) async {
     final audio = GameAudio(playback: RecordingPlayback());
     for (final cue in AudioCues.oneShots) {
+      if (AudioCues.awaitingFiles.contains(cue)) {
+        // Remove it from awaitingFiles once the file lands.
+        expect(await audio.resolvedFile(cue), isNull, reason: cue);
+        continue;
+      }
       expect(await audio.resolvedFile(cue), 'sfx/$cue.wav', reason: cue);
     }
   });
@@ -109,6 +115,37 @@ void main() {
       ]),
     );
     expect(playback.sfx, isNot(contains('sfx/throw_whoosh.wav')));
+  });
+
+  testWidgets('throws and hits play at 0.75; the rest at full', (tester) async {
+    final playback = RecordingPlayback();
+    final audio = GameAudio(playback: playback);
+    for (final cue in [
+      AudioCues.throwWhoosh,
+      AudioCues.hitOuch,
+      AudioCues.impactSnow,
+      AudioCues.houndGrowl,
+      AudioCues.coinPop,
+    ]) {
+      await audio.playSfx(cue);
+    }
+    expect(playback.volumes['sfx/throw_whoosh.wav'], 0.75);
+    expect(playback.volumes['sfx/hit_ouch.wav'], 0.75);
+    expect(playback.volumes['sfx/impact_snow.wav'], 0.75);
+    expect(playback.volumes['sfx/hound_growl.wav'], 1);
+    expect(playback.volumes['sfx/coin_pop.wav'], 1);
+    expect(AudioCues.chargeHumVolume, closeTo(0.6 * 1.25, 1e-9));
+  });
+
+  test('skill copy is short and plain', () {
+    for (final node in SkillTree.nodes) {
+      expect(node.detail.length, lessThanOrEqualTo(64), reason: node.id);
+      expect(
+        node.detail,
+        isNot(matches(RegExp(r'\b(HP|stun|lock|radius|bots?)\b|×|%'))),
+        reason: node.id,
+      );
+    }
   });
 
   testWidgets('the charge hum loops until stopped; a quick stop wins', (

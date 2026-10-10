@@ -44,7 +44,9 @@ import 'components/lob_projectile.dart';
 import 'components/overlay_banner.dart';
 import 'components/perk_badges.dart';
 import 'components/splash_particles.dart';
+import 'kid_colors.dart';
 import 'throw_physics.dart';
+import 'wave_reward.dart';
 
 enum MatchPhase { entering, fight, clearing, defeat, shop, paused }
 
@@ -220,7 +222,16 @@ class BackyardBarrageGame extends FlameGame {
 
   /// What this wave paid, newest last, for the wave report: power-ups from
   /// a scared hound or a boss, knockout coins, and the clear bonus.
-  final List<String> waveRewards = [];
+  final List<WaveReward> waveRewards = [];
+
+  /// Rivals each kid knocked out this wave (by index).
+  final List<int> kidKos = [0, 0, 0];
+
+  void _creditKo(KidComponent? thrower) {
+    if (thrower == null || thrower.side != KidSide.player) return;
+    final index = players.indexOf(thrower);
+    if (index >= 0 && index < kidKos.length) kidKos[index] += 1;
+  }
 
   /// Points the last wave clear added to the score.
   int lastWaveScore = 0;
@@ -648,6 +659,7 @@ class BackyardBarrageGame extends FlameGame {
       }
       rival.recoil(shot.facing);
       _rivalHurt(rival);
+      if (rival.isKo) _creditKo(shot.owner);
     }
     resolveKnockouts();
   }
@@ -990,6 +1002,7 @@ class BackyardBarrageGame extends FlameGame {
     _paidKills.clear();
     killCoinsThisWave = 0;
     waveRewards.clear();
+    kidKos.setAll(0, [0, 0, 0]);
     phase = MatchPhase.entering;
     _entrance.clear();
 
@@ -1010,7 +1023,8 @@ class BackyardBarrageGame extends FlameGame {
       players.removeLast().removeFromParent();
     }
     while (players.length < meta.crewSize) {
-      final kid = _makeKid(KidSide.player, players.length);
+      final kid = _makeKid(KidSide.player, players.length)
+        ..tagColor = KidColors.of(players.length);
       players.add(kid);
       world.add(kid);
     }
@@ -1393,7 +1407,7 @@ class BackyardBarrageGame extends FlameGame {
       held.uses = 0;
       if (_rng.nextDouble() >= EnemyPerkRules.dropChance) continue;
       meta.replaceItems({...meta.items, item: meta.itemCount(item) + 1});
-      waveRewards.add('Dropped by a rival: +1 ${item.label}');
+      waveRewards.add(WaveReward.item(item, 'Dropped by a rival'));
       world.add(
         CoinPop(
           amount: 0,
@@ -1669,9 +1683,9 @@ class BackyardBarrageGame extends FlameGame {
     String reason = 'Bonus',
   }) {
     final given = [for (var i = 0; i < count; i++) meta.grantRandomItem(_rng)];
-    waveRewards.add(
-      '$reason: ${[for (final item in given) '+1 ${item.label}'].join(', ')}',
-    );
+    for (final item in given) {
+      waveRewards.add(WaveReward.item(item, reason));
+    }
     final label = given.length == 1
         ? '+1 ${given.single.label}'
         : '+${given.length} power-ups';
@@ -1935,9 +1949,9 @@ class BackyardBarrageGame extends FlameGame {
     meta.earn(lastReward);
     lastWaveScore = meta.scoreWaveClear(wave);
     if (killCoinsThisWave > 0) {
-      waveRewards.add('Knockouts: +$killCoinsThisWave coins');
+      waveRewards.add(WaveReward.coins(killCoinsThisWave, 'Knockouts'));
     }
-    waveRewards.add('Wave $wave clear: +$lastReward coins');
+    waveRewards.add(WaveReward.coins(lastReward, 'Wave $wave clear'));
     meta.noteWaveCleared(wave);
     _settleCrew();
     unawaited(persist());
@@ -2607,6 +2621,7 @@ class BackyardBarrageGame extends FlameGame {
     _magmaSplash(shot);
     target.recoil(shot.facing);
     if (target.side == KidSide.enemy) _rivalHurt(target);
+    if (target.isKo && target.side == KidSide.enemy) _creditKo(shot.owner);
     _punch(knockedOut: target.isKo);
     if (target.isKo && target.side == KidSide.enemy) {
       world.add(

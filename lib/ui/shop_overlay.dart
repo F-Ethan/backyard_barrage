@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../feel/feel_bus.dart';
 import '../game/backyard_barrage_game.dart';
+import '../game/kid_colors.dart';
 import '../meta/power_up.dart';
 import '../meta/skill_tree.dart';
 import '../seasons/season.dart';
@@ -46,15 +47,16 @@ class _ShopOverlayState extends State<ShopOverlay> {
   bool _items = false;
   SkillBranch _branch = SkillBranch.throwSpeed;
 
-  /// Whose personal skills the open branch shows (Health, Shield, …).
-  int _kid = 0;
+  /// Which skills show: a kid's own (Health, Shield, …) by index, or the
+  /// team's shared ones when null. Picked with the buttons by Next wave.
+  int? _filter = 0;
   _Purchase? _lastPurchase;
   int _purchaseSerial = 0;
 
-  /// The kid a purchase in the open branch goes to: [_kid] for a personal
-  /// branch, 0 (unused) for a team one.
+  /// The kid a purchase in the open branch goes to: the picked kid for a
+  /// personal branch, 0 (unused) for a team one.
   int get _owner => SkillTree.isPersonal(_branch)
-      ? _kid.clamp(0, widget.game.meta.crewSize - 1)
+      ? (_filter ?? 0).clamp(0, widget.game.meta.crewSize - 1)
       : 0;
 
   Future<void> _buy(SkillNode node) async {
@@ -106,31 +108,37 @@ class _ShopOverlayState extends State<ShopOverlay> {
   void _selectBranch(SkillBranch branch) {
     if (branch == _branch) return;
     widget.game.feel.uiTap();
+    setState(() => _branch = branch);
+  }
+
+  /// Team (null) or Kid 1–3: shows only those skills.
+  void _selectFilter(int? filter) {
+    if (filter == _filter && !_items) return;
+    widget.game.feel.uiTap();
     setState(() {
-      _branch = branch;
-      // Bot-only skills default to the first teammate: the lead kid is
-      // usually the one you throw with.
-      if (_botBranches.contains(branch) && widget.game.meta.crewSize > 1) {
-        _kid = 1;
-      }
+      _filter = filter;
+      _items = false;
+      final shown = _shownBranches(_group);
+      if (!shown.contains(_branch)) _branch = shown.first;
     });
   }
 
-  static const _botBranches = {
-    SkillBranch.aim,
-    SkillBranch.reaction,
-    SkillBranch.charge,
-  };
-
-  /// Branches in [group] with something this difficulty can buy. Easy
-  /// hides Recovery: it already heals everyone between waves.
+  /// Branches in [group] for the picked filter (a kid's own, or the
+  /// team's) with something this difficulty can buy. Easy hides Recovery:
+  /// it already heals everyone between waves.
   List<SkillBranch> _shownBranches(SkillGroup group) => [
     for (final branch in group.branches)
-      if (!SkillTree.chain(
-        branch,
-      ).every((node) => widget.game.meta.hidesNode(node.id)))
+      if (SkillTree.isPersonal(branch) == (_filter != null) &&
+          !SkillTree.chain(
+            branch,
+          ).every((node) => widget.game.meta.hidesNode(node.id)))
         branch,
   ];
+
+  /// Ranks [kid] (or the team) owns in [branch].
+  int _ranksOwned(SkillBranch branch, int kid) => SkillTree.chain(
+    branch,
+  ).where((node) => widget.game.meta.ownsFor(kid, node.id)).length;
 
   /// The ranks worth showing: the last one owned, then the next few.
   /// A long chain does not list every rank.
@@ -215,6 +223,17 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                           child: _BranchList(
                                             key: ValueKey(_group),
                                             branches: _shownBranches(_group),
+                                            ranks: {
+                                              for (final branch
+                                                  in _shownBranches(_group))
+                                                branch: _ranksOwned(
+                                                  branch,
+                                                  _filter ?? 0,
+                                                ),
+                                            },
+                                            tint: _filter == null
+                                                ? null
+                                                : KidColors.of(_filter!),
                                             selected: _branch,
                                             onSelect: _selectBranch,
                                           ),
@@ -238,24 +257,13 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                                 hiddenOwned > 0
                                                     ? 'Ranks 1–$hiddenOwned owned. Each rank unlocks the next.'
                                                     : personal
-                                                    ? 'Each kid buys their own.'
+                                                    ? 'Kid ${owner + 1}'
+                                                          "'s own skill."
                                                     : 'Shared by the whole crew.',
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: BarrageType.muted,
                                               ),
-                                              if (personal) ...[
-                                                SizedBox(
-                                                  height: tokens.space.xs,
-                                                ),
-                                                _KidPicker(
-                                                  count: meta.crewSize,
-                                                  selected: _kid,
-                                                  onSelect: (kid) => setState(
-                                                    () => _kid = kid,
-                                                  ),
-                                                ),
-                                              ],
                                               SizedBox(height: tokens.space.sm),
                                               for (
                                                 var i = 0;
@@ -301,24 +309,46 @@ class _ShopOverlayState extends State<ShopOverlay> {
                               ),
                       ),
                       SizedBox(height: tokens.space.sm),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: DraftImageButton(
-                          key: const Key('next-wave'),
-                          label: fromDefeat ? 'Back' : 'Next wave',
-                          back: fromDefeat,
-                          trailingIcon: fromDefeat
-                              ? null
-                              : Icons.arrow_forward_rounded,
-                          leadingIcon: fromDefeat
-                              ? Icons.arrow_back_rounded
-                              : null,
-                          onPressed: game.continueFromShop,
-                          width: 220,
-                          height: compact ? 48 : 54,
-                          fontSize: 17,
-                          feel: game.feel,
-                        ),
+                      Row(
+                        children: [
+                          const Spacer(),
+                          _FilterButton(
+                            key: const Key('shop-filter-team'),
+                            label: 'Team',
+                            color: tokens.primary,
+                            selected: !_items && _filter == null,
+                            compact: compact,
+                            onTap: () => _selectFilter(null),
+                          ),
+                          for (var i = 0; i < meta.crewSize; i++) ...[
+                            SizedBox(width: tokens.space.xs),
+                            _FilterButton(
+                              key: Key('shop-filter-kid-$i'),
+                              label: 'Kid ${i + 1}',
+                              color: KidColors.of(i),
+                              selected: !_items && _filter == i,
+                              compact: compact,
+                              onTap: () => _selectFilter(i),
+                            ),
+                          ],
+                          SizedBox(width: tokens.space.md),
+                          DraftImageButton(
+                            key: const Key('next-wave'),
+                            label: fromDefeat ? 'Back' : 'Next wave',
+                            back: fromDefeat,
+                            trailingIcon: fromDefeat
+                                ? null
+                                : Icons.arrow_forward_rounded,
+                            leadingIcon: fromDefeat
+                                ? Icons.arrow_back_rounded
+                                : null,
+                            onPressed: game.continueFromShop,
+                            width: 200,
+                            height: compact ? 48 : 54,
+                            fontSize: 17,
+                            feel: game.feel,
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -421,36 +451,6 @@ class _Header extends StatelessWidget {
 }
 
 /// Crew / Fight / Defense tabs with a sliding selected pill.
-/// Kid 1 / Kid 2 / Kid 3 for the personal branches.
-class _KidPicker extends StatelessWidget {
-  const _KidPicker({
-    required this.count,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  final int count;
-  final int selected;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    return Wrap(
-      spacing: tokens.space.xs,
-      children: [
-        for (var i = 0; i < count; i++)
-          ChoiceChip(
-            key: Key('shop-kid-$i'),
-            label: Text('Kid ${i + 1}'),
-            selected: i == selected,
-            onSelected: (_) => onSelect(i),
-          ),
-      ],
-    );
-  }
-}
-
 class _GroupTabs extends StatelessWidget {
   const _GroupTabs({
     required this.selected,
@@ -565,11 +565,19 @@ class _BranchList extends StatelessWidget {
   const _BranchList({
     super.key,
     required this.branches,
+    required this.ranks,
+    required this.tint,
     required this.selected,
     required this.onSelect,
   });
 
   final List<SkillBranch> branches;
+
+  /// Ranks owned in each branch, for the picked kid or the team.
+  final Map<SkillBranch, int> ranks;
+
+  /// The picked kid's color, or null for the team.
+  final Color? tint;
   final SkillBranch selected;
   final ValueChanged<SkillBranch> onSelect;
 
@@ -585,6 +593,8 @@ class _BranchList extends StatelessWidget {
             child: _BranchTile(
               key: Key('skill-branch-${branch.name}'),
               label: branch.label,
+              rank: ranks[branch] ?? 0,
+              tint: tint,
               selected: branch == selected,
               onTap: () => onSelect(branch),
             ),
@@ -599,11 +609,15 @@ class _BranchTile extends StatelessWidget {
   const _BranchTile({
     super.key,
     required this.label,
+    required this.rank,
+    required this.tint,
     required this.selected,
     required this.onTap,
   });
 
   final String label;
+  final int rank;
+  final Color? tint;
   final bool selected;
   final VoidCallback onTap;
 
@@ -647,6 +661,22 @@ class _BranchTile extends StatelessWidget {
                 ),
               ),
             ),
+            if (rank > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                decoration: BoxDecoration(
+                  color: (tint ?? tokens.primary).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  SkillTree.roman(rank),
+                  style: BarrageType.muted.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: tokens.ink,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -1015,6 +1045,58 @@ class _ItemRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Team or Kid N by the Next wave button: a pill in that kid's color,
+/// filled when picked.
+class _FilterButton extends StatelessWidget {
+  const _FilterButton({
+    super.key,
+    required this.label,
+    required this.color,
+    required this.selected,
+    required this.compact,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color color;
+  final bool selected;
+  final bool compact;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final motion = context.motion;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: PressScale(
+        pressedScale: 0.95,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: motion.fast,
+          height: compact ? 40 : 44,
+          padding: EdgeInsets.symmetric(horizontal: tokens.space.md),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? color : tokens.surface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: color, width: 2),
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            style: BarrageType.button.copyWith(
+              fontSize: 14,
+              color: selected ? BarrageColors.ink : tokens.ink,
+            ),
+          ),
+        ),
       ),
     );
   }

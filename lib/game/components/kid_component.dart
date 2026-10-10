@@ -163,6 +163,10 @@ class KidComponent extends SpriteComponent {
             ));
   }
 
+  /// A player kid's own color (see `KidColors`), shown as a ring on the
+  /// ground under them. Null for rivals.
+  Color? tagColor;
+
   Color? _aura;
   Paint? _auraPaint;
   double _auraAge = 0;
@@ -622,6 +626,7 @@ class KidComponent extends SpriteComponent {
       canvas.translate(0, -lift / ((scale.y == 0 ? 1 : scale.y) * _drawScale));
     }
     final moved = _applyFeelTransform(canvas);
+    _drawTagRing(canvas);
     _renderPosed(canvas);
     if (moved) canvas.restore();
     if (lifted) canvas.restore();
@@ -815,6 +820,25 @@ class KidComponent extends SpriteComponent {
         ..color = const Color(0xFFFFE66D)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3,
+    );
+  }
+
+  /// The kid's color as a ring at their feet, under the sprite.
+  void _drawTagRing(Canvas canvas) {
+    final color = tagColor;
+    if (color == null || isKo) return;
+    final oval = Rect.fromCenter(
+      center: Offset(size.x / 2, size.y - 8),
+      width: size.x * 0.5,
+      height: 14,
+    );
+    canvas.drawOval(oval, Paint()..color = color.withValues(alpha: 0.35));
+    canvas.drawOval(
+      oval,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5,
     );
   }
 

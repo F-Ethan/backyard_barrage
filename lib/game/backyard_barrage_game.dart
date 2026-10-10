@@ -40,6 +40,7 @@ import 'components/hound_component.dart';
 import 'components/ice_spike.dart';
 import 'components/impact_burst.dart';
 import 'components/kid_component.dart';
+import 'components/shield_pile.dart';
 import 'components/lob_projectile.dart';
 import 'components/overlay_banner.dart';
 import 'components/perk_badges.dart';
@@ -115,6 +116,15 @@ class BackyardBarrageGame extends FlameGame {
   Sprite? _magmaBall;
   Sprite? _ogreBall;
   Sprite? _bunkerBuster;
+  Sprite? _shieldPile;
+
+  /// A kid's shield took its last hit: leave it broken in the snow.
+  void _dropShield(KidComponent kid) {
+    final sprite = _shieldPile;
+    if (sprite == null || kid.shieldSpot == null || !kid.isMounted) return;
+    world.add(ShieldPile.under(kid, sprite));
+  }
+
   Sprite? _magmaImpact;
   Sprite? _fireWaveSprite;
   Sprite? _shockwaveSprite;
@@ -767,8 +777,8 @@ class BackyardBarrageGame extends FlameGame {
         meta.kidPoise(math.max(0, players.indexOf(kid))) *
         _tuning().allyStunScale;
     for (var i = 1; i < hits; i++) {
-      if (kid.shieldHits > 0) {
-        kid.shieldHits -= 1;
+      if (kid.blockWithShield()) {
+        continue;
       } else if (kid.hp > 1) {
         kid.hp -= 1;
       }
@@ -873,6 +883,10 @@ class BackyardBarrageGame extends FlameGame {
     _rivalFortCollapsed = await loadSprite(GameArt.fortCollapsed(rival: true));
     KidComponent.armorSprite = await loadSprite(GameArt.iceBubble);
     KidComponent.shieldSprite = await loadSprite(GameArt.ironShield);
+    KidComponent.shieldCrackedSprite = await loadSprite(
+      GameArt.ironShieldCracked,
+    );
+    _shieldPile = await loadSprite(GameArt.ironShieldDestroyed);
     _bunkerBuster = await loadSprite(GameArt.bunkerBuster);
     for (final path in GameArt.props) {
       _propSprites.add(await loadSprite(path));
@@ -1220,12 +1234,14 @@ class BackyardBarrageGame extends FlameGame {
   KidComponent _makeKid(KidSide side, int slot) {
     final player = side == KidSide.player;
     return KidComponent(
-      side: side,
-      poses: player ? _kit.posesForKid(slot) : _kit.enemyPoses,
-      position: ArenaGrid.slot(side, slot),
-      size: Vector2.all(ArenaGrid.kidSize),
-      maxHp: player ? meta.kidMaxHp(slot) : _tuning().enemyHitsToKo,
-    )..shieldSpot = player ? _crewShield : null;
+        side: side,
+        poses: player ? _kit.posesForKid(slot) : _kit.enemyPoses,
+        position: ArenaGrid.slot(side, slot),
+        size: Vector2.all(ArenaGrid.kidSize),
+        maxHp: player ? meta.kidMaxHp(slot) : _tuning().enemyHitsToKo,
+      )
+      ..shieldSpot = player ? _crewShield : null
+      ..onShieldBroken = _dropShield;
   }
 
   KidComponent _makeRival(RivalType type, int slot) {
@@ -1238,6 +1254,7 @@ class BackyardBarrageGame extends FlameGame {
     );
     final profile = RivalProfile.of(type);
     kid.shieldSpot = _rivalShield;
+    kid.onShieldBroken = _dropShield;
     kid.glint = profile.glint;
     kid.aura = profile.aura;
     final at = profile.glintAt;

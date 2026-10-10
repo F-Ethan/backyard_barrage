@@ -140,6 +140,7 @@ Both rivals charge on `windup` (snowball raised); the `aim_*` frames are a smoot
 | `characters/player/ethan3d/kid_*_512.png` | Kid idle, throw follow-through, hit, KO, two aim-away frames, four-frame run |
 | `characters/player/team_green/`, `team_red/` | Kid 2 (green girl) and Kid 3 (red boy): the same 13 frames as the blue kid, 512², same foot line (2026-10-10) |
 | `props/shield/iron_shield.png` | Iron shield held while Shield hits remain, 256² (2026-10-10) |
+| `props/shield/iron_shield_cracked.png`, `iron_shield_destroyed.png` | Cracked shield (256², swaps in place); broken shield on the ground (512×256) (2026-10-10) |
 | `projectiles/bunker_buster.png` | Fort cracker ball, 256² (2026-10-10) |
 | `vfx/boss/ogre_snowball.png` | The ogre's thrown snowball, 256² (2026-10-10) |
 

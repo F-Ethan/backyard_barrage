@@ -21,6 +21,11 @@ abstract final class GameArt {
   /// Shield perk) still has hits to block.
   static const ironShield = 'props/shield/iron_shield.png';
 
+  /// The shield after it has blocked a hit, and broken on the ground
+  /// after its last.
+  static const ironShieldCracked = 'props/shield/iron_shield_cracked.png';
+  static const ironShieldDestroyed = 'props/shield/iron_shield_destroyed.png';
+
   /// The spiked ball a throw flies as while Fort cracker is armed.
   static const bunkerBuster = 'projectiles/bunker_buster.png';
 
@@ -64,6 +69,8 @@ abstract final class GameArt {
     ],
     iceBubble,
     ironShield,
+    ironShieldCracked,
+    ironShieldDestroyed,
     bunkerBuster,
     ...props,
     // Also drawn as the ball on a throw that carries that power-up.

@@ -98,7 +98,7 @@ void main() {
       for (final type in RivalType.values) ...[
         for (final pose in SeasonAssets.poseNames)
           ?SeasonAssets.rivalPose(type, pose),
-        ...?SeasonAssets.rivalWalkCycle(type),
+        ...SeasonAssets.rivalWalkCycle(type),
       ],
       for (final frame in HoundComponent.frames)
         HoundComponent.framePath(frame),

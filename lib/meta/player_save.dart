@@ -87,8 +87,14 @@ class PlayerSave {
   };
 
   factory PlayerSave.fromJson(Map<String, dynamic> json) {
-    final season = Season.tryParse(json['season'] as String?) ?? Season.winter;
-    final mode = PlayMode.tryParse(json['mode'] as String?) ?? PlayMode.arcade;
+    final rawSeason = json['season'];
+    final rawMode = json['mode'];
+    final season =
+        Season.tryParse(rawSeason is String ? rawSeason : null) ??
+        Season.winter;
+    final mode =
+        PlayMode.tryParse(rawMode is String ? rawMode : null) ??
+        PlayMode.arcade;
 
     final v3 = _asMap(json['wallets']);
     if (v3 != null) {
@@ -100,7 +106,7 @@ class PlayerSave {
             m: {
               for (final d in Difficulty.values)
                 if (_asMap(_asMap(v3[m.name])?[d.name]) case final raw?)
-                  d: MetaState.fromJson(raw),
+                  d: _wallet(raw),
             },
         },
       );
@@ -142,6 +148,16 @@ class PlayerSave {
             ? (legacy..bestWave = bests[d] ?? 0)
             : MetaState(bestWave: bests[d] ?? 0),
     };
+  }
+
+  /// One wallet. A wallet that will not parse starts fresh instead of
+  /// taking every other wallet down with it.
+  static MetaState _wallet(Map<String, dynamic> raw) {
+    try {
+      return MetaState.fromJson(raw);
+    } catch (_) {
+      return MetaState();
+    }
   }
 
   static Map<String, dynamic>? _asMap(Object? raw) {

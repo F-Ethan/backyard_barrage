@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'game_settings.dart';
@@ -29,18 +30,23 @@ class SettingsStore {
       if (decoded is Map) {
         return GameSettings.fromJson(Map<String, dynamic>.from(decoded));
       }
-    } on FormatException {
-      return const GameSettings();
+    } catch (error) {
+      debugPrint('SettingsStore: unreadable settings: $error');
     }
     return const GameSettings();
   }
 
   Future<void> save(GameSettings settings) {
     final raw = jsonEncode(settings.toJson());
-    _queue = _queue.then((_) async {
-      final prefs = await _instance();
-      await prefs.setString(storageKey, raw);
-    });
+    // A failed write is logged and skipped; it never blocks later writes.
+    _queue = _queue
+        .then((_) async {
+          final prefs = await _instance();
+          await prefs.setString(storageKey, raw);
+        })
+        .catchError((Object error) {
+          debugPrint('SettingsStore: write failed: $error');
+        });
     return _queue;
   }
 }

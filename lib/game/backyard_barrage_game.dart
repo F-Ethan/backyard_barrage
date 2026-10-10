@@ -477,7 +477,6 @@ class BackyardBarrageGame extends FlameGame {
     final hits = BossRules.hits(
       feel.settings.difficulty,
       BossRules.appearance(wave),
-      playerHits: meta.bestKidHits,
     );
     final kid = KidComponent(
       side: KidSide.enemy,
@@ -1739,13 +1738,14 @@ class BackyardBarrageGame extends FlameGame {
     return true;
   }
 
-  /// Wave report: one heart back for kid [index] for [MetaState.healCost].
+  /// Wave report: one heart back for kid [index] for [MetaState.healCostFor]
+  /// (it rises with the wave).
   bool healKid(int index) {
     final pending = _pendingCrewHp;
     if (pending == null || index >= pending.length) return false;
     final hp = pending[index];
     if (hp <= 0 || hp >= meta.kidMaxHp(index)) return false;
-    if (!meta.buyHeal()) return false;
+    if (!meta.buyHeal(wave: wave)) return false;
     pending[index] = hp + 1;
     _afterReportPurchase();
     return true;

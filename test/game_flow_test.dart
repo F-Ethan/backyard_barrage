@@ -62,7 +62,20 @@ void main() {
           for (final pose in SeasonAssets.poseNames)
             SeasonAssets.pose(player: player, season: season, pose: pose),
       ],
-      ...?SeasonAssets.walkCycle(player: true, season: Season.winter),
+      for (var kid = 0; kid < SeasonAssets.crewDirs.length; kid++) ...[
+        for (final pose in SeasonAssets.poseNames)
+          SeasonAssets.pose(
+            player: true,
+            season: Season.winter,
+            pose: pose,
+            kid: kid,
+          ),
+        ...?SeasonAssets.walkCycle(
+          player: true,
+          season: Season.winter,
+          kid: kid,
+        ),
+      ],
       for (final type in RivalType.values)
         for (final pose in SeasonAssets.poseNames)
           ?SeasonAssets.rivalPose(type, pose),
@@ -177,7 +190,7 @@ void main() {
     expect(game.fort.shelters(game.players[1]), isFalse);
   });
 
-  testWidgets('a loss shows an ad after the coin beat, a minute apart', (
+  testWidgets('a loss shows an ad only after a won wave and three minutes', (
     tester,
   ) async {
     final ads = _RecordingEndAd();
@@ -186,11 +199,31 @@ void main() {
     game.update(1.25);
     expect(game.fightSeconds, closeTo(before + 1.25, 0.02));
 
+    void lose() {
+      knockOut(game.players);
+      game.resolveKnockouts();
+      game.update(0.7);
+      game.update(1.5);
+    }
+
+    // Losing wave 1 again and again never shows one, however long it takes.
+    game.debugAddPlayTime(600);
+    lose();
+    expect(ads.calls, 0);
+    game.retryFromDefeat();
+    game.finishEntrance();
+
+    // One won wave, then a loss: the ad comes after the coin beat.
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    expect(ads.calls, 0, reason: 'an ordinary clear waits for five');
+    game.continueFromShop();
+    game.finishEntrance();
     knockOut(game.players);
     game.resolveKnockouts();
     expect(game.phase, MatchPhase.defeat);
-    expect(game.coinCarryLabel, isNull);
-    expect(ads.calls, 0);
     game.update(0.7);
     expect(game.coinCarryLabel, isNotNull);
     expect(ads.calls, 0);
@@ -201,31 +234,15 @@ void main() {
     await tester.pump();
     expect(game.playSinceAd, 0);
 
-    // Leaving right after is not another break-time ad.
-    game.exitToMenu();
-    expect(ads.calls, 1);
-    await tester.pump();
-
-    // A quick second loss inside a minute of fighting waits.
+    // Straight back in and down again: no win since, no ad.
     game.retryFromDefeat();
     game.finishEntrance();
-    knockOut(game.players);
-    game.resolveKnockouts();
-    game.update(0.7);
-    game.update(1.5);
+    game.debugAddPlayTime(600);
+    lose();
     expect(ads.calls, 1);
-
-    game.debugAddPlayTime(60);
-    game.retryFromDefeat();
-    game.finishEntrance();
-    knockOut(game.players);
-    game.resolveKnockouts();
-    game.update(0.7);
-    game.update(1.5);
-    expect(ads.calls, 2);
   });
 
-  testWidgets('leaving to the menu shows an ad only after five minutes', (
+  testWidgets('leaving to the menu shows an ad only after five wins', (
     tester,
   ) async {
     final ads = _RecordingEndAd();
@@ -234,18 +251,18 @@ void main() {
     expect(game.phase, MatchPhase.fight);
     expect(ads.calls, 0);
 
+    game.debugAddPlayTime(600);
     game.pauseMatch();
     game.exitToMenu();
     expect(ads.calls, 0);
-
-    game.debugAddPlayTime(300);
-    game.exitToMenu();
-    expect(ads.calls, 1);
   });
 
-  testWidgets('a boss wave clear shows an ad', (tester) async {
+  testWidgets('a boss wave clear shows an ad after three minutes', (
+    tester,
+  ) async {
     final ads = _RecordingEndAd();
     final game = (await boot(tester, MetaState(), endAd: ads)).game;
+    game.debugAddPlayTime(180);
     game.wave = 10;
     game.startWave();
     game.finishEntrance();
@@ -286,11 +303,10 @@ void main() {
     expect(ads.calls, 0);
   });
 
-  testWidgets('a wave clear shows an ad after five minutes of fighting', (
-    tester,
-  ) async {
+  testWidgets('a wave clear shows an ad every five wins', (tester) async {
     final ads = _RecordingEndAd();
     final game = (await boot(tester, MetaState(), endAd: ads)).game;
+    game.debugAddPlayTime(180);
 
     void clearWave() {
       knockOut(game.enemies);
@@ -300,28 +316,34 @@ void main() {
       expect(game.phase, MatchPhase.shop);
     }
 
-    for (var cleared = 0; cleared < 3; cleared++) {
+    for (var cleared = 0; cleared < 4; cleared++) {
       clearWave();
       expect(ads.calls, 0);
       game.continueFromShop();
       game.finishEntrance();
     }
-
-    game.debugAddPlayTime(300);
     clearWave();
     expect(ads.calls, 1);
     await tester.pump();
     game.continueFromShop();
     game.finishEntrance();
+    game.debugAddPlayTime(600);
     clearWave();
-    expect(ads.calls, 1);
+    expect(ads.calls, 1, reason: 'the count starts over');
   });
 
-  testWidgets('a missed interstitial does not start the cooldown', (
+  testWidgets('a missed interstitial does not reset the counts', (
     tester,
   ) async {
     final ads = _RecordingEndAd()..shown = false;
     final game = (await boot(tester, MetaState(), endAd: ads)).game;
+    game.debugAddPlayTime(180);
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    game.continueFromShop();
+    game.finishEntrance();
 
     knockOut(game.players);
     game.resolveKnockouts();
@@ -3098,7 +3120,17 @@ void main() {
       MetaState(coins: 1000, skills: {'team-2'}),
     )).game;
     final thrower = game.players[1];
-    expect(thrower.tagColor, KidColors.of(1));
+    // Kid 2 is the green girl, in her own art.
+    expect(
+      SeasonAssets.pose(
+        player: true,
+        season: Season.winter,
+        pose: 'idle',
+        kid: 1,
+      ),
+      'characters/player/team_green/kid_idle_512.png',
+    );
+    expect(KidColors.of(1), const Color(0xFF2ECC71));
     final rival = game.enemies.first..hp = 1;
     game.debugKidHit(
       LobProjectile(

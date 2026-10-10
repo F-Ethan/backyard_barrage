@@ -163,10 +163,6 @@ class KidComponent extends SpriteComponent {
             ));
   }
 
-  /// A player kid's own color (see `KidColors`), shown as a ring on the
-  /// ground under them. Null for rivals.
-  Color? tagColor;
-
   Color? _aura;
   Paint? _auraPaint;
   double _auraAge = 0;
@@ -626,7 +622,6 @@ class KidComponent extends SpriteComponent {
       canvas.translate(0, -lift / ((scale.y == 0 ? 1 : scale.y) * _drawScale));
     }
     final moved = _applyFeelTransform(canvas);
-    _drawTagRing(canvas);
     _renderPosed(canvas);
     if (moved) canvas.restore();
     if (lifted) canvas.restore();
@@ -639,6 +634,42 @@ class KidComponent extends SpriteComponent {
   /// Frost armor art (an ice bubble). Shared by every kid; set once the
   /// image loads. Null draws the plain ring.
   static Sprite? armorSprite;
+
+  /// The iron shield held while [shieldHits] is above 0. Shared by every
+  /// kid; set once the image loads.
+  static Sprite? shieldSprite;
+
+  /// Where the iron shield sits on this kid's standing art, as fractions
+  /// of the 512² render (centre x, centre y, side), and whether it is
+  /// flipped. Null for art with no mapped hand (the shield badge still
+  /// shows the count).
+  ({double x, double y, double side, bool mirror})? shieldSpot;
+
+  /// Standing frames only: the hand positions are mapped on the idle art.
+  bool get _standing =>
+      identical(sprite, idleSprite) || identical(sprite, pickupSprite);
+
+  /// The iron shield in the kid's front hand, in the render's own space
+  /// (the 512² art is drawn from a 471px square starting 20.5px in).
+  void _drawHeldShield(Canvas canvas) {
+    final art = shieldSprite;
+    final spot = shieldSpot;
+    if (art == null || spot == null || shieldHits <= 0 || !_standing) return;
+    const crop = 471.0;
+    const left = 20.5;
+    final cx = (spot.x * 512 - left) / crop * size.x;
+    final cy = spot.y * 512 / crop * size.y;
+    final side = spot.side * 512 / crop * size.x;
+    canvas.save();
+    canvas.translate(cx, cy);
+    if (spot.mirror) canvas.scale(-1, 1);
+    art.render(
+      canvas,
+      position: Vector2(-side / 2, -side / 2),
+      size: Vector2.all(side),
+    );
+    canvas.restore();
+  }
 
   /// A small blue shield over the head with the hits it still blocks.
   void _drawShieldBadge(Canvas canvas) {
@@ -800,6 +831,7 @@ class KidComponent extends SpriteComponent {
     if (_frozenTimer > 0 && !isKo) {
       sprite?.render(canvas, size: size, overridePaint: _icePaint);
     }
+    if (!isKo) _drawHeldShield(canvas);
     if (isKo) {
       _drawKnockoutMark(canvas);
       canvas.restore();
@@ -820,25 +852,6 @@ class KidComponent extends SpriteComponent {
         ..color = const Color(0xFFFFE66D)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3,
-    );
-  }
-
-  /// The kid's color as a ring at their feet, under the sprite.
-  void _drawTagRing(Canvas canvas) {
-    final color = tagColor;
-    if (color == null || isKo) return;
-    final oval = Rect.fromCenter(
-      center: Offset(size.x / 2, size.y - 8),
-      width: size.x * 0.5,
-      height: 14,
-    );
-    canvas.drawOval(oval, Paint()..color = color.withValues(alpha: 0.35));
-    canvas.drawOval(
-      oval,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5,
     );
   }
 

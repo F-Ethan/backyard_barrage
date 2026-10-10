@@ -34,13 +34,13 @@ class AdConfig {
   static const String androidInterstitialId =
       'ca-app-pub-3940256099942544/1033173712';
 
-  /// Fight time between interstitials when there is no boss or loss to
-  /// show one after. The timer is for the app session. It is not saved.
-  static const Duration interstitialEvery = Duration(minutes: 5);
+  /// Waves won between interstitials when there is no boss or loss to
+  /// show one after. Counts are for the app session. They are not saved.
+  static const int interstitialWaves = 5;
 
-  /// Fight time a boss or loss interstitial waits after the last one, so
-  /// a quick loss right after a boss does not show two in a row.
-  static const Duration interstitialMinGap = Duration(minutes: 1);
+  /// Fight time between any two interstitials, and before the first one
+  /// after the app opens.
+  static const Duration interstitialMinGap = Duration(minutes: 3);
 
   /// Non-consumable Remove Ads product. Its price is set in App Store
   /// Connect; the game shows the store's localized price.

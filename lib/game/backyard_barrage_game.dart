@@ -44,7 +44,6 @@ import 'components/lob_projectile.dart';
 import 'components/overlay_banner.dart';
 import 'components/perk_badges.dart';
 import 'components/splash_particles.dart';
-import 'kid_colors.dart';
 import 'throw_physics.dart';
 import 'wave_reward.dart';
 
@@ -114,6 +113,8 @@ class BackyardBarrageGame extends FlameGame {
   final Map<BossType, KidPoseSprites> _bossPoses = {};
   final Map<BossType, List<Sprite>> _bossSpecials = {};
   Sprite? _magmaBall;
+  Sprite? _ogreBall;
+  Sprite? _bunkerBuster;
   Sprite? _magmaImpact;
   Sprite? _fireWaveSprite;
   Sprite? _shockwaveSprite;
@@ -272,7 +273,9 @@ class BackyardBarrageGame extends FlameGame {
   /// Fight seconds since the last interstitial that actually showed (or
   /// since the app opened).
   double _playSinceAd = 0;
-  bool _anyAdShown = false;
+
+  /// Waves won since the last interstitial that actually showed.
+  int _wavesSinceAd = 0;
   var _adInFlight = false;
 
   @visibleForTesting
@@ -503,6 +506,7 @@ class BackyardBarrageGame extends FlameGame {
       ];
     }
     _magmaBall = await loadSprite(BossArt.magmaBall);
+    _ogreBall = await loadSprite(BossArt.ogreBall);
     _magmaImpact = await loadSprite(BossArt.magmaImpact);
     _fireWaveSprite = await loadSprite(BossArt.fireWave);
     _shockwaveSprite = await loadSprite(BossArt.shockwave);
@@ -583,7 +587,7 @@ class BackyardBarrageGame extends FlameGame {
       target,
       1,
       aimAt: aim,
-      sprite: magma ? _magmaBall : null,
+      sprite: magma ? _magmaBall : _ogreBall,
       radiusScale: 1.6,
       quiet: true,
       magma: magma,
@@ -593,6 +597,9 @@ class BackyardBarrageGame extends FlameGame {
     shot.size.scale(bossBallDrawScale);
     _bossShots.add(shot);
   }
+
+  /// The Fort cracker ball draws this much bigger than a snowball.
+  static const double bunkerBusterDrawScale = 1.5;
 
   /// Boss balls draw this much bigger than their hit size.
   static const double bossBallDrawScale = 1.8;
@@ -674,7 +681,9 @@ class BackyardBarrageGame extends FlameGame {
   /// that power-up's icon.
   Sprite? _armedSprite(bool manual) {
     if (!manual) return null;
-    if (_crackerArmed) return _powerUpSprites[PowerUp.fortCracker];
+    if (_crackerArmed) {
+      return _bunkerBuster ?? _powerUpSprites[PowerUp.fortCracker];
+    }
     if (_splatArmed) return _powerUpSprites[PowerUp.bigSplat];
     if (_powerArmed) return _powerUpSprites[PowerUp.powerThrow];
     return null;
@@ -863,6 +872,8 @@ class BackyardBarrageGame extends FlameGame {
     _fortCollapsed = await loadSprite(GameArt.fortCollapsed());
     _rivalFortCollapsed = await loadSprite(GameArt.fortCollapsed(rival: true));
     KidComponent.armorSprite = await loadSprite(GameArt.iceBubble);
+    KidComponent.shieldSprite = await loadSprite(GameArt.ironShield);
+    _bunkerBuster = await loadSprite(GameArt.bunkerBuster);
     for (final path in GameArt.props) {
       _propSprites.add(await loadSprite(path));
     }
@@ -981,8 +992,8 @@ class BackyardBarrageGame extends FlameGame {
   void _applyKit(SeasonKit kit) {
     _kit = kit;
     _bg.sprite = _backdrop(kit);
-    for (final kid in players) {
-      kid.applyPoses(kit.playerPoses);
+    for (var i = 0; i < players.length; i++) {
+      players[i].applyPoses(kit.posesForKid(i));
     }
     for (final kid in enemies) {
       if (kid.isBoss) continue;
@@ -1029,8 +1040,7 @@ class BackyardBarrageGame extends FlameGame {
       players.removeLast().removeFromParent();
     }
     while (players.length < meta.crewSize) {
-      final kid = _makeKid(KidSide.player, players.length)
-        ..tagColor = KidColors.of(players.length);
+      final kid = _makeKid(KidSide.player, players.length);
       players.add(kid);
       world.add(kid);
     }
@@ -1200,15 +1210,22 @@ class BackyardBarrageGame extends FlameGame {
     hudRevision.value++;
   }
 
+  /// Iron shield placement on the idle art (from the artist's
+  /// `shield_offsets.json`): the crew holds it in the front hand; rivals
+  /// face left, so theirs is flipped. Measured on the frost kid and used
+  /// for every rival.
+  static const _crewShield = (x: 0.60, y: 0.585, side: 0.318, mirror: false);
+  static const _rivalShield = (x: 0.40, y: 0.62, side: 0.325, mirror: true);
+
   KidComponent _makeKid(KidSide side, int slot) {
     final player = side == KidSide.player;
     return KidComponent(
       side: side,
-      poses: player ? _kit.playerPoses : _kit.enemyPoses,
+      poses: player ? _kit.posesForKid(slot) : _kit.enemyPoses,
       position: ArenaGrid.slot(side, slot),
       size: Vector2.all(ArenaGrid.kidSize),
       maxHp: player ? meta.kidMaxHp(slot) : _tuning().enemyHitsToKo,
-    );
+    )..shieldSpot = player ? _crewShield : null;
   }
 
   KidComponent _makeRival(RivalType type, int slot) {
@@ -1220,6 +1237,7 @@ class BackyardBarrageGame extends FlameGame {
       maxHp: RivalProfile.of(type).hitsToKo(_tuning().enemyHitsToKo),
     );
     final profile = RivalProfile.of(type);
+    kid.shieldSpot = _rivalShield;
     kid.glint = profile.glint;
     kid.aura = profile.aura;
     final at = profile.glintAt;
@@ -1439,7 +1457,13 @@ class BackyardBarrageGame extends FlameGame {
       if (held.perk == EnemyPerk.fortCracker) {
         held.uses = 0;
         shot.cracker = true;
-        shot.sprite = _powerUpSprites[PowerUp.fortCracker];
+        final buster = _bunkerBuster;
+        if (buster != null) {
+          shot.sprite = buster;
+          shot.size.scale(bunkerBusterDrawScale);
+        } else {
+          shot.sprite = _powerUpSprites[PowerUp.fortCracker];
+        }
         return;
       }
     }
@@ -2071,6 +2095,7 @@ class BackyardBarrageGame extends FlameGame {
         _pendingBanner = _Banner.none;
         _clearBanner();
         phase = MatchPhase.shop;
+        _wavesSinceAd += 1;
         _offerEndAd(isBossWave ? AdMoment.bossBeaten : AdMoment.breakTime);
         // The wave report first; it hands off to the shop.
         overlays.add('report');
@@ -2226,9 +2251,9 @@ class BackyardBarrageGame extends FlameGame {
 
   /// One interstitial outside the fight (see [AdPolicy]): after a boss
   /// wave clear, after a loss (once its coin beat is over), and otherwise
-  /// at a wave clear or a Pause → menu once five minutes of fighting have
-  /// passed since the last one. Remove Ads skips it. A missed show does
-  /// not reset the timer.
+  /// at a wave clear or a Pause → menu once five waves have been won, all
+  /// only after a won wave and three minutes of fighting since the last
+  /// one. Remove Ads skips it. A missed show does not reset the counts.
   void _offerEndAd(AdMoment moment) {
     if (_adInFlight) return;
     if (adsRemoved?.call() ?? false) return;
@@ -2236,7 +2261,7 @@ class BackyardBarrageGame extends FlameGame {
       inFight: phase == MatchPhase.fight,
       moment: moment,
       playSinceAd: Duration(milliseconds: (_playSinceAd * 1000).round()),
-      anyShown: _anyAdShown,
+      wavesSinceAd: _wavesSinceAd,
     )) {
       return;
     }
@@ -2251,7 +2276,7 @@ class BackyardBarrageGame extends FlameGame {
     } finally {
       _adInFlight = false;
       if (shown) {
-        _anyAdShown = true;
+        _wavesSinceAd = 0;
         _playSinceAd = 0;
       }
     }
@@ -2591,6 +2616,10 @@ class BackyardBarrageGame extends FlameGame {
     if (manualThrow && fromPlayer) {
       shot.cracker = _crackerArmed;
       shot.splat = _splatArmed;
+      // The spiked bunker buster is half again as big as a snowball.
+      if (_crackerArmed && _bunkerBuster != null) {
+        shot.size.scale(bunkerBusterDrawScale);
+      }
       _crackerArmed = false;
       _splatArmed = false;
       _powerArmed = false;

@@ -300,11 +300,18 @@ class KidCard extends StatelessWidget {
     required this.hpNext,
     required this.shieldNext,
     required this.maxHp,
+    this.attack = 0,
+    this.defense = 0,
     this.action,
   });
 
   final int kid;
   final int knockouts;
+
+  /// Their own upgrade ranks: attack (throw, hit, aim) and defense
+  /// (hearts, shield, shake it off).
+  final int attack;
+  final int defense;
   final int hpNow;
   final int shieldNow;
   final int hpNext;
@@ -329,13 +336,13 @@ class KidCard extends StatelessWidget {
           KidPortrait(kid: kid, down: hpNow <= 0),
           SizedBox(width: tokens.space.md),
           SizedBox(
-            width: 84,
+            width: 104,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Kid ${kid + 1}',
+                  KidColors.nameOf(kid),
                   style: BarrageType.heading.copyWith(
                     color: KidColors.deepOf(kid),
                   ),
@@ -344,6 +351,25 @@ class KidCard extends StatelessWidget {
                   '$knockouts KO${knockouts == 1 ? '' : 's'}',
                   key: Key('report-kos-$kid'),
                   style: BarrageType.muted,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  key: Key('report-upgrades-$kid'),
+                  children: [
+                    _UpgradeChip(
+                      icon: Icons.flash_on_rounded,
+                      count: attack,
+                      color: const Color(0xFFE67E22),
+                      label: 'Attack upgrades',
+                    ),
+                    const SizedBox(width: 4),
+                    _UpgradeChip(
+                      icon: Icons.shield_rounded,
+                      count: defense,
+                      color: tokens.primary,
+                      label: 'Defense upgrades',
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -374,6 +400,53 @@ class KidCard extends StatelessWidget {
           ),
           ?action,
         ],
+      ),
+    );
+  }
+}
+
+/// A tiny icon and count: how many attack or defense upgrades a kid has.
+class _UpgradeChip extends StatelessWidget {
+  const _UpgradeChip({
+    required this.icon,
+    required this.count,
+    required this.color,
+    required this.label,
+  });
+
+  final IconData icon;
+  final int count;
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '$label: $count',
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(4, 1, 7, 1),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: count > 0 ? 0.16 : 0.06),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: count > 0 ? color : color.withValues(alpha: 0.4),
+            ),
+            const SizedBox(width: 2),
+            Text(
+              '$count',
+              style: BarrageType.heading.copyWith(
+                fontSize: 13,
+                color: count > 0 ? BarrageColors.ink : BarrageColors.inkMuted,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -57,6 +57,8 @@ class _WaveReportState extends State<WaveReport> {
             hpNext: next[i],
             shieldNext: meta.kidShield(i),
             maxHp: meta.kidMaxHp(i),
+            attack: meta.kidUpgrades(i).attack,
+            defense: meta.kidUpgrades(i).defense,
             action: _action(i, next[i], meta, healCost),
           ),
         const ReportSection('Your power-ups'),

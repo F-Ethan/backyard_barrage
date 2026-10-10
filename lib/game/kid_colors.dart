@@ -17,6 +17,12 @@ abstract final class KidColors {
     Color(0xFFB03A2E),
   ];
 
+  /// Their names, in the same order: the blue boy, the green girl, the
+  /// red boy.
+  static const List<String> names = ['Mike', 'Beth', 'Ruben'];
+
+  static String nameOf(int kid) => names[kid % names.length];
+
   static Color of(int kid) => bright[kid % bright.length];
 
   static Color deepOf(int kid) => deep[kid % deep.length];

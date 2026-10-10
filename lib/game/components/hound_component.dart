@@ -46,7 +46,8 @@ enum HoundState { warn, approach, jump, hunt, pounce, bite, leave, flee, gone }
 /// the player can step out of the way. On the player's side, a kid inside
 /// its catch box (wider on harder difficulties) is caught: it pounces and
 /// bites, and that kid is knocked out in one go on every difficulty. A
-/// snowball hit before it reaches anyone scares it back off the yard.
+/// snowball hit before it lands (the leap over the river included) scares
+/// it back off the yard.
 /// Kid-safe: the bite is a cartoon frost snap; the kid is frozen out of the
 /// round like any other knockout.
 class HoundComponent extends SpriteComponent {
@@ -249,10 +250,16 @@ class HoundComponent extends SpriteComponent {
   Vector2 get hitCenter => position + Vector2(0, -size.y * 0.3 - _lift);
   static const double hitRadius = 55;
 
-  /// True while a snowball can still turn it around: before it reaches the
-  /// player's side.
+  /// Where a snowball's ground track has to pass to hit it: under its
+  /// body, even mid-leap (the lob's shadow lines up with the hound's).
+  Vector2 get groundHitCenter => position + Vector2(0, -size.y * 0.3);
+
+  /// True while a snowball can still turn it around: until it has landed
+  /// on the player's side, so the leap over the river counts.
   bool get scareable =>
-      _state == HoundState.warn || _state == HoundState.approach;
+      _state == HoundState.warn ||
+      _state == HoundState.approach ||
+      _state == HoundState.jump;
 
   /// A snowball hit: turn tail and run back off the yard.
   void scare() {

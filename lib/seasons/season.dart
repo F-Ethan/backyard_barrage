@@ -167,7 +167,8 @@ class SeasonAssets {
           'turn_15l' ||
           'turn_15r' ||
           'turn_30r' => 'windup',
-          'walk' || 'pickup' => 'idle',
+          'walk' => 'walk_00',
+          'pickup' => 'idle',
           _ => pose,
         },
       ),
@@ -183,15 +184,13 @@ class SeasonAssets {
     RivalType.frostKid => 1.18,
   };
 
-  /// Frames a rival loops while it walks on or steps, or null to slide on
-  /// its idle. The frost kid waits on livelier walk art.
-  static List<String>? rivalWalkCycle(RivalType type) {
+  /// Frames a rival loops while it walks on or steps.
+  static List<String> rivalWalkCycle(RivalType type) {
     final folder = switch (type) {
       RivalType.snowGhost => 'ghost',
       RivalType.rusher => 'rusher',
-      RivalType.frostKid => null,
+      RivalType.frostKid => 'frostkid',
     };
-    if (folder == null) return null;
     return [
       for (final i in ['00', '01', '02', '03'])
         '$rivalDir$folder/${folder}_walk_${i}_draft.png',

@@ -101,7 +101,6 @@ Future<SeasonKit> loadSeasonKit(FlameGame game, Season season) async {
 
 Future<List<Sprite>?> _rivalWalk(FlameGame game, RivalType type) async {
   final frames = SeasonAssets.rivalWalkCycle(type);
-  if (frames == null) return null;
   return Future.wait([for (final path in frames) _loadPose(game, path)]);
 }
 

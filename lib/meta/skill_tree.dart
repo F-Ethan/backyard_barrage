@@ -6,6 +6,7 @@ enum SkillBranch {
   team('Team'),
   recovery('Recovery'),
   fort('Fort'),
+  moreForts('More forts'),
   throwSpeed('Throw'),
   poise('Poise'),
   pressure('Pressure'),
@@ -49,6 +50,7 @@ enum SkillGroup {
     ],
     SkillGroup.defense => const [
       SkillBranch.fort,
+      SkillBranch.moreForts,
       SkillBranch.shield,
       SkillBranch.lanes,
     ],
@@ -98,6 +100,7 @@ class SkillNode {
     },
     SkillBranch.team ||
     SkillBranch.fort ||
+    SkillBranch.moreForts ||
     SkillBranch.throwSpeed ||
     SkillBranch.poise ||
     SkillBranch.pressure ||
@@ -229,6 +232,23 @@ class SkillTree {
       detail: 'Add ice blocks. Your fort takes 4 more hits.',
       cost: 235,
       parentId: 'fort-hp-1',
+    ),
+    // Extra forts: each stands on a random spot in your half every wave,
+    // at your fort's stage.
+    SkillNode(
+      id: 'fort-extra-1',
+      branch: SkillBranch.moreForts,
+      title: 'Second fort',
+      detail: 'Build another snow fort somewhere in your yard.',
+      cost: 60,
+    ),
+    SkillNode(
+      id: 'fort-extra-2',
+      branch: SkillBranch.moreForts,
+      title: 'Third fort',
+      detail: 'One more fort. Three places to hide.',
+      cost: 150,
+      parentId: 'fort-extra-1',
     ),
     SkillNode(
       id: 'throw-1',
@@ -551,7 +571,10 @@ class SkillTree {
     int hand,
   ) {
     return switch (branch) {
-      SkillBranch.team || SkillBranch.recovery || SkillBranch.lanes => null,
+      SkillBranch.team ||
+      SkillBranch.recovery ||
+      SkillBranch.lanes ||
+      SkillBranch.moreForts => null,
       SkillBranch.throwSpeed => (r) => (
         'throw-$r',
         'Quicker throw ${roman(r)}',

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:backyard_barrage/meta/difficulty.dart';
 import 'package:backyard_barrage/meta/meta_state.dart';
@@ -163,6 +164,8 @@ void main() {
           'fort-3:40',
           'fort-hp-1:95',
           'fort-hp-2:235',
+          'fort-extra-1:60',
+          'fort-extra-2:150',
           'throw-1:10',
           'throw-2:25',
           'throw-3:65',
@@ -331,7 +334,7 @@ void main() {
     test('the hand-made tree fits one long run; the rest keeps going', () {
       int sum(Iterable<SkillNode> nodes) =>
           nodes.fold<int>(0, (total, node) => total + node.cost);
-      expect(sum(SkillTree.handNodes), 3437);
+      expect(sum(SkillTree.handNodes), 3647);
       var waves = 0;
       for (var wave = 1; wave <= 20; wave++) {
         waves += MetaState.coinsForWave(wave);
@@ -766,7 +769,7 @@ void main() {
       expect(MetaState(coins: 1).buyItem(PowerUp.powerThrow), isFalse);
     });
 
-    test('items survive a save, the wallet split, and a defeat', () {
+    test('items survive a save and the wallet split; Campaign loss clears', () {
       final meta = MetaState(coins: 100)..buyItem(PowerUp.bigSplat);
       final back = MetaState.fromJson(meta.toJson());
       expect(back.itemCount(PowerUp.bigSplat), 1);
@@ -778,7 +781,11 @@ void main() {
         1,
       );
       meta.resetRun();
-      expect(meta.itemCount(PowerUp.bigSplat), 1);
+      expect(
+        meta.itemCount(PowerUp.bigSplat),
+        0,
+        reason: 'Campaign wipes items with the skills',
+      );
     });
   });
 
@@ -980,5 +987,30 @@ void main() {
       120,
       reason: 'older saves start their best at the current score',
     );
+  });
+
+  test('Campaign loss clears items and the Revive price', () {
+    final meta = MetaState(coins: 500)
+      ..buyItem(PowerUp.revive)
+      ..buyItem(PowerUp.hotCocoa);
+    expect(meta.itemCost(PowerUp.revive), 150);
+    meta.resetRun();
+    expect(meta.items, isEmpty);
+    expect(meta.itemCost(PowerUp.revive), 100);
+  });
+
+  test('a free random item never overfills and skips full ones', () {
+    final meta = MetaState(
+      items: {
+        for (final item in PowerUp.values)
+          if (item != PowerUp.hotCocoa) item: PowerUp.maxStack,
+      },
+    );
+    final rng = math.Random(1);
+    expect(meta.grantRandomItem(rng), PowerUp.hotCocoa);
+    expect(meta.ledger.reviveBought, 0);
+    meta.grantRandomItem(rng);
+    meta.grantRandomItem(rng);
+    expect(meta.grantRandomItem(rng), isNull);
   });
 }

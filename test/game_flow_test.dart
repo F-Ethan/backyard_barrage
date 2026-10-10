@@ -1603,6 +1603,136 @@ void main() {
     );
   });
 
+  testWidgets('a frost kid looks again mid-windup, so an early dodge fails', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    final kid = game.players.first;
+    final rival = game.enemies.first;
+    for (final brain in rival.children.whereType<EnemyController>().toList()) {
+      brain.removeFromParent();
+    }
+    final profile = RivalProfile.of(RivalType.frostKid);
+    final sniper = EnemyController(
+      host: rival,
+      players: game.players,
+      rivals: game.enemies,
+      wave: 1,
+      rng: math.Random(3),
+      onFire: (_, _, _, {aimAt}) {},
+      isFighting: () => true,
+      tuning: () => DifficultyTuning.of(Difficulty.normal),
+      initialDelay: 1,
+      profile: profile,
+    );
+    for (var i = 0; i < 900 && sniper.lockedAim == null; i++) {
+      sniper.update(1 / 60);
+    }
+    final first = sniper.lockedAim!.clone();
+    // Step three rows away right after the windup starts.
+    final dodge = ArenaGrid.rowStep * 3;
+    kid.position =
+        kid.position + Vector2(0, kid.position.y < 560 ? dodge : -dodge);
+    kid.syncDepth();
+    final hold = sniper.windupSeconds;
+    for (var t = 0.0; t < hold * 0.7; t += 1 / 60) {
+      sniper.update(1 / 60);
+    }
+    final second = sniper.lockedAim!;
+    final spread =
+        DifficultyTuning.of(Difficulty.normal).aimDepthRows *
+        profile.jitterScale *
+        ArenaGrid.rowStep;
+    expect((second.y - first.y).abs(), greaterThan(ArenaGrid.rowStep));
+    expect((second.y - kid.hitCenter.y).abs(), lessThanOrEqualTo(spread + 1));
+  });
+
+  testWidgets('scaring a hound or beating a boss pays random power-ups', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    final one = game.rewardRandomItems(1, at: Vector2(400, 400));
+    expect(one, hasLength(1));
+    expect(game.meta.itemCount(one.single), 1);
+    final three = game.rewardRandomItems(3, at: Vector2(400, 400));
+    expect(three, hasLength(3));
+    // A full wallet pays coins instead.
+    game.meta.replaceItems({
+      for (final item in PowerUp.values) item: PowerUp.maxStack,
+    });
+    final coins = game.meta.coins;
+    expect(game.rewardRandomItems(1, at: Vector2(400, 400)), isEmpty);
+    expect(game.meta.coins, greaterThan(coins));
+  });
+
+  testWidgets('bought extra forts stand apart and stop rival snowballs', (
+    tester,
+  ) async {
+    final game = (await boot(
+      tester,
+      MetaState(skills: {'fort-extra-1', 'fort-extra-2'}),
+    )).game;
+    for (var wave = 1; wave <= 12; wave++) {
+      game.wave = wave;
+      game.startWave();
+      expect(game.extraForts, hasLength(2));
+      final forts = [game.fort, ...game.extraForts];
+      for (var i = 0; i < forts.length; i++) {
+        for (var j = i + 1; j < forts.length; j++) {
+          final a = forts[i];
+          final b = forts[j];
+          expect(
+            (a.coverColumn - b.coverColumn).abs() >= 2 ||
+                (a.coverRow - b.coverRow).abs() >= 2,
+            isTrue,
+            reason: 'wave $wave: forts $i and $j overlap',
+          );
+        }
+      }
+    }
+    final extra = game.extraForts.first;
+    expect(
+      _shotStopped(
+        cover: extra,
+        owner: game.enemies.first,
+        velocity: Vector2(-500, 0),
+        throwerColumn: 3,
+      ),
+      isTrue,
+    );
+  });
+
+  testWidgets('a rival lob a little off a kid behind the fort still hits the '
+      'fort', (tester) async {
+    final game = (await boot(tester, MetaState())).game;
+    final rival = game.enemies.first;
+    // Past the old 0.46-row box, inside a kid's hit reach. The test ball
+    // also drops a little under gravity on the way in.
+    final offset = ArenaGrid.rowStep * 0.55;
+    expect(
+      _shotStopped(
+        cover: game.fort,
+        owner: rival,
+        velocity: Vector2(-500, 0),
+        throwerColumn: 3,
+        yOffset: offset,
+      ),
+      isTrue,
+      reason: 'inside the kid hit reach behind the wall',
+    );
+    expect(
+      _shotStopped(
+        cover: game.fort,
+        owner: rival,
+        velocity: Vector2(-500, 0),
+        throwerColumn: 3,
+        yOffset: ArenaGrid.rowStep * 1.1,
+      ),
+      isFalse,
+      reason: 'a row over is open',
+    );
+  });
+
   testWidgets('below the pan start the kid throws straight ahead', (
     tester,
   ) async {
@@ -2228,8 +2358,10 @@ void main() {
     game.startWave();
     game.finishEntrance();
     final howl = game.howlDueAt!;
+    final howls = game.howlTimes.length;
+    expect(howls, game.houndTimes.length, reason: 'one howl per hound');
     game.update(howl + 0.01);
-    expect(game.howlDueAt, isNull, reason: 'it played');
+    expect(game.howlTimes.length, lessThan(howls), reason: 'it played');
     await tester.pump();
     expect(booted.playback.sfx, contains('sfx/hound_howl.wav'));
     expect(game.hounds, isEmpty, reason: 'the hound is still to come');
@@ -2725,9 +2857,10 @@ bool _shotStopped({
   required KidComponent owner,
   required Vector2 velocity,
   required int throwerColumn,
+  double yOffset = 0,
 }) {
   final box = cover.footprint;
-  final y = (box.top + box.bottom) / 2;
+  final y = (box.top + box.bottom) / 2 + yOffset;
   final startX = velocity.x < 0 ? box.right + 8 : box.left - 8;
   var stopped = false;
   LobProjectile(

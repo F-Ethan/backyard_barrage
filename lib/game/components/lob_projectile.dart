@@ -510,12 +510,14 @@ class LobProjectile extends SpriteComponent {
       return false;
     }
     if (_clearedForts.contains(cover)) return false;
-    if (!_centerInFootprint(cover)) return false;
-
     final ownerSide = owner?.side;
     final sameSide = ownerSide != null && ownerSide == cover.side;
-    final behind =
-        sameSide && ArenaGrid.columnIsBehindFort(ownerSide, throwerColumn);
+    // The other side's shots meet the taller shield box.
+    if (!_centerIn(sameSide ? cover.footprint : cover.shieldFootprint)) {
+      return false;
+    }
+
+    final behind = sameSide && cover.isBehind(throwerColumn);
     if (sameSide && !behind) return false;
 
     // Easy and Normal: a shot that peaks past your own fort has already
@@ -563,8 +565,7 @@ class LobProjectile extends SpriteComponent {
     removeFromParent();
   }
 
-  bool _centerInFootprint(FortComponent cover) {
-    final box = cover.footprint;
+  bool _centerIn(Rect box) {
     return _hit.x >= box.left &&
         _hit.x <= box.right &&
         _hit.y >= box.top &&

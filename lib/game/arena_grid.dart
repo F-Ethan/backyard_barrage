@@ -274,10 +274,16 @@ class ArenaGrid {
   }
 
   /// Bottom-center of the fort art, sitting on the two cover cells.
-  static Vector2 fortAnchor([KidSide side = KidSide.player, int? row]) {
+  /// [column] is the first of the pair (default [coverColumnA]); extra
+  /// forts sit on other pairs.
+  static Vector2 fortAnchor([
+    KidSide side = KidSide.player,
+    int? row,
+    int column = coverColumnA,
+  ]) {
     final coverRow = row ?? ArenaGrid.coverRow;
-    final left = cellCenter(side, coverColumnA, coverRow);
-    final right = cellCenter(side, coverColumnB, coverRow);
+    final left = cellCenter(side, column, coverRow);
+    final right = cellCenter(side, column + 1, coverRow);
     return Vector2((left.x + right.x) / 2, left.y);
   }
 
@@ -287,14 +293,19 @@ class ArenaGrid {
   /// and only about one row tall. The back column and the front column stay
   /// open, and the rows above and below the fort stay open, so a lob can
   /// pass. Horizontal edges do not move when the row changes.
-  static Rect fortFootprint(KidSide side, [int? row]) {
+  static Rect fortFootprint(
+    KidSide side, [
+    int? row,
+    int column = coverColumnA,
+    double halfRows = 0.46,
+  ]) {
     final coverRow = row ?? ArenaGrid.coverRow;
-    final a = cellCenter(side, coverColumnA, coverRow);
-    final b = cellCenter(side, coverColumnB, coverRow);
+    final a = cellCenter(side, column, coverRow);
+    final b = cellCenter(side, column + 1, coverRow);
     final centerX = (a.x + b.x) / 2;
     final halfWidth = columnStep * 0.55;
     final mid = laneY(coverRow);
-    final halfHeight = rowStep * 0.46;
+    final halfHeight = rowStep * halfRows;
     return Rect.fromLTRB(
       centerX - halfWidth,
       mid - halfHeight,

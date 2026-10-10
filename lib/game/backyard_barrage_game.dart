@@ -97,6 +97,12 @@ class BackyardBarrageGame extends FlameGame {
 
   late FortComponent fort;
   late FortComponent enemyFort;
+
+  /// Bought extra forts (More forts), placed at random each wave.
+  final List<FortComponent> extraForts = [];
+
+  /// Every fort a snowball can meet.
+  List<FortComponent> get _allForts => [fort, ...extraForts, enemyFort];
   late ChargeIndicator chargeHud;
   late SeasonKit _kit;
   late SpriteComponent _bg;
@@ -576,15 +582,30 @@ class BackyardBarrageGame extends FlameGame {
     _reserve.addAll(lineup.skip(starting));
     _walkOnTimer = WavePlan.walkOnGap;
 
-    fort.applyStage(
-      nextStage: meta.fortStage,
-      intactSprite: _fortIntact[meta.fortStage]!,
-      damagedSprite: _fortDamaged[meta.fortStage]!,
-      collapsedSprite: _fortCollapsed!,
-    );
-    if (meta.fortBonusHp > 0) {
-      fort.maxHp += meta.fortBonusHp;
-      fort.hp = fort.maxHp;
+    while (extraForts.length > meta.extraForts) {
+      extraForts.removeLast().removeFromParent();
+    }
+    while (extraForts.length < meta.extraForts) {
+      final extra = FortComponent(
+        side: KidSide.player,
+        sprite: _fortIntact[meta.fortStage]!,
+        position: ArenaGrid.fortAnchor(),
+        size: ArenaGrid.fortDrawSize,
+      );
+      extraForts.add(extra);
+      world.add(extra);
+    }
+    for (final cover in [fort, ...extraForts]) {
+      cover.applyStage(
+        nextStage: meta.fortStage,
+        intactSprite: _fortIntact[meta.fortStage]!,
+        damagedSprite: _fortDamaged[meta.fortStage]!,
+        collapsedSprite: _fortCollapsed!,
+      );
+      if (meta.fortBonusHp > 0) {
+        cover.maxHp += meta.fortBonusHp;
+        cover.hp = cover.maxHp;
+      }
     }
     enemyFort.applyStage(
       nextStage: 1,
@@ -594,9 +615,57 @@ class BackyardBarrageGame extends FlameGame {
     );
     fort.placeOnRow(ArenaGrid.rollFortRow(_rng));
     enemyFort.placeOnRow(ArenaGrid.rollFortRow(_rng));
+    _placeExtraForts();
     _showWaveIntro();
     _publishHud();
     unawaited(feel.enterBattle(meta.season));
+  }
+
+  /// Drops each extra fort on a random spot in the player's half that does
+  /// not overlap another fort: a different column pair, or at least two
+  /// rows apart. A bad first pick can leave no room for the next, so the
+  /// whole layout is retried; a fort that still finds no room sits the
+  /// wave out (hidden, no cover).
+  void _placeExtraForts() {
+    List<(int, int)>? best;
+    for (var attempt = 0; attempt < 40; attempt++) {
+      final taken = <(int, int)>[(fort.coverColumn, fort.coverRow)];
+      final layout = <(int, int)>[];
+      for (var i = 0; i < extraForts.length; i++) {
+        final spots = <(int, int)>[
+          for (var row = 1; row < ArenaGrid.rows - 1; row++)
+            for (
+              var column = 0;
+              column < ArenaGrid.columnsPerSide - 1;
+              column++
+            )
+              if (taken.every(
+                (other) =>
+                    (other.$1 - column).abs() >= 2 ||
+                    (other.$2 - row).abs() >= 2,
+              ))
+                (column, row),
+        ];
+        if (spots.isEmpty) break;
+        final pick = spots[_rng.nextInt(spots.length)];
+        taken.add(pick);
+        layout.add(pick);
+      }
+      if (best == null || layout.length > best.length) best = layout;
+      if (layout.length == extraForts.length) break;
+    }
+    for (var i = 0; i < extraForts.length; i++) {
+      final extra = extraForts[i];
+      if (i < best!.length) {
+        extra
+          ..opacity = 1
+          ..placeAt(row: best[i].$2, column: best[i].$1);
+      } else {
+        extra
+          ..opacity = 0
+          ..hp = 0;
+      }
+    }
   }
 
   void _publishHud() {
@@ -792,11 +861,18 @@ class BackyardBarrageGame extends FlameGame {
   /// Seconds into the fight when each hound still to come is released.
   final List<double> _houndTimes = [];
 
-  /// Seconds into the fight when the warning howl plays, or null.
-  double? _howlAt;
+  /// Seconds into the fight when each warning howl plays: one per hound,
+  /// sorted.
+  final List<double> _howlTimes = [];
 
-  /// When this wave's warning howl plays, or null (no hound, or it played).
-  double? get howlDueAt => _howlAt;
+  /// When this wave's next warning howl plays, or null (none left).
+  double? get howlDueAt => _howlTimes.isEmpty ? null : _howlTimes.first;
+
+  /// Every hound and howl time still to come, for tests.
+  @visibleForTesting
+  List<double> get houndTimes => List.unmodifiable(_houndTimes);
+  @visibleForTesting
+  List<double> get howlTimes => List.unmodifiable(_howlTimes);
   double _waveFight = 0;
 
   /// The most recent hound on the yard, if any.
@@ -814,28 +890,36 @@ class BackyardBarrageGame extends FlameGame {
   void _rollHound() {
     _clearHound();
     _waveFight = 0;
-    final count = HoundComponent.countFor(wave, feel.settings.difficulty, _rng);
-    var at = 4 + _rng.nextDouble() * 5;
-    for (var i = 0; i < count; i++) {
-      _houndTimes.add(at);
-      at += 3 + _rng.nextDouble() * 3;
+    _houndTimes.addAll(
+      HoundComponent.scheduleFor(
+        wave: wave,
+        difficulty: feel.settings.difficulty,
+        averageSeconds: HoundComponent.averageWaveSeconds(
+          CombatRules.enemyCountForWave(wave),
+        ),
+        rng: _rng,
+      ),
+    );
+    // Each hound is warned by a howl 2 to 6 seconds before it comes (never
+    // before half a second into the fight).
+    for (final at in _houndTimes) {
+      final lead = howlLead + _rng.nextDouble() * howlSpread;
+      _howlTimes.add(math.max(howlEarliest, at - lead));
     }
-    // A howl warns that a hound is coming: at a random moment from the
-    // start of the fight to two seconds before the first one.
-    if (count > 0) {
-      final latest = _houndTimes.first - howlLead;
-      _howlAt = howlEarliest + _rng.nextDouble() * (latest - howlEarliest);
-    }
+    _howlTimes.sort();
   }
 
   /// Earliest the howl plays, in seconds into the fight.
   static const double howlEarliest = 0.5;
 
-  /// The howl always comes at least this long before the first hound.
+  /// A howl always comes at least this long before its hound...
   static const double howlLead = 2;
 
+  /// ...and up to this much more.
+  static const double howlSpread = 4;
+
   void _clearHound() {
-    _howlAt = null;
+    _howlTimes.clear();
     for (final hound in _hounds) {
       hound.removeFromParent();
     }
@@ -875,9 +959,9 @@ class BackyardBarrageGame extends FlameGame {
   void _tickHound(double dt) {
     if (phase != MatchPhase.fight) return;
     _waveFight += dt;
-    final howl = _howlAt;
-    if (howl != null && !_settling && _waveFight >= howl) {
-      _howlAt = null;
+    if (!_settling && _howlTimes.isNotEmpty && _waveFight >= _howlTimes.first) {
+      // Howls due on the same frame play once.
+      _howlTimes.removeWhere((at) => at <= _waveFight);
       feel.houndHowl();
     }
     _hounds.removeWhere((hound) => hound.state == HoundState.gone);
@@ -914,9 +998,38 @@ class BackyardBarrageGame extends FlameGame {
         _burst(shot.position, power: 0.8);
         shot.absorb();
         hound.scare();
+        rewardRandomItems(1, at: hound.hitCenter);
         break;
       }
     }
+  }
+
+  /// Free power-ups: one for scaring off a hound, three for a boss. Each is
+  /// a random item the wallet has room for; with every slot full it pays
+  /// that item's price in coins instead.
+  @visibleForTesting
+  List<PowerUp> rewardRandomItems(int count, {required Vector2 at}) {
+    final given = <PowerUp>[];
+    for (var i = 0; i < count; i++) {
+      final item = meta.grantRandomItem(_rng);
+      if (item != null) {
+        given.add(item);
+      } else {
+        meta.earn(
+          meta.itemCost(PowerUp.values[_rng.nextInt(PowerUp.values.length)]),
+        );
+      }
+    }
+    final label = given.isEmpty
+        ? 'Coins!'
+        : given.length == 1
+        ? '+1 ${given.single.label}'
+        : '+${given.length} power-ups';
+    world.add(CoinPop(amount: 0, label: label, position: at - Vector2(0, 80)));
+    feel.purchased();
+    hudRevision.value++;
+    unawaited(persist());
+    return given;
   }
 
   /// The hound's bite: a one-hit knockout on every difficulty. Frost armor
@@ -1639,7 +1752,7 @@ class BackyardBarrageGame extends FlameGame {
       targets: targets,
       owner: owner,
       blockedByFort: true,
-      forts: [fort, enemyFort],
+      forts: _allForts,
       friendlyFortDamage: _tuning().friendlyFortDamage,
       passOwnFort: fromPlayer && meta.passesOwnFort,
       manualThrow: manualThrow,

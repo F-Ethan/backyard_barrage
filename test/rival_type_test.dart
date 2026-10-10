@@ -50,8 +50,13 @@ void main() {
       expect(p.jitterScale, lessThan(1));
       expect(p.windupScale, greaterThan(1));
       expect(p.glint, isTrue);
-      expect(p.hitsToKo(1), 1, reason: 'never below one hit');
-      expect(p.hitsToKo(3), 2);
+      expect(p.hitsToKo(1), 1);
+      expect(p.hitsToKo(3), 1, reason: 'one snowball on every difficulty');
+      expect(p.reaimAt, isNotNull);
+      expect(
+        p.jitterScale,
+        lessThan(RivalProfile.of(RivalType.snowGhost).jitterScale / 2),
+      );
     });
 
     test('rusher holds the front line and throws quick and loose', () {

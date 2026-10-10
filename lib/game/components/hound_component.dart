@@ -121,44 +121,72 @@ class HoundComponent extends SpriteComponent {
   /// From this wave a hound is likelier ([bracketChance]).
   static const int likelyWave = 5;
 
-  /// From this wave every wave has a hound, and maybe more.
+  /// From this wave every wave has a hound, plus one more sure hound every
+  /// ten waves after (wave 20 has two, wave 30 three).
   static const int packWave = 10;
 
-  /// Most hounds in one wave.
-  static const int maxPack = 4;
-
-  /// Chance of a hound on waves [likelyWave] to [packWave] - 1.
+  /// Chance of a hound on waves [likelyWave] to [packWave] - 1, at an
+  /// average pace.
   static double bracketChance(Difficulty difficulty) => switch (difficulty) {
     Difficulty.easy => 0.5,
     Difficulty.normal => 0.6,
     Difficulty.hard => 0.7,
   };
 
-  /// Expected extra hounds on top of the first from [packWave]: 10% / 15% /
-  /// 20% at first, +10% every five waves after that.
-  static double extraFor(int wave, Difficulty difficulty) {
-    if (wave < packWave) return 0;
-    final base = switch (difficulty) {
-      Difficulty.easy => 0.1,
-      Difficulty.normal => 0.15,
-      Difficulty.hard => 0.2,
-    };
-    return base + 0.1 * ((wave - packWave) ~/ 5);
-  }
+  /// Chance of one more hound on top of the sure ones from [packWave], at
+  /// an average pace. Taking twice as long makes it certain.
+  static double extraChance(Difficulty difficulty) => switch (difficulty) {
+    Difficulty.easy => 0.2,
+    Difficulty.normal => 0.25,
+    Difficulty.hard => 0.3,
+  };
 
-  /// How many hounds [wave] gets.
-  static int countFor(int wave, Difficulty difficulty, math.Random rng) {
-    if (wave < firstWave) return 0;
-    if (wave < likelyWave) {
-      return rng.nextDouble() < chanceFor(difficulty) ? 1 : 0;
-    }
+  /// Earliest a hound comes, in seconds into the fight.
+  static const double earliest = 4;
+
+  /// How long a wave with [rivals] rivals usually lasts. The hound odds are
+  /// tuned against this pace.
+  static double averageWaveSeconds(int rivals) => 20 + 8.0 * rivals;
+
+  /// When this wave's hounds come, in seconds into the fight, sorted. A
+  /// hound whose time the fight never reaches does not come, so a longer
+  /// fight sees more of them:
+  ///
+  /// * Waves [firstWave]..[packWave] - 1: one hound with chance P at an
+  ///   average pace ([chanceFor], then [bracketChance]). Its time is
+  ///   uniform from [earliest] to D / P, so a fight of length D sees it
+  ///   with chance P, and longer fights more often.
+  /// * From [packWave]: one sure hound per ten waves, spread through the
+  ///   first D seconds, then one extra whose time is uniform from a to 2D,
+  ///   with a set so it lands inside D with [extraChance].
+  static List<double> scheduleFor({
+    required int wave,
+    required Difficulty difficulty,
+    required double averageSeconds,
+    required math.Random rng,
+  }) {
+    if (wave < firstWave) return const [];
+    final d = math.max(averageSeconds, earliest + 1);
+    double between(double a, double b) => a + rng.nextDouble() * (b - a);
     if (wave < packWave) {
-      return rng.nextDouble() < bracketChance(difficulty) ? 1 : 0;
+      final p = wave < likelyWave
+          ? chanceFor(difficulty)
+          : bracketChance(difficulty);
+      return [between(earliest, d / p)];
     }
-    final extra = extraFor(wave, difficulty);
-    final sure = extra.floor();
-    final maybe = rng.nextDouble() < extra - sure ? 1 : 0;
-    return math.min(maxPack, 1 + sure + maybe);
+    final sure = wave ~/ packWave;
+    final times = <double>[
+      for (var i = 0; i < sure; i++)
+        between(
+          earliest + (d - earliest) * i / sure,
+          earliest + (d - earliest) * (i + 1) / sure,
+        ),
+    ];
+    final e = extraChance(difficulty);
+    final from = math.max(earliest, d * (1 - 2 * e) / (1 - e));
+    times.add(between(from, 2 * d));
+    times.sort();
+    return times;
   }
 
   /// Catch box: how far off its lane (feet Y, in rows) a kid is still in

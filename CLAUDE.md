@@ -23,7 +23,7 @@ These rules are non-negotiable.
 - **Never work or push commits directly to `main` for new features** (the bootstrap agent-docs push is the exception). Do not force-push `main`.
 - **Every new feature or fix is a branch + PR.** Branch from the latest `origin/main`. Open a pull request targeting `main`. Do not land work by committing straight to `main`.
 - **Document out-of-scope issues explicitly.** If you find a bug, missing asset, or follow-up that is not part of the current change, add it to `PROGRESS.md` → **Known gaps**. Do not silently skip it, and do not expand the PR to “while we’re here” unless the user asked.
-- **Kid-safe only.** Projectiles are snowballs and water balloons. No blood, gore, or weaponized violence.
+- **Kid-safe only.** Kids throw snowballs (and water balloons in summer). Bosses may use cartoon elemental attacks (the magma elemental's lava balls and heat wave, the ice ogre's ground spikes; owner-approved Oct 2026); a hit is the same snowy stun as a snowball, with no burns or injuries shown on kids. No blood, gore, or weaponized violence.
 - **Camera:** keep the **3/4 side-arena** view (NOT pure top-down). Match the draft art style in `docs/STYLE.md` (player blue `#3D7CFF`, enemy violet `#9B59B6`).
 - **Landscape only** on iOS + Android (ship targets). macOS / Chrome are fine for local playtest.
 

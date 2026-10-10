@@ -32,6 +32,22 @@ abstract final class AudioCues {
   static const houndSnap = 'hound_snap';
   static const houndWhimper = 'hound_whimper';
   static const houndHowl = 'hound_howl';
+  static const bossIntro = 'boss_intro_stinger';
+  static const bossDefeated = 'boss_defeated_stinger';
+  static const magmaRoar = 'magma_roar';
+  static const magmaThrow = 'magma_ball_throw';
+  static const magmaImpact = 'magma_ball_impact';
+  static const magmaHit = 'magma_hit';
+  static const magmaDefeat = 'magma_defeat';
+  static const magmaWaveCharge = 'magma_wave_charge';
+  static const magmaWaveRelease = 'magma_wave_release';
+  static const ogreRoar = 'ogre_roar';
+  static const ogreThrow = 'ogre_throw';
+  static const ogreHit = 'ogre_hit';
+  static const ogreHop = 'ogre_hop';
+  static const ogreCrash = 'ogre_crash';
+  static const ogreDefeat = 'ogre_defeat';
+  static const iceSpikes = 'ice_spikes_erupt';
 
   /// Cues wired in the game whose file has not been delivered yet. They
   /// stay silent until `assets/audio/sfx/<cue>.wav` lands.
@@ -68,14 +84,35 @@ abstract final class AudioCues {
     houndSnap,
     houndWhimper,
     houndHowl,
+    bossIntro,
+    bossDefeated,
+    magmaRoar,
+    magmaThrow,
+    magmaImpact,
+    magmaHit,
+    magmaDefeat,
+    magmaWaveCharge,
+    magmaWaveRelease,
+    ogreRoar,
+    ogreThrow,
+    ogreHit,
+    ogreHop,
+    ogreCrash,
+    ogreDefeat,
+    iceSpikes,
   ];
 
   static const loops = <String>[menuLoop, battleWinter, battleSummer];
 
-  /// Mix level for one-shots (0–1). Every cue plays at full: the v2 throw
-  /// and hit sounds are already about 5dB under the old placeholders that
-  /// needed turning down.
-  static double volumeOf(String cue) => 1;
+  /// Mix level for one-shots (0–1). Almost everything plays at full (the
+  /// v2 throw and hit sounds are already about 5dB under the old
+  /// placeholders that needed turning down). The boss roars were slowed and
+  /// layered and come out loud next to the boss hits and defeats, so they
+  /// sit a little lower.
+  static double volumeOf(String cue) => switch (cue) {
+    magmaRoar || ogreRoar => 0.75,
+    _ => 1,
+  };
 
   /// The charge hum loop: 1.25× its old 0.6 so it can be heard.
   static const double chargeHumVolume = 0.75;

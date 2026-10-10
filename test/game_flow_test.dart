@@ -8,7 +8,11 @@ import 'package:backyard_barrage/feel/feel_bus.dart';
 import 'package:backyard_barrage/feel/game_haptics.dart';
 import 'package:backyard_barrage/game/arena_grid.dart';
 import 'package:backyard_barrage/game/backyard_barrage_game.dart';
+import 'package:backyard_barrage/game/boss.dart';
 import 'package:backyard_barrage/game/combat_rules.dart';
+import 'package:backyard_barrage/game/components/fire_wave.dart';
+import 'package:backyard_barrage/game/components/ice_spike.dart';
+import 'package:backyard_barrage/game/components/boss_controller.dart';
 import 'package:backyard_barrage/game/components/coin_pop.dart';
 import 'package:backyard_barrage/game/components/enemy_controller.dart';
 import 'package:backyard_barrage/game/game_art.dart';
@@ -61,6 +65,7 @@ void main() {
         for (final pose in SeasonAssets.poseNames)
           ?SeasonAssets.rivalPose(type, pose),
       ...GameArt.flameImages,
+      ...BossArt.all,
       for (final type in RivalType.values)
         ...?SeasonAssets.rivalWalkCycle(type),
       for (final frame in HoundComponent.frames)
@@ -2351,7 +2356,8 @@ void main() {
         reason: 'wave $wave',
       );
     }
-    game.wave = HoundComponent.packWave;
+    // The first wave past the boss: hounds for sure.
+    game.wave = HoundComponent.packWave + 1;
     game.startWave();
     game.finishEntrance();
     final howl = game.howlDueAt!;
@@ -2531,6 +2537,10 @@ void main() {
     for (var wave = HoundComponent.packWave; wave <= 30; wave++) {
       game.wave = wave;
       game.startWave();
+      if (BossRules.isBossWave(wave)) {
+        expect(game.houndsDue, 0, reason: 'wave $wave: the boss is the fight');
+        continue;
+      }
       expect(game.houndsDue, greaterThanOrEqualTo(1), reason: 'wave $wave');
     }
   });
@@ -2682,6 +2692,188 @@ void main() {
     await tester.pump();
     expect(find.byKey(const Key('retry')), findsOneWidget);
     expect(find.byKey(const Key('start-over')), findsNothing);
+  });
+
+  testWidgets('wave 10 is a boss alone; later bosses bring help', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.wave = 10;
+    game.startWave();
+    game.finishEntrance();
+    await tester.pump();
+    final boss = game.boss!;
+    expect(game.enemies, [boss]);
+    expect(boss.isBoss, isTrue);
+    expect(boss.maxHp, BossRules.hits(Difficulty.normal, 1));
+    expect(game.houndsDue, 0);
+    expect(find.byKey(const Key('boss-bar')), findsOneWidget);
+    final first = game.bossType;
+
+    game.wave = 15;
+    game.startWave();
+    game.finishEntrance();
+    expect(game.enemies.where((kid) => !kid.isBoss), hasLength(1));
+    expect(game.bossType, isNot(first), reason: 'never the same twice');
+    expect(game.boss!.maxHp, BossRules.hits(Difficulty.normal, 2));
+  });
+
+  testWidgets('a boss shrugs off stuns, and its KO pays three power-ups', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.wave = 10;
+    game.startWave();
+    game.finishEntrance();
+    final boss = game.boss!;
+    final kid = game.players.first;
+    final shot = LobProjectile(
+      sprite: kid.sprite!,
+      position: kid.throwOrigin,
+      velocity: Vector2(100, 0),
+      targets: game.enemies,
+      owner: kid,
+      onHit: (_, _) {},
+    );
+    game.applySnowballHit(shot: shot, target: boss);
+    expect(boss.hp, boss.maxHp - 1);
+    expect(boss.isStunned, isFalse, reason: 'a boss keeps attacking');
+    int held() =>
+        PowerUp.values.fold<int>(0, (n, item) => n + game.meta.itemCount(item));
+    final before = held();
+    while (!boss.isKo) {
+      game.applySnowballHit(shot: shot, target: boss);
+    }
+    game.resolveKnockouts();
+    expect(held(), before + BossRules.rewardItems);
+    expect(game.phase, MatchPhase.clearing);
+    expect(
+      game.lastReward,
+      MetaState.coinsForWave(10) * BossRules.coinMultiplier,
+    );
+  });
+
+  testWidgets('the heat wave hits two lanes, passes through, and stops short', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState(crewSize: 3))).game;
+    final [lane, near, far] = game.players;
+    final laneY = ArenaGrid.laneY(3);
+    void put(KidComponent kid, int column, double rowsOff) {
+      kid.position =
+          ArenaGrid.cellCenter(KidSide.player, column, 3) +
+          Vector2(0, ArenaGrid.rowStep * rowsOff);
+      kid.syncDepth();
+    }
+
+    put(lane, 3, 0);
+    put(near, 2, 1);
+    put(far, 3, 2.2);
+    final hit = <KidComponent>[];
+    final fortsHit = <FortComponent>[];
+    game.fort.placeAt(row: 3, column: 1);
+    final wave = FireWave(
+      sprite: lane.sprite!,
+      laneY: laneY,
+      startX: 1000,
+      players: game.players,
+      forts: [game.fort],
+      onKidHit: hit.add,
+      onFortHit: fortsHit.add,
+    );
+    for (var i = 0; i < 400 && !wave.stopped; i++) {
+      wave.update(1 / 60);
+    }
+    expect(wave.stopped, isTrue);
+    expect(wave.frontX, closeTo(FireWave.stopX, 0.5));
+    expect(hit, containsAll([lane, near]), reason: 'two kids at once');
+    expect(hit, isNot(contains(far)));
+    expect(fortsHit, [game.fort], reason: 'once, then through');
+
+    // The back column is past the stop: always safe.
+    put(lane, 0, 0);
+    hit.clear();
+    final again = FireWave(
+      sprite: lane.sprite!,
+      laneY: laneY,
+      startX: 1000,
+      players: [lane],
+      forts: const [],
+      onKidHit: hit.add,
+      onFortHit: (_) {},
+    );
+    for (var i = 0; i < 400 && !again.stopped; i++) {
+      again.update(1 / 60);
+    }
+    expect(hit, isEmpty);
+  });
+
+  testWidgets('an ice spike bursts where the kid stood; stepping off dodges', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState(crewSize: 2))).game;
+    final [stays, moves] = game.players;
+    final hit = <KidComponent>[];
+    final spikes = [
+      for (final kid in [stays, moves])
+        IceSpike(
+          frames: [stays.sprite!, stays.sprite!, stays.sprite!],
+          feet: kid.position.clone(),
+          warnSeconds: 0.8,
+          players: [kid],
+          onKidHit: hit.add,
+        ),
+    ];
+    moves.position = moves.position + Vector2(0, ArenaGrid.rowStep * 1.5);
+    for (final spike in spikes) {
+      spike.update(0.7);
+    }
+    expect(hit, isEmpty, reason: 'still cracking');
+    for (final spike in spikes) {
+      spike.update(0.15);
+    }
+    expect(hit, [stays]);
+  });
+
+  testWidgets('boss specials telegraph, then fire', (tester) async {
+    final game = (await boot(tester, MetaState(crewSize: 2))).game;
+    for (var wave = 10; wave <= 20; wave += 5) {
+      game.wave = wave;
+      game.startWave();
+      game.finishEntrance();
+      final brain = game.bossBrain!;
+      brain.forceSpecial();
+      var sawWindup = false;
+      var fired = false;
+      for (var i = 0; i < 400 && !fired; i++) {
+        brain.update(1 / 60);
+        game.boss!.update(1 / 60);
+        if (brain.phase == BossPhase.waveWindup ||
+            brain.phase == BossPhase.hopCrouch) {
+          sawWindup = true;
+        }
+        await tester.pump();
+        fired =
+            game.world.children.whereType<FireWave>().isNotEmpty ||
+            game.world.children.whereType<IceSpike>().isNotEmpty;
+      }
+      expect(sawWindup, isTrue, reason: '${game.bossType} winds up first');
+      expect(fired, isTrue, reason: '${game.bossType} fires');
+    }
+  });
+
+  testWidgets('Arcade: losing to a boss retries just the boss', (tester) async {
+    final game = (await boot(
+      tester,
+      MetaState(mode: PlayMode.campaign, coins: 50),
+    )).game;
+    game.wave = 10;
+    game.startWave();
+    game.finishEntrance();
+    expect(game.meta.ledger.checkpointWave, 10);
+    knockOut(game.players);
+    game.resolveKnockouts();
+    expect(game.lastDefeat!.wave, 10);
   });
 
   testWidgets('Easy hides Recovery in the shop', (tester) async {

@@ -33,6 +33,12 @@ Added 2026-10-08 (mono WAV, same specs). The four hound cues were replaced the s
 | hound_snap.wav | The hound's bite lands |
 | hound_whimper.wav | The hound runs off (scared or bounced) |
 | hound_howl.wav | A far-off warning howl at a random moment before a wave's first hound (0.5s into the fight to 2s before it). 2.95s, a little over the 2.5s stinger guide. |
+| boss_intro_stinger.wav / boss_defeated_stinger.wav | "BOSS!" banner / boss knocked out |
+| magma_roar.wav / ogre_roar.wav | With the intro sting (played at 0.75) |
+| magma_ball_throw.wav / magma_ball_impact.wav | Magmo's lob and its landing |
+| magma_wave_charge.wav / magma_wave_release.wav | Heat-wave lean-back / push |
+| ogre_throw.wav, ogre_hop.wav, ogre_crash.wav, ice_spikes_erupt.wav | Grumblefrost's lob, hop, crash, and the first spike to burst |
+| magma_hit.wav / ogre_hit.wav, magma_defeat.wav / ogre_defeat.wav | Boss takes a hit / boss knocked out |
 
 ## Loops (`assets/audio/music/`)
 - menu_loop.wav (cozy backyard, light) — menus

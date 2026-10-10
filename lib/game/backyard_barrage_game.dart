@@ -41,6 +41,7 @@ import 'components/hound_component.dart';
 import 'components/ice_spike.dart';
 import 'components/impact_burst.dart';
 import 'components/kid_component.dart';
+import 'components/reward_float.dart';
 import 'components/shield_pile.dart';
 import 'components/lob_projectile.dart';
 import 'components/overlay_banner.dart';
@@ -1053,6 +1054,10 @@ class BackyardBarrageGame extends FlameGame {
     _paidKills.clear();
     killCoinsThisWave = 0;
     waveRewards.clear();
+    // A float still up when the report paused the yard goes with it.
+    for (final float in world.children.whereType<RewardFloat>().toList()) {
+      float.removeFromParent();
+    }
     kidKos.setAll(0, [0, 0, 0]);
     phase = MatchPhase.entering;
     _entrance.clear();
@@ -1470,13 +1475,7 @@ class BackyardBarrageGame extends FlameGame {
       if (_rng.nextDouble() >= EnemyPerkRules.dropChance) continue;
       meta.replaceItems({...meta.items, item: meta.itemCount(item) + 1});
       _addReward(WaveReward.item(item, 'Dropped by a rival'));
-      world.add(
-        CoinPop(
-          amount: 0,
-          label: '+1 ${item.label}',
-          position: kid.hitCenter - Vector2(0, 130),
-        ),
-      );
+      _floatRewards([item], kid.hitCenter - Vector2(0, 130));
       feel.purchased();
     }
   }
@@ -1743,6 +1742,35 @@ class BackyardBarrageGame extends FlameGame {
     }
   }
 
+  /// Each earned power-up's icon pops out over [at] and floats up, side
+  /// by side and one after another; repeats show once ("+2 Revive").
+  void _floatRewards(List<PowerUp> items, Vector2 at) {
+    final counts = <PowerUp, int>{};
+    for (final item in items) {
+      counts[item] = (counts[item] ?? 0) + 1;
+    }
+    const gap = 140.0;
+    const margin = 80.0;
+    final span = (counts.length - 1) * gap;
+    // Centred over [at], shifted in so the row stays on screen.
+    final first = (at.x - span / 2).clamp(margin, worldWidth - margin - span);
+    final left = first - at.x;
+    var i = 0;
+    for (final entry in counts.entries) {
+      final icon = _powerUpSprites[entry.key];
+      if (icon == null) continue;
+      world.add(
+        RewardFloat(
+          icon: icon,
+          text: '+${entry.value} ${entry.key.label}',
+          position: at + Vector2(left + i * gap, 0),
+          delay: i * 0.12,
+        ),
+      );
+      i++;
+    }
+  }
+
   /// Free power-ups: one for scaring off a hound, three for a boss, each a
   /// random item.
   @visibleForTesting
@@ -1755,10 +1783,7 @@ class BackyardBarrageGame extends FlameGame {
     for (final item in given) {
       _addReward(WaveReward.item(item, reason));
     }
-    final label = given.length == 1
-        ? '+1 ${given.single.label}'
-        : '+${given.length} power-ups';
-    world.add(CoinPop(amount: 0, label: label, position: at - Vector2(0, 80)));
+    _floatRewards(given, at - Vector2(0, 80));
     feel.purchased();
     hudRevision.value++;
     unawaited(persist());

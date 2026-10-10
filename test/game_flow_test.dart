@@ -23,6 +23,7 @@ import 'package:backyard_barrage/game/components/fort_component.dart';
 import 'package:backyard_barrage/game/components/hound_component.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
 import 'package:backyard_barrage/game/components/lob_projectile.dart';
+import 'package:backyard_barrage/game/components/reward_float.dart';
 import 'package:backyard_barrage/game/components/shield_pile.dart';
 import 'package:backyard_barrage/game/components/splash_particles.dart';
 import 'package:backyard_barrage/game/rival_type.dart';
@@ -2203,6 +2204,29 @@ void main() {
     expect(game.enemies.first.isKo, isTrue);
     final pop = game.world.children.whereType<CoinPop>().single;
     expect(pop.amount, MetaState.coinsPerKnockout);
+  });
+
+  testWidgets('earned power-ups float up as their icons', (tester) async {
+    final game = (await boot(tester, MetaState())).game;
+    final at = game.players.first.hitCenter;
+    final given = game.rewardRandomItems(3, at: at, reason: 'Magmo beaten');
+    game.update(0.01);
+    await tester.pump();
+    final floats = game.world.children.whereType<RewardFloat>().toList();
+    // One icon per kind, repeats folded ("+2 Revive").
+    expect(floats, hasLength(given.toSet().length));
+    for (final float in floats) {
+      expect(float.text, startsWith('+'));
+    }
+    expect(game.world.children.whereType<CoinPop>(), isEmpty);
+    // Side by side, then gone before the report would cover the yard.
+    final xs = floats.map((f) => f.position.x).toSet();
+    expect(xs, hasLength(floats.length));
+    for (var i = 0; i < 20; i++) {
+      game.update(0.1);
+    }
+    await tester.pump();
+    expect(game.world.children.whereType<RewardFloat>(), isEmpty);
   });
 
   testWidgets('the charge sweep swaps upright yaw poses', (tester) async {

@@ -107,6 +107,9 @@ class LobProjectile extends SpriteComponent {
 
   /// Fort cracker: knocks down any rival fort this shot strikes.
   bool cracker = false;
+
+  /// Big splat: bursts where it lands, hitting every rival in the splash.
+  bool splat = false;
   final bool scripted;
 
   /// Straight depth line for hits. The sprite climbs and drops above it.

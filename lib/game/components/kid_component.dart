@@ -1,8 +1,9 @@
 import 'dart:math' as math;
-import 'dart:ui';
+import 'dart:ui' hide TextStyle;
 
 import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
+import 'package:flutter/painting.dart' show TextPainter, TextSpan, TextStyle;
 
 import '../arena_grid.dart';
 import '../combat_rules.dart';
@@ -625,11 +626,52 @@ class KidComponent extends SpriteComponent {
     if (scaled) canvas.restore();
     if (glint && _chargingPose && !isKo && !isStunned) _drawGlint(canvas);
     if (armored && !isKo) _drawArmor(canvas);
+    if (shieldHits > 0 && !isKo) _drawShieldBadge(canvas);
   }
 
   /// Frost armor art (an ice bubble). Shared by every kid; set once the
   /// image loads. Null draws the plain ring.
   static Sprite? armorSprite;
+
+  /// A small blue shield over the head with the hits it still blocks.
+  void _drawShieldBadge(Canvas canvas) {
+    final center = Offset(size.x / 2 + size.x * 0.28, size.y * 0.02);
+    const r = 15.0;
+    canvas.drawCircle(center, r + 2, Paint()..color = const Color(0xFFFFFFFF));
+    canvas.drawCircle(center, r, Paint()..color = const Color(0xFF3D7CFF));
+    final shield = Path()
+      ..moveTo(center.dx, center.dy - 9)
+      ..lineTo(center.dx + 8, center.dy - 5)
+      ..quadraticBezierTo(
+        center.dx + 7,
+        center.dy + 6,
+        center.dx,
+        center.dy + 10,
+      )
+      ..quadraticBezierTo(
+        center.dx - 7,
+        center.dy + 6,
+        center.dx - 8,
+        center.dy - 5,
+      )
+      ..close();
+    canvas.drawPath(shield, Paint()..color = const Color(0x55FFFFFF));
+    final text = TextPainter(
+      text: TextSpan(
+        text: '$shieldHits',
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w900,
+          color: Color(0xFFFFFFFF),
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    text.paint(
+      canvas,
+      Offset(center.dx - text.width / 2, center.dy - text.height / 2),
+    );
+  }
 
   void _drawArmor(Canvas canvas) {
     final center = Offset(size.x / 2, size.y * 0.55);

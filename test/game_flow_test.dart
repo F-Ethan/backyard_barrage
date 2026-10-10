@@ -981,13 +981,12 @@ void main() {
     final shot = game.world.children.whereType<LobProjectile>().singleWhere(
       (s) => identical(s.owner, kid),
     );
+    // Big splat flies as a normal-size ball and bursts where it lands.
     expect(
       shot.radius,
-      closeTo(
-        MetaState.baseBlastRadius * game.meta.blastScale * PowerUp.splatScale,
-        0.01,
-      ),
+      closeTo(MetaState.baseBlastRadius * game.meta.blastScale, 0.01),
     );
+    expect(shot.splat, isTrue);
     expect(shot.cracker, isTrue);
     expect(game.isPowerUpLive(PowerUp.bigSplat), isFalse);
     expect(game.isPowerUpLive(PowerUp.fortCracker), isFalse);
@@ -997,6 +996,113 @@ void main() {
     expect(game.enemyFort.isCollapsed, isFalse);
     game.debugFortHit(shot);
     expect(game.enemyFort.isCollapsed, isTrue);
+  });
+
+  testWidgets('a Big splat landing hits every rival in the splash', (
+    tester,
+  ) async {
+    final game = (await boot(
+      tester,
+      MetaState(items: {PowerUp.bigSplat: 1}),
+    )).game;
+    game.wave = 4;
+    game.startWave();
+    game.finishEntrance();
+    final [a, b, c] = game.enemies;
+    final at = a.hitCenter.clone();
+    b.position = a.position + Vector2(40, ArenaGrid.rowStep * 0.5);
+    c.position = a.position + Vector2(0, ArenaGrid.rowStep * 4);
+    final hp = [
+      for (final kid in [a, b, c]) kid.hp,
+    ];
+    final shot = LobProjectile(
+      sprite: a.sprite!,
+      position: at,
+      velocity: Vector2.zero(),
+      targets: game.enemies,
+      owner: game.players.first,
+      onHit: (_, _) {},
+    )..splat = true;
+    game.debugGroundMiss(shot);
+    expect(a.hp, lessThan(hp[0]), reason: 'in the middle');
+    expect(b.hp, lessThan(hp[1]), reason: 'in the splash');
+    expect(c.hp, hp[2], reason: 'four rows away');
+  });
+
+  testWidgets('a boss ball bursts: two hits in the middle, one in the ring', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState(crewSize: 3))).game;
+    game.wave = 10;
+    game.startWave();
+    game.finishEntrance();
+    final [middle, ring, clear] = game.players;
+    final at = middle.hitCenter.clone();
+    ring.position = middle.position + Vector2(70, 0);
+    clear.position = middle.position + Vector2(0, ArenaGrid.rowStep * 3);
+    game.debugBossBlast(at);
+    expect(middle.hp, CombatRules.hitsToKo - 2);
+    expect(ring.hp, CombatRules.hitsToKo - 1);
+    expect(clear.hp, CombatRules.hitsToKo);
+  });
+
+  testWidgets('going to the background pauses and saves the run', (
+    tester,
+  ) async {
+    final booted = await boot(
+      tester,
+      MetaState(mode: PlayMode.campaign, skills: {'throw-1'}),
+    );
+    final game = booted.game;
+    game.wave = 7;
+    game.startWave();
+    game.finishEntrance();
+    game.onAppBackgrounded();
+    await tester.pump();
+    expect(game.phase, MatchPhase.paused);
+    expect(game.meta.resumeWave, 7, reason: 'a kill picks up here');
+    final saved = await SaveStore(
+      preferences: await SharedPreferences.getInstance(),
+    ).load();
+    expect(saved.wallet(PlayMode.campaign, Difficulty.normal).resumeWave, 7);
+    // Android back toggles the pause menu.
+    game.onBackPressed();
+    expect(game.phase, isNot(MatchPhase.paused));
+    game.onBackPressed();
+    expect(game.phase, MatchPhase.paused);
+  });
+
+  testWidgets('leaving an Arcade defeat keeps the checkpoint to resume', (
+    tester,
+  ) async {
+    final game = (await boot(
+      tester,
+      MetaState(mode: PlayMode.campaign, coins: 10),
+    )).game;
+    game.wave = 6;
+    game.startWave();
+    game.finishEntrance();
+    knockOut(game.players);
+    game.resolveKnockouts();
+    game.exitToMenu();
+    expect(game.meta.resumeWave, 6, reason: 'not wave 1');
+
+    // An Arcade run with no bookmark still starts at its checkpoint.
+    game.meta.resumeWave = 0;
+    await tester.pumpWidget(const SizedBox.shrink());
+    final again = (await boot(tester, game.meta)).game;
+    expect(again.wave, 6);
+  });
+
+  test('the snowman draws smallest and the rusher tallest', () {
+    double tall(RivalType type, double artHeight) =>
+        artHeight * SeasonAssets.rivalDrawScale(type);
+    final ghost = tall(RivalType.snowGhost, 378);
+    final frost = tall(RivalType.frostKid, 386);
+    final rusher = tall(RivalType.rusher, 361);
+    expect(ghost, lessThan(frost));
+    expect(frost, lessThan(rusher));
+    expect(rusher / ghost, closeTo(1.1, 0.03));
   });
 
   testWidgets('the shop Items tab buys a power-up', (tester) async {
@@ -2752,7 +2858,7 @@ void main() {
     );
   });
 
-  testWidgets('the heat wave hits two lanes, passes through, and stops short', (
+  testWidgets('the heat wave sweeps its lane at once, through two kids', (
     tester,
   ) async {
     final game = (await boot(tester, MetaState(crewSize: 3))).game;
@@ -2789,7 +2895,8 @@ void main() {
     expect(hit, isNot(contains(far)));
     expect(fortsHit, [game.fort], reason: 'once, then through');
 
-    // The back column is past the stop: always safe.
+    // Even the back column is in reach, and it gets there in well under
+    // half a second: the windup is the time to move.
     put(lane, 0, 0);
     hit.clear();
     final again = FireWave(
@@ -2801,10 +2908,13 @@ void main() {
       onKidHit: hit.add,
       onFortHit: (_) {},
     );
+    var seconds = 0.0;
     for (var i = 0; i < 400 && !again.stopped; i++) {
       again.update(1 / 60);
+      seconds += 1 / 60;
     }
-    expect(hit, isEmpty);
+    expect(hit, [lane]);
+    expect(seconds, lessThan(0.45));
   });
 
   testWidgets('an ice spike bursts where the kid stood; stepping off dodges', (

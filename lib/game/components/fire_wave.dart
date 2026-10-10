@@ -8,11 +8,12 @@ import '../../meta/meta_state.dart';
 import 'fort_component.dart';
 import 'kid_component.dart';
 
-/// The magma elemental's heat wave. It rolls left along one lane from the
-/// boss to a fixed stop short of the crew's back line, so stepping back or
-/// changing rows always dodges it. It is twice a snowball's hit size, so
-/// it can catch two kids at once, and it passes through kids (each is hit
-/// once) and through forts (each loses [fortDamage] HP once).
+/// The magma elemental's heat wave. After the long, marked windup it
+/// sweeps the whole lane almost at once, to the yard's far edge, so the
+/// only dodge is leaving the lane during the windup. It is twice a
+/// snowball's hit size, so it can catch two kids at once, and it passes
+/// through kids (each is hit once) and through forts (each loses
+/// [fortDamage] HP once). The fire lingers on the lane a moment after.
 class FireWave extends PositionComponent {
   FireWave({
     required this.sprite,
@@ -34,20 +35,19 @@ class FireWave extends PositionComponent {
   final void Function(KidComponent kid) onKidHit;
   final void Function(FortComponent fort) onFortHit;
 
-  /// Where the crest stops: two columns into the crew's half, so the back
-  /// two columns stay safe.
-  static double get stopX =>
-      ArenaGrid.columnX(KidSide.player, 1) + ArenaGrid.columnStep * 0.5;
+  /// Where the crest stops: the yard's left edge.
+  static const double stopX = 20;
 
-  static const double speed = 380;
+  /// Fast enough to cross the yard in about a third of a second.
+  static const double speed = 3000;
 
   /// Half-height of the wave's hit band: twice a snowball's radius.
   static double get hitHalfHeight => MetaState.baseBlastRadius * 2;
 
   static const int fortDamage = 2;
 
-  /// Seconds the wave lingers and fades once it stops.
-  static const double fadeSeconds = 0.35;
+  /// Seconds the fire lingers and fades once it stops.
+  static const double fadeSeconds = 0.6;
 
   double _frontX;
   double _fade = 0;
@@ -65,11 +65,14 @@ class FireWave extends PositionComponent {
       if (_fade >= fadeSeconds) removeFromParent();
       return;
     }
+    // Sweep everything the crest passed this frame, so a fast wave or a
+    // slow frame cannot skip over a kid.
+    final from = _frontX;
     _frontX = math.max(stopX, _frontX - speed * dt);
     for (final kid in players) {
       if (kid.isKo || _hitKids.contains(kid)) continue;
       final center = kid.hitCenter;
-      if ((center.x - _frontX).abs() > 34) continue;
+      if (center.x < _frontX - 34 || center.x > from + 34) continue;
       if ((center.y - laneY).abs() > hitHalfHeight + kid.hitRadius * 0.5) {
         continue;
       }
@@ -79,7 +82,7 @@ class FireWave extends PositionComponent {
     for (final cover in forts) {
       if (cover.isCollapsed || _hitForts.contains(cover)) continue;
       final box = cover.shieldFootprint;
-      if (_frontX < box.left || _frontX > box.right) continue;
+      if (box.right < _frontX || box.left > from) continue;
       if (laneY + hitHalfHeight < box.top ||
           laneY - hitHalfHeight > box.bottom) {
         continue;

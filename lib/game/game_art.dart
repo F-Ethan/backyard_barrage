@@ -45,8 +45,8 @@ abstract final class GameArt {
     PowerUp.revive => 'revive',
   };
 
-  /// Every path the game loads through Flame's image cache (not the
-  /// Flutter-side icons), for preloading and tests.
+  /// Every path the game loads through Flame's image cache, for
+  /// preloading and tests.
   static List<String> get flameImages => [
     for (final rival in [false, true]) ...[
       for (final stage in [1, 2, 3]) ...[
@@ -57,5 +57,7 @@ abstract final class GameArt {
     ],
     iceBubble,
     ...props,
+    // Also drawn as the ball on a throw that carries that power-up.
+    for (final item in PowerUp.values) powerUp(item),
   ];
 }

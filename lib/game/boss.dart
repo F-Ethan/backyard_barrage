@@ -38,15 +38,18 @@ abstract final class BossRules {
   /// after brings one more.
   static int supportFor(int wave) => appearance(wave) - 1;
 
-  /// Hits to put a boss down: 6 / 9 / 12 (Easy / Normal / Hard) the first
-  /// time, then 25% more each time a boss comes back.
-  static int hits(Difficulty difficulty, int appearance) {
+  /// Health: 8 / 12 / 16 snowballs (Easy / Normal / Hard) the first time,
+  /// 25% more each time a boss comes back. It is counted in snowballs, not
+  /// hits, so damage skills do not melt it: [playerHits] is how many hits
+  /// the player's own throw lands right now (Harder hit ranks).
+  static int hits(Difficulty difficulty, int appearance, {int playerHits = 1}) {
     final base = switch (difficulty) {
-      Difficulty.easy => 6,
-      Difficulty.normal => 9,
-      Difficulty.hard => 12,
+      Difficulty.easy => 8,
+      Difficulty.normal => 12,
+      Difficulty.hard => 16,
     };
-    return (base * math.pow(1.25, math.max(appearance, 1) - 1)).round();
+    final throws = (base * math.pow(1.25, math.max(appearance, 1) - 1)).round();
+    return throws * math.max(playerHits, 1);
   }
 
   /// A random boss, never the same as [last] twice in a row.
@@ -85,9 +88,9 @@ abstract final class BossRules {
 
   /// Seconds between a boss's normal throws, and between its specials.
   static double throwGap(Difficulty difficulty) => switch (difficulty) {
-    Difficulty.easy => 3.2,
-    Difficulty.normal => 2.6,
-    Difficulty.hard => 2.0,
+    Difficulty.easy => 2.6,
+    Difficulty.normal => 2.1,
+    Difficulty.hard => 1.6,
   };
 
   static double specialGap(Difficulty difficulty) => switch (difficulty) {

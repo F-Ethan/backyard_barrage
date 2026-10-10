@@ -179,9 +179,12 @@ class SeasonAssets {
   /// Drawn size of a rival's art relative to its 152px body box. The renders
   /// leave headroom above the hat, so they draw a little larger to stand
   /// about as tall as the player kid. Hit circles do not change.
+  /// The snowman is the plain rival and draws smallest; the rusher (the
+  /// brute) draws about 10% taller than it, and the frost kid in between.
   static double rivalDrawScale(RivalType type) => switch (type) {
-    RivalType.snowGhost || RivalType.rusher => 1.12,
-    RivalType.frostKid => 1.18,
+    RivalType.snowGhost => 1.0,
+    RivalType.frostKid => 1.03,
+    RivalType.rusher => 1.15,
   };
 
   /// Frames a rival loops while it walks on or steps.

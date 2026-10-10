@@ -14,7 +14,7 @@ enum RivalType {
   frostKid,
 
   /// Up close and fast. Holds the front line and throws quick, loose lobs.
-  /// Drawn as a snowman with a red tint and glow until it gets its own art.
+  /// The ice brute with the amber core.
   rusher,
 }
 
@@ -95,7 +95,6 @@ class RivalProfile {
       jitterScale: 2.2,
       stepScale: 1.6,
       holdColumn: 0,
-      aura: Color(0xFFFF4D4D),
     ),
   };
 

@@ -25,8 +25,9 @@ enum PowerUp {
   final String detail;
   final int cost;
 
-  /// Most of one item a wallet can hold.
-  static const int maxStack = 3;
+  /// No limit on how many of one item a wallet holds; this only bounds a
+  /// corrupt save.
+  static const int maxHeld = 9999;
 
   /// Seconds Frost armor lasts.
   static const double armorSeconds = 3;

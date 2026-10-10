@@ -822,7 +822,7 @@ class _NodeRow extends StatelessWidget {
   }
 }
 
-/// One-use power-ups: buy up to [PowerUp.maxStack] of each, then fire them
+/// One-use power-ups: buy as many of each as you like, then fire them
 /// from the fight HUD.
 class _ItemsPanel extends StatelessWidget {
   const _ItemsPanel({
@@ -885,7 +885,6 @@ class _ItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final full = owned >= PowerUp.maxStack;
     return Container(
       key: Key('item-${item.name}'),
       padding: EdgeInsets.all(tokens.space.sm),
@@ -896,15 +895,7 @@ class _ItemRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: tokens.primaryGradient,
-            ),
-            child: Icon(powerUpIcon(item), color: tokens.onPrimary, size: 22),
-          ),
+          PowerUpBadge(item: item, size: 44),
           SizedBox(width: tokens.space.sm),
           Expanded(
             child: Column(
@@ -912,7 +903,7 @@ class _ItemRow extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '${item.label}  ·  $owned/${PowerUp.maxStack}',
+                  owned > 0 ? '${item.label}  ·  $owned owned' : item.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: BarrageType.body.copyWith(fontWeight: FontWeight.w700),
@@ -941,19 +932,11 @@ class _ItemRow extends StatelessWidget {
                 color: affordable ? null : tokens.lockedFill,
                 borderRadius: BorderRadius.circular(999),
               ),
-              child: full
-                  ? Text(
-                      'Full',
-                      style: BarrageType.button.copyWith(
-                        fontSize: 14,
-                        color: tokens.inkMuted,
-                      ),
-                    )
-                  : CoinAmount(
-                      amount: cost,
-                      fontSize: 14,
-                      color: affordable ? tokens.onPrimary : tokens.inkMuted,
-                    ),
+              child: CoinAmount(
+                amount: cost,
+                fontSize: 14,
+                color: affordable ? tokens.onPrimary : tokens.inkMuted,
+              ),
             ),
           ),
         ],

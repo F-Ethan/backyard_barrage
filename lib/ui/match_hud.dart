@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../game/backyard_barrage_game.dart';
 import '../game/components/kid_component.dart';
+import '../game/game_art.dart';
 import '../meta/meta_state.dart';
 import '../meta/play_mode.dart';
 import 'barrage_colors.dart';
@@ -53,6 +54,20 @@ class MatchHud extends StatelessWidget {
               Positioned.fill(
                 child: IgnorePointer(child: _ChargeGlow(charge: charge)),
               ),
+            // Freeze all: frost creeps in from the edges while it lasts.
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  key: const Key('freeze-frost'),
+                  opacity: fighting && game.freezeLeft > 0 ? 0.85 : 0,
+                  duration: const Duration(milliseconds: 250),
+                  child: Image.asset(
+                    'assets/images/${GameArt.frostCrust}',
+                    fit: BoxFit.fill,
+                  ),
+                ),
+              ),
+            ),
             if (fighting)
               Positioned(
                 left: 0,

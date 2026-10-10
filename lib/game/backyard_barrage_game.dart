@@ -23,6 +23,7 @@ import '../seasons/season.dart';
 import '../seasons/season_kit.dart';
 import 'arena_grid.dart';
 import 'combat_rules.dart';
+import 'game_art.dart';
 import 'crew_carry.dart';
 import 'rival_type.dart';
 import 'components/charge_indicator.dart';
@@ -86,6 +87,11 @@ class BackyardBarrageGame extends FlameGame {
   final Map<int, Sprite> _fortIntact = {};
   final Map<int, Sprite> _fortDamaged = {};
   Sprite? _fortCollapsed;
+  final Map<int, Sprite> _rivalFortIntact = {};
+  final Map<int, Sprite> _rivalFortDamaged = {};
+  Sprite? _rivalFortCollapsed;
+  final List<Sprite> _propSprites = [];
+  final List<SpriteComponent> _props = [];
 
   final List<KidComponent> players = [];
   final List<KidComponent> enemies = [];
@@ -274,6 +280,10 @@ class BackyardBarrageGame extends FlameGame {
   bool _powerArmed = false;
   double _armorTime = 0;
 
+  /// Freeze all time left. The HUD frosts the screen edges meanwhile.
+  double _freezeTime = 0;
+  double get freezeLeft => _freezeTime;
+
   /// True while that power-up is armed for the next throw (or Frost armor
   /// is up). The HUD lights its button.
   bool isPowerUpLive(PowerUp item) => switch (item) {
@@ -306,6 +316,7 @@ class BackyardBarrageGame extends FlameGame {
       case PowerUp.fortCracker:
         _crackerArmed = true;
       case PowerUp.freezeAll:
+        _freezeTime = PowerUp.freezeSeconds;
         for (final rival in enemies) {
           rival.freeze(PowerUp.freezeSeconds);
         }
@@ -371,7 +382,53 @@ class BackyardBarrageGame extends FlameGame {
   /// A new map for a new run, different from the last one when possible.
   void _rollArena({bool avoidCurrent = false}) {
     _arena = Arena.pick(_rng, except: avoidCurrent ? _arena : null);
-    if (isLoaded) _bg.sprite = _backdrop(_kit);
+    if (isLoaded) {
+      _bg.sprite = _backdrop(_kit);
+      _scatterProps();
+    }
+  }
+
+  /// Feet spots for yard props, clear of both crews' columns and the river:
+  /// along the back of the yard, and the far front-right corner (the
+  /// front-left holds the power-up buttons).
+  static const List<(double, double)> propSpots = [
+    (55, 418),
+    (425, 410),
+    (825, 410),
+    (1225, 418),
+    (1232, 708),
+  ];
+
+  /// How many props a yard gets.
+  static const int propCount = 4;
+
+  /// Props on the yard now, for tests.
+  @visibleForTesting
+  List<SpriteComponent> get props => List.unmodifiable(_props);
+
+  /// Fresh scenery: [propCount] different props on random [propSpots].
+  /// Decoration only; nothing collides with them.
+  void _scatterProps() {
+    for (final prop in _props) {
+      prop.removeFromParent();
+    }
+    _props.clear();
+    if (_propSprites.isEmpty) return;
+    final spots = List.of(propSpots)..shuffle(_rng);
+    final sprites = List.of(_propSprites)..shuffle(_rng);
+    for (var i = 0; i < propCount && i < spots.length; i++) {
+      final (x, y) = spots[i];
+      final scale = ArenaGrid.depthScale(y, groundTrack: false);
+      final prop = SpriteComponent(
+        sprite: sprites[i % sprites.length],
+        size: Vector2.all(160 * scale),
+        position: Vector2(x, y),
+        anchor: Anchor.bottomCenter,
+        priority: ArenaGrid.depthOrder(y),
+      );
+      _props.add(prop);
+      world.add(prop);
+    }
   }
 
   @override
@@ -391,14 +448,23 @@ class BackyardBarrageGame extends FlameGame {
     _kit = _kits[meta.season]!;
 
     for (final stage in [1, 2, 3]) {
-      _fortIntact[stage] = await loadSprite(
-        'forts/fort_stage_${stage}_draft.png',
-      );
+      _fortIntact[stage] = await loadSprite(GameArt.fort(stage));
       _fortDamaged[stage] = await loadSprite(
-        'forts/fort_stage_${stage}_damaged_draft.png',
+        GameArt.fort(stage, damaged: true),
+      );
+      _rivalFortIntact[stage] = await loadSprite(
+        GameArt.fort(stage, rival: true),
+      );
+      _rivalFortDamaged[stage] = await loadSprite(
+        GameArt.fort(stage, damaged: true, rival: true),
       );
     }
-    _fortCollapsed = await loadSprite('forts/fort_collapsed_draft.png');
+    _fortCollapsed = await loadSprite(GameArt.fortCollapsed());
+    _rivalFortCollapsed = await loadSprite(GameArt.fortCollapsed(rival: true));
+    KidComponent.armorSprite = await loadSprite(GameArt.iceBubble);
+    for (final path in GameArt.props) {
+      _propSprites.add(await loadSprite(path));
+    }
 
     final glow = await loadSprite('vfx/charge_glow_draft.png');
     _coinSprite = await loadSprite('ui/coin_draft.png');
@@ -420,6 +486,8 @@ class BackyardBarrageGame extends FlameGame {
       crouch: await hound('jump_00'),
       leap: await hound('jump_01'),
       bite: [await hound('bite_00'), await hound('bite_01')],
+      land: await hound('land'),
+      hit: await hound('hit'),
     );
     for (final arena in Arena.values) {
       _arenaArt[arena] = await loadSprite(arena.background);
@@ -434,6 +502,7 @@ class BackyardBarrageGame extends FlameGame {
       priority: 0,
     );
     world.add(_bg);
+    _scatterProps();
 
     fort = FortComponent(
       side: KidSide.player,
@@ -444,7 +513,7 @@ class BackyardBarrageGame extends FlameGame {
     world.add(fort);
     enemyFort = FortComponent(
       side: KidSide.enemy,
-      sprite: _fortIntact[1]!,
+      sprite: _rivalFortIntact[1]!,
       position: ArenaGrid.fortAnchor(KidSide.enemy),
       size: ArenaGrid.fortDrawSize,
     );
@@ -609,9 +678,9 @@ class BackyardBarrageGame extends FlameGame {
     }
     enemyFort.applyStage(
       nextStage: 1,
-      intactSprite: _fortIntact[1]!,
-      damagedSprite: _fortDamaged[1]!,
-      collapsedSprite: _fortCollapsed!,
+      intactSprite: _rivalFortIntact[1]!,
+      damagedSprite: _rivalFortDamaged[1]!,
+      collapsedSprite: _rivalFortCollapsed!,
     );
     fort.placeOnRow(ArenaGrid.rollFortRow(_rng));
     enemyFort.placeOnRow(ArenaGrid.rollFortRow(_rng));
@@ -1004,25 +1073,12 @@ class BackyardBarrageGame extends FlameGame {
     }
   }
 
-  /// Free power-ups: one for scaring off a hound, three for a boss. Each is
-  /// a random item the wallet has room for; with every slot full it pays
-  /// that item's price in coins instead.
+  /// Free power-ups: one for scaring off a hound, three for a boss, each a
+  /// random item.
   @visibleForTesting
   List<PowerUp> rewardRandomItems(int count, {required Vector2 at}) {
-    final given = <PowerUp>[];
-    for (var i = 0; i < count; i++) {
-      final item = meta.grantRandomItem(_rng);
-      if (item != null) {
-        given.add(item);
-      } else {
-        meta.earn(
-          meta.itemCost(PowerUp.values[_rng.nextInt(PowerUp.values.length)]),
-        );
-      }
-    }
-    final label = given.isEmpty
-        ? 'Coins!'
-        : given.length == 1
+    final given = [for (var i = 0; i < count; i++) meta.grantRandomItem(_rng)];
+    final label = given.length == 1
         ? '+1 ${given.single.label}'
         : '+${given.length} power-ups';
     world.add(CoinPop(amount: 0, label: label, position: at - Vector2(0, 80)));
@@ -2248,6 +2304,13 @@ class BackyardBarrageGame extends FlameGame {
         for (final kid in players) {
           kid.armored = false;
         }
+        hudRevision.value++;
+      }
+    }
+    if (_freezeTime > 0) {
+      _freezeTime -= dt;
+      if (_freezeTime <= 0) {
+        _freezeTime = 0;
         hudRevision.value++;
       }
     }

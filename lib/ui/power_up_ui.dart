@@ -1,21 +1,29 @@
 import 'package:flutter/material.dart';
 
 import '../game/backyard_barrage_game.dart';
+import '../game/game_art.dart';
 import '../meta/power_up.dart';
 import 'barrage_colors.dart';
 import 'barrage_theme.dart';
 import 'motion.dart';
 
-/// Glyph for each power-up. Material icons stand in until item art lands.
-IconData powerUpIcon(PowerUp item) => switch (item) {
-  PowerUp.frostArmor => Icons.shield_rounded,
-  PowerUp.fortCracker => Icons.construction_rounded,
-  PowerUp.freezeAll => Icons.ac_unit_rounded,
-  PowerUp.powerThrow => Icons.bolt_rounded,
-  PowerUp.bigSplat => Icons.blur_on_rounded,
-  PowerUp.hotCocoa => Icons.local_cafe_rounded,
-  PowerUp.revive => Icons.favorite_rounded,
-};
+/// The round icon art for a power-up, [size] across.
+class PowerUpBadge extends StatelessWidget {
+  const PowerUpBadge({super.key, required this.item, this.size = 48});
+
+  final PowerUp item;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/images/${GameArt.powerUp(item)}',
+      width: size,
+      height: size,
+      filterQuality: FilterQuality.medium,
+    );
+  }
+}
 
 /// Fight HUD: one round button per power-up the wallet holds, with its
 /// count, in the bottom-left corner within reach of the left thumb. Items the player has none of do not show. A live item (armed for
@@ -82,25 +90,21 @@ class _PowerUpButton extends StatelessWidget {
         child: AnimatedContainer(
           duration: motion.medium,
           curve: motion.enter,
-          width: 48,
-          height: 48,
+          width: 52,
+          height: 52,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: live ? null : tokens.primaryGradient,
-            color: live ? BarrageColors.charge : null,
-            border: Border.all(color: tokens.surface, width: 2.5),
+            // A live item (armed, or armor running) gets a gold ring.
+            border: Border.all(
+              color: live ? BarrageColors.charge : Colors.transparent,
+              width: 3,
+            ),
             boxShadow: live ? tokens.shadowPrimary : tokens.shadowSoft,
           ),
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              Center(
-                child: Icon(
-                  powerUpIcon(item),
-                  color: live ? BarrageColors.ink : tokens.onPrimary,
-                  size: 24,
-                ),
-              ),
+              Center(child: PowerUpBadge(item: item, size: 46)),
               if (count > 0)
                 Positioned(
                   right: -4,

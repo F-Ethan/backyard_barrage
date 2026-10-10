@@ -64,12 +64,15 @@ Future<SeasonKit> loadSeasonKit(FlameGame game, Season season) async {
       uprightKo:
           rival == null &&
           SeasonAssets.uprightKo(player: player, season: season),
-      // Rival renders lie flat on the feet line already.
-      koDrop: rival == null ? 40 : 0,
+      // 3D renders (rivals and Ethan's kid) lie flat on the feet line
+      // already; the 2D drafts sink a little.
+      koDrop: SeasonAssets.crop(path('ko')) != null ? 0 : 40,
       drawScale: rival != null
           ? SeasonAssets.rivalDrawScale(rival)
           : (player ? SeasonAssets.playerDrawScale(season) : 1),
-      walkCycle: rival != null ? null : await walkCycle(player),
+      walkCycle: rival != null
+          ? await _rivalWalk(game, rival)
+          : await walkCycle(player),
     );
   }
 
@@ -94,6 +97,12 @@ Future<SeasonKit> loadSeasonKit(FlameGame game, Season season) async {
       for (final entry in rivalPoses.entries) entry.key: await entry.value,
     },
   );
+}
+
+Future<List<Sprite>?> _rivalWalk(FlameGame game, RivalType type) async {
+  final frames = SeasonAssets.rivalWalkCycle(type);
+  if (frames == null) return null;
+  return Future.wait([for (final path in frames) _loadPose(game, path)]);
 }
 
 Future<Sprite> _loadPose(FlameGame game, String path) {

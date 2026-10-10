@@ -755,16 +755,15 @@ void main() {
     ]);
   });
   group('power-ups', () {
-    test('buy up to the stack cap, spend one at a time', () {
+    test('buy as many as you can afford, spend one at a time', () {
       final meta = MetaState(coins: 500);
-      for (var i = 0; i < PowerUp.maxStack; i++) {
+      for (var i = 0; i < 10; i++) {
         expect(meta.buyItem(PowerUp.freezeAll), isTrue);
       }
-      expect(meta.buyItem(PowerUp.freezeAll), isFalse, reason: 'stack full');
-      expect(meta.itemCount(PowerUp.freezeAll), PowerUp.maxStack);
-      expect(meta.coins, 500 - PowerUp.freezeAll.cost * PowerUp.maxStack);
+      expect(meta.itemCount(PowerUp.freezeAll), 10, reason: 'no cap');
+      expect(meta.coins, 500 - PowerUp.freezeAll.cost * 10);
       expect(meta.useItem(PowerUp.freezeAll), isTrue);
-      expect(meta.itemCount(PowerUp.freezeAll), PowerUp.maxStack - 1);
+      expect(meta.itemCount(PowerUp.freezeAll), 9);
       expect(meta.useItem(PowerUp.hotCocoa), isFalse, reason: 'none owned');
       expect(MetaState(coins: 1).buyItem(PowerUp.powerThrow), isFalse);
     });
@@ -999,18 +998,22 @@ void main() {
     expect(meta.itemCost(PowerUp.revive), 100);
   });
 
-  test('a free random item never overfills and skips full ones', () {
-    final meta = MetaState(
-      items: {
-        for (final item in PowerUp.values)
-          if (item != PowerUp.hotCocoa) item: PowerUp.maxStack,
-      },
-    );
+  test('a free random item adds one and never raises prices', () {
+    final meta = MetaState(items: {PowerUp.revive: 40});
     final rng = math.Random(1);
-    expect(meta.grantRandomItem(rng), PowerUp.hotCocoa);
+    final seen = <PowerUp>{};
+    for (var i = 0; i < 200; i++) {
+      seen.add(meta.grantRandomItem(rng));
+    }
+    expect(seen, PowerUp.values.toSet());
+    expect(
+      PowerUp.values.fold<int>(0, (n, item) => n + meta.itemCount(item)),
+      240,
+    );
     expect(meta.ledger.reviveBought, 0);
-    meta.grantRandomItem(rng);
-    meta.grantRandomItem(rng);
-    expect(meta.grantRandomItem(rng), isNull);
+    expect(
+      MetaState.fromJson(meta.toJson()).itemCount(PowerUp.revive),
+      meta.itemCount(PowerUp.revive),
+    );
   });
 }

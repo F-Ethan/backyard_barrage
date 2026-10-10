@@ -125,7 +125,19 @@ Owner renders, 512² RGBA with the feet on y≈471, facing screen-left. Wired wi
 | `ghost/` (snow ghost, standard rival) | `aim_00`, `aim_15a`, `aim_15b`, `aim_30a`, `aim_30b`, `idle`, `windup` (v1, rescaled), `throw`, `hit`, `ko` |
 | `frostkid/` (long range) | same set plus `windup` |
 
-Both rivals charge on `windup` (snowball raised); the `aim_*` frames are a smoother sculpt and are not drawn. `ghost/ghost_windup_draft.png` is the v1 `characters/enemy/ghost/ghost_windup_512.png` rescaled ×0.961 onto the v2 feet line. The rusher type draws the ghost frames with a red tint and glow (`RivalProfile.aura`) until its art lands.
+Both rivals charge on `windup` (snowball raised); the `aim_*` frames are a smoother sculpt and are not drawn. `ghost/ghost_windup_draft.png` is the v1 `characters/enemy/ghost/ghost_windup_512.png` rescaled ×0.961 onto the v2 feet line. `rusher/` (2026-10-09): `idle`, `windup`, `throw`, `hit`, `ko`, `walk_00`–`03`, an ice brute with an amber core. Ghost and rusher loop four `walk_*` frames; the frost kid walk is being redrawn. The ghost and frost kid `throw` frames are the v2 no-ball versions, so only the real projectile shows. `hellhound/` adds `land` and `hit` (redo v2).
+
+### Finals (2026-10-09)
+
+| Path | What |
+| --- | --- |
+| `forts/fort_stage_{1,2,3}{,_damaged}.png`, `forts/fort_collapsed.png` | Player forts, blue flag, 640² on y=611 |
+| `forts/rival/rival_*` | Rival forts, violet flag (the rival fort uses stage 1) |
+| `projectiles/snowball.png` | Snowball, 256² |
+| `vfx/ice_bubble.png`, `vfx/frost_crust_overlay.png` | Frost armor bubble; Freeze all screen-edge frost (1280×720) |
+| `props/winter/*.png` | Eight props, 512², standing on y=496 |
+| `ui/powerups/pu_*.png` | Seven round power-up icons, 256² |
+| `characters/player/ethan3d/kid_*_512.png` | Kid idle, throw follow-through, hit, KO, two aim-away frames, four-frame run |
 
 `hellhound/` (Ice hound event, 2026-10-08): `idle`, `run_00`–`run_03`, `jump_00` (crouch), `jump_01` (air), `bite_00`, `bite_01`, the 512 versions with the same square crop. `jump_02` (same as `idle`) and `look` are not copied; the landing uses `idle`.
 

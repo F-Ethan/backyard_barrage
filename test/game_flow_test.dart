@@ -11,6 +11,7 @@ import 'package:backyard_barrage/game/backyard_barrage_game.dart';
 import 'package:backyard_barrage/game/combat_rules.dart';
 import 'package:backyard_barrage/game/components/coin_pop.dart';
 import 'package:backyard_barrage/game/components/enemy_controller.dart';
+import 'package:backyard_barrage/game/game_art.dart';
 import 'package:backyard_barrage/game/components/fort_component.dart';
 import 'package:backyard_barrage/game/components/hound_component.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
@@ -59,11 +60,9 @@ void main() {
       for (final type in RivalType.values)
         for (final pose in SeasonAssets.poseNames)
           ?SeasonAssets.rivalPose(type, pose),
-      for (final stage in [1, 2, 3]) ...[
-        'forts/fort_stage_${stage}_draft.png',
-        'forts/fort_stage_${stage}_damaged_draft.png',
-      ],
-      'forts/fort_collapsed_draft.png',
+      ...GameArt.flameImages,
+      for (final type in RivalType.values)
+        ...?SeasonAssets.rivalWalkCycle(type),
       for (final frame in HoundComponent.frames)
         HoundComponent.framePath(frame),
       for (final arena in Arena.values) arena.background,
@@ -604,7 +603,7 @@ void main() {
         final profile = RivalProfile.of(type);
         expect(e.maxHp, profile.hitsToKo(base), reason: type.name);
         expect(e.glint, profile.glint, reason: type.name);
-        expect(e.aura, profile.aura, reason: type.name);
+
         final hold = profile.holdColumn;
         if (hold != null) {
           expect(
@@ -1350,7 +1349,7 @@ void main() {
     expect(game.meta.throwRank, 1);
     expect(booted.pulses.kinds, ['medium']);
     expect(booted.playback.sfx, contains('sfx/purchase_coin.wav'));
-    expect(booted.playback.loops, contains('music/battle_loop_winter.wav'));
+    expect(booted.playback.loops, contains('music/battle_loop_winter.m4a'));
   });
 
   testWidgets('with motion on, the shop pops in and a purchase celebrates', (
@@ -1656,13 +1655,11 @@ void main() {
     expect(game.meta.itemCount(one.single), 1);
     final three = game.rewardRandomItems(3, at: Vector2(400, 400));
     expect(three, hasLength(3));
-    // A full wallet pays coins instead.
-    game.meta.replaceItems({
-      for (final item in PowerUp.values) item: PowerUp.maxStack,
-    });
-    final coins = game.meta.coins;
-    expect(game.rewardRandomItems(1, at: Vector2(400, 400)), isEmpty);
-    expect(game.meta.coins, greaterThan(coins));
+    final held = PowerUp.values.fold<int>(
+      0,
+      (n, item) => n + game.meta.itemCount(item),
+    );
+    expect(held, 4, reason: 'no cap, so every reward lands');
   });
 
   testWidgets('bought extra forts stand apart and stop rival snowballs', (
@@ -2706,15 +2703,15 @@ void main() {
     expect(find.byKey(const Key('skill-branch-recovery')), findsNothing);
   });
 
-  testWidgets('the player kid runs on a looping two-frame cycle', (
+  testWidgets('the player kid runs on a looping four-frame cycle', (
     tester,
   ) async {
     final game = (await boot(tester, MetaState())).game;
     final kid = game.players.first;
-    expect(kid.walkFrames, hasLength(2));
+    expect(kid.walkFrames, hasLength(4));
     kid.setWalking(true);
     final seen = <Sprite>{};
-    for (var i = 0; i < 6; i++) {
+    for (var i = 0; i < 8; i++) {
       kid.update(KidComponent.walkFrameSeconds);
       seen.add(kid.sprite!);
     }

@@ -129,7 +129,7 @@ class MetaState {
   void replaceItems(Map<PowerUp, int> next) {
     _items.clear();
     for (final entry in next.entries) {
-      final n = entry.value.clamp(0, PowerUp.maxStack);
+      final n = entry.value.clamp(0, PowerUp.maxHeld);
       if (n > 0) _items[entry.key] = n;
     }
   }
@@ -142,8 +142,7 @@ class MetaState {
     return _round5(base * math.pow(1.5, ledger.reviveBought).toDouble());
   }
 
-  bool canBuyItem(PowerUp item) =>
-      coins >= itemCost(item) && itemCount(item) < PowerUp.maxStack;
+  bool canBuyItem(PowerUp item) => coins >= itemCost(item);
 
   bool buyItem(PowerUp item) {
     if (!canBuyItem(item)) return false;
@@ -153,16 +152,10 @@ class MetaState {
     return true;
   }
 
-  /// Adds one random item the wallet has room for, for free (a hound or
-  /// boss reward), and returns it. Null when every item is full. A free
-  /// Revive does not raise the Revive price.
-  PowerUp? grantRandomItem(math.Random rng) {
-    final open = [
-      for (final item in PowerUp.values)
-        if (itemCount(item) < PowerUp.maxStack) item,
-    ];
-    if (open.isEmpty) return null;
-    final item = open[rng.nextInt(open.length)];
+  /// Adds one random item for free (a hound or boss reward) and returns
+  /// it. A free Revive does not raise the Revive price.
+  PowerUp grantRandomItem(math.Random rng) {
+    final item = PowerUp.values[rng.nextInt(PowerUp.values.length)];
     _items[item] = itemCount(item) + 1;
     return item;
   }
@@ -570,7 +563,7 @@ class MetaState {
     return {
       for (final entry in raw.entries)
         ?PowerUp.tryParse(entry.key is String ? entry.key as String : null):
-            _clampInt(_asInt(entry.value), 0, PowerUp.maxStack),
+            _clampInt(_asInt(entry.value), 0, PowerUp.maxHeld),
     };
   }
 

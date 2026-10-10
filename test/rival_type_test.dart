@@ -74,13 +74,13 @@ void main() {
   });
 
   group('rival art', () {
-    test('only the rusher glows', () {
-      expect(RivalProfile.of(RivalType.rusher).aura, isNotNull);
-      expect(RivalProfile.of(RivalType.snowGhost).aura, isNull);
-      expect(RivalProfile.of(RivalType.frostKid).aura, isNull);
+    test('no rival needs a stand-in tint now', () {
+      for (final type in RivalType.values) {
+        expect(RivalProfile.of(type).aura, isNull, reason: type.name);
+      }
     });
 
-    test('ghost and frost kid have renders; rusher wears the snowman', () {
+    test('every rival draws from its own renders', () {
       for (final pose in SeasonAssets.poseNames) {
         expect(
           SeasonAssets.rivalPose(RivalType.snowGhost, pose),
@@ -92,7 +92,7 @@ void main() {
         );
         expect(
           SeasonAssets.rivalPose(RivalType.rusher, pose),
-          SeasonAssets.rivalPose(RivalType.snowGhost, pose),
+          startsWith('characters/rivals/rusher/'),
         );
       }
     });

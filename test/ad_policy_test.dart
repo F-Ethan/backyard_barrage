@@ -6,32 +6,38 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('an interstitial waits three minutes and never shows in a fight', () {
-    expect(AdConfig.interstitialCooldown, const Duration(minutes: 3));
-    expect(AdPolicy.allows(inFight: false, sinceLastShow: null), isTrue);
-    expect(
-      AdPolicy.allows(
-        inFight: false,
-        sinceLastShow:
-            const Duration(minutes: 3) - const Duration(milliseconds: 1),
-      ),
-      isFalse,
-    );
-    expect(
-      AdPolicy.allows(
-        inFight: false,
-        sinceLastShow: const Duration(minutes: 3),
-      ),
-      isTrue,
-    );
-    expect(
-      AdPolicy.allows(
-        inFight: true,
-        sinceLastShow: const Duration(minutes: 10),
-      ),
-      isFalse,
-    );
-    expect(AdPolicy.allows(inFight: true, sinceLastShow: null), isFalse);
+  test('ads follow bosses and losses, else every five minutes', () {
+    expect(AdConfig.interstitialEvery, const Duration(minutes: 5));
+    expect(AdConfig.interstitialMinGap, const Duration(minutes: 1));
+    bool allows(AdMoment moment, int seconds, {bool fight = false}) =>
+        AdPolicy.allows(
+          inFight: fight,
+          moment: moment,
+          playSinceAd: Duration(seconds: seconds),
+          anyShown: true,
+        );
+    // Boss and loss: after a minute of fighting since the last ad.
+    for (final moment in [AdMoment.bossBeaten, AdMoment.defeat]) {
+      expect(allows(moment, 59), isFalse);
+      expect(allows(moment, 60), isTrue);
+      expect(
+        AdPolicy.allows(
+          inFight: false,
+          moment: moment,
+          playSinceAd: Duration.zero,
+          anyShown: false,
+        ),
+        isTrue,
+        reason: 'the first one of the session shows',
+      );
+    }
+    // Any other break: five minutes.
+    expect(allows(AdMoment.breakTime, 299), isFalse);
+    expect(allows(AdMoment.breakTime, 300), isTrue);
+    // Never in a fight.
+    for (final moment in AdMoment.values) {
+      expect(allows(moment, 3600, fight: true), isFalse);
+    }
   });
 
   test('native app ids match the single Dart config', () {

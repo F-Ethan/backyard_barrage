@@ -269,12 +269,18 @@ class BackyardBarrageGame extends FlameGame {
   /// count.
   double fightSeconds = 0;
 
-  /// Wall clock for the interstitial cooldown. Tests replace this.
-  @visibleForTesting
-  DateTime Function() adClock = DateTime.now;
-
-  DateTime? _lastAdShownAt;
+  /// Fight seconds since the last interstitial that actually showed (or
+  /// since the app opened).
+  double _playSinceAd = 0;
+  bool _anyAdShown = false;
   var _adInFlight = false;
+
+  @visibleForTesting
+  double get playSinceAd => _playSinceAd;
+
+  /// Count [seconds] of fighting toward the next interstitial.
+  @visibleForTesting
+  void debugAddPlayTime(double seconds) => _playSinceAd += seconds;
 
   /// Right-hand share of the screen. A hold there charges; release throws.
   static const double chargeScreenFraction = 2 / 3;
@@ -1883,7 +1889,7 @@ class BackyardBarrageGame extends FlameGame {
 
   void exitToMenu() {
     _bookmarkRun();
-    _offerEndAd();
+    _offerEndAd(AdMoment.breakTime);
     overlays.clear();
     if (paused) resumeEngine();
     unawaited(persist());
@@ -2065,6 +2071,7 @@ class BackyardBarrageGame extends FlameGame {
         _pendingBanner = _Banner.none;
         _clearBanner();
         phase = MatchPhase.shop;
+        _offerEndAd(isBossWave ? AdMoment.bossBeaten : AdMoment.breakTime);
         // The wave report first; it hands off to the shop.
         overlays.add('report');
         pauseEngine();
@@ -2078,7 +2085,7 @@ class BackyardBarrageGame extends FlameGame {
         _clearBanner();
         _clearCoinCarry();
         // After the coin beat, so the interstitial does not cover it.
-        _offerEndAd();
+        _offerEndAd(AdMoment.defeat);
         overlays.add('defeat');
         pauseEngine();
       case _Banner.waveIntro:
@@ -2217,33 +2224,36 @@ class BackyardBarrageGame extends FlameGame {
     );
   }
 
-  /// One interstitial outside the fight, at least three minutes after the
-  /// last one that actually showed. Offered after the defeat coin beat,
-  /// before the summary, and when Pause returns to the menu. A wave-clear
-  /// shop does not offer one. Remove Ads skips it and does not start the
-  /// cooldown.
-  void _offerEndAd() {
+  /// One interstitial outside the fight (see [AdPolicy]): after a boss
+  /// wave clear, after a loss (once its coin beat is over), and otherwise
+  /// at a wave clear or a Pause → menu once five minutes of fighting have
+  /// passed since the last one. Remove Ads skips it. A missed show does
+  /// not reset the timer.
+  void _offerEndAd(AdMoment moment) {
     if (_adInFlight) return;
     if (adsRemoved?.call() ?? false) return;
-    final now = adClock();
-    final last = _lastAdShownAt;
     if (!AdPolicy.allows(
       inFight: phase == MatchPhase.fight,
-      sinceLastShow: last == null ? null : now.difference(last),
+      moment: moment,
+      playSinceAd: Duration(milliseconds: (_playSinceAd * 1000).round()),
+      anyShown: _anyAdShown,
     )) {
       return;
     }
     _adInFlight = true;
-    unawaited(_finishAdOffer(now));
+    unawaited(_finishAdOffer());
   }
 
-  Future<void> _finishAdOffer(DateTime offeredAt) async {
+  Future<void> _finishAdOffer() async {
     var shown = false;
     try {
       shown = await endAd.onRunEnded(fightSeconds: fightSeconds);
     } finally {
       _adInFlight = false;
-      if (shown) _lastAdShownAt = offeredAt;
+      if (shown) {
+        _anyAdShown = true;
+        _playSinceAd = 0;
+      }
     }
   }
 
@@ -3075,7 +3085,10 @@ class BackyardBarrageGame extends FlameGame {
     if (paused || phase == MatchPhase.paused) return;
     super.update(dt);
     _tickEntrance(dt);
-    if (phase == MatchPhase.fight) fightSeconds += dt;
+    if (phase == MatchPhase.fight) {
+      fightSeconds += dt;
+      _playSinceAd += dt;
+    }
     if (_settling) {
       _settleTime += dt;
       if (!_shotsInFlight || _settleTime >= settleCapSeconds) {

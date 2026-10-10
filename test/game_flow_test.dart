@@ -177,13 +177,11 @@ void main() {
     expect(game.fort.shelters(game.players[1]), isFalse);
   });
 
-  testWidgets('an end ad shows after the coin beat, then waits three minutes', (
+  testWidgets('a loss shows an ad after the coin beat, a minute apart', (
     tester,
   ) async {
-    var now = DateTime.utc(2026, 1, 1);
     final ads = _RecordingEndAd();
     final game = (await boot(tester, MetaState(), endAd: ads)).game;
-    game.adClock = () => now;
     final before = game.fightSeconds;
     game.update(1.25);
     expect(game.fightSeconds, closeTo(before + 1.25, 0.02));
@@ -200,11 +198,15 @@ void main() {
     expect(game.coinCarryLabel, isNull);
     expect(ads.calls, 1);
     expect(ads.lastSeconds, closeTo(game.fightSeconds, 0.01));
+    await tester.pump();
+    expect(game.playSinceAd, 0);
 
+    // Leaving right after is not another break-time ad.
     game.exitToMenu();
     expect(ads.calls, 1);
     await tester.pump();
 
+    // A quick second loss inside a minute of fighting waits.
     game.retryFromDefeat();
     game.finishEntrance();
     knockOut(game.players);
@@ -213,7 +215,7 @@ void main() {
     game.update(1.5);
     expect(ads.calls, 1);
 
-    now = now.add(const Duration(minutes: 3));
+    game.debugAddPlayTime(60);
     game.retryFromDefeat();
     game.finishEntrance();
     knockOut(game.players);
@@ -223,7 +225,9 @@ void main() {
     expect(ads.calls, 2);
   });
 
-  testWidgets('leaving mid-fight does not show an ad', (tester) async {
+  testWidgets('leaving to the menu shows an ad only after five minutes', (
+    tester,
+  ) async {
     final ads = _RecordingEndAd();
     final game = (await boot(tester, MetaState(), endAd: ads)).game;
     game.exitToMenu();
@@ -232,6 +236,29 @@ void main() {
 
     game.pauseMatch();
     game.exitToMenu();
+    expect(ads.calls, 0);
+
+    game.debugAddPlayTime(300);
+    game.exitToMenu();
+    expect(ads.calls, 1);
+  });
+
+  testWidgets('a boss wave clear shows an ad', (tester) async {
+    final ads = _RecordingEndAd();
+    final game = (await boot(tester, MetaState(), endAd: ads)).game;
+    game.wave = 10;
+    game.startWave();
+    game.finishEntrance();
+    expect(game.isBossWave, isTrue);
+    for (final rival in game.enemies) {
+      while (!rival.isKo) {
+        rival.takeHit();
+      }
+    }
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    expect(game.phase, MatchPhase.shop);
     expect(ads.calls, 1);
   });
 
@@ -259,25 +286,34 @@ void main() {
     expect(ads.calls, 0);
   });
 
-  testWidgets('a wave-clear shop does not offer an ad', (tester) async {
+  testWidgets('a wave clear shows an ad after five minutes of fighting', (
+    tester,
+  ) async {
     final ads = _RecordingEndAd();
     final game = (await boot(tester, MetaState(), endAd: ads)).game;
 
-    for (var cleared = 0; cleared < 3; cleared++) {
+    void clearWave() {
       knockOut(game.enemies);
       game.resolveKnockouts();
       game.update(0.7);
       game.update(0.6);
       expect(game.phase, MatchPhase.shop);
+    }
+
+    for (var cleared = 0; cleared < 3; cleared++) {
+      clearWave();
       expect(ads.calls, 0);
       game.continueFromShop();
       game.finishEntrance();
     }
 
-    game.pauseMatch();
-    expect(game.phase, MatchPhase.paused);
-    expect(ads.calls, 0);
-    game.exitToMenu();
+    game.debugAddPlayTime(300);
+    clearWave();
+    expect(ads.calls, 1);
+    await tester.pump();
+    game.continueFromShop();
+    game.finishEntrance();
+    clearWave();
     expect(ads.calls, 1);
   });
 

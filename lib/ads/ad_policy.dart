@@ -1,18 +1,36 @@
 import 'ad_config.dart';
 
-/// When an interstitial is allowed.
+/// Where the game is offering an interstitial.
+enum AdMoment {
+  /// A boss wave was just cleared.
+  bossBeaten,
+
+  /// The crew went down.
+  defeat,
+
+  /// Any other break: an ordinary wave clear, or leaving to the menu.
+  breakTime,
+}
+
+/// When an interstitial is allowed: after every boss and every loss, and
+/// otherwise once [AdConfig.interstitialEvery] of fighting has passed
+/// since the last one. Never in a fight.
 class AdPolicy {
   const AdPolicy._();
 
-  /// True outside a fight, once [AdConfig.interstitialCooldown] has passed
-  /// since the last interstitial that actually showed. A null
-  /// [sinceLastShow] means none has shown this session.
+  /// [playSinceAd] is fight time since the last interstitial that actually
+  /// showed (or since the app opened, when none has).
   static bool allows({
     required bool inFight,
-    required Duration? sinceLastShow,
+    required AdMoment moment,
+    required Duration playSinceAd,
+    required bool anyShown,
   }) {
     if (inFight) return false;
-    if (sinceLastShow == null) return true;
-    return sinceLastShow >= AdConfig.interstitialCooldown;
+    return switch (moment) {
+      AdMoment.bossBeaten || AdMoment.defeat =>
+        !anyShown || playSinceAd >= AdConfig.interstitialMinGap,
+      AdMoment.breakTime => playSinceAd >= AdConfig.interstitialEvery,
+    };
   }
 }

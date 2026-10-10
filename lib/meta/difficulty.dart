@@ -16,8 +16,7 @@ enum Difficulty {
   String get summary => switch (this) {
     Difficulty.easy => 'Fast charge, short stuns, full aim guide.',
     Difficulty.normal => 'Quicker charge, aim path without the target ring.',
-    Difficulty.hard =>
-      'Full charge and stuns, no aim guide, rivals throw more.',
+    Difficulty.hard => 'Rivals throw fast and aim true. No aim guide.',
   };
 
   /// How much of the throw preview this mode draws while charging.
@@ -93,11 +92,15 @@ class DifficultyTuning {
   final double chargeScale;
 
   /// Player charge time as a fraction of the throw-rank hold.
-  /// Easy is 1/2 (2× speed). Normal is 2/3 (1.5× speed). Hard stays 1.
+  /// Easy is 1/2 (2× speed). Normal is 2/3 (1.5× speed). Hard is 0.7, about
+  /// 2.1s at rank 0: still the slowest bar, but a cross-yard throw is not
+  /// a sitting duck against rivals that wind up in half a second.
   final double playerChargeTimeScale;
 
   /// Ally stun as a fraction of the base lock.
-  /// Easy is half. Normal is three quarters. Hard stays the full lock.
+  /// Easy is half (1.4s). Normal is three quarters (2.1s). Hard is 0.4
+  /// (about 1.1s): Hard rivals throw every 1–1.5s, and a hit during a stun
+  /// knocks a kid out, so a long stun made the first hit a sure KO.
   /// Rivals do not use this. Their brush-off and knockdown stay full length.
   final double allyStunScale;
 
@@ -220,8 +223,8 @@ class DifficultyTuning {
           friendlyFortDamage: true,
           enemyStepSpeed: 170,
           chargeVersusPlayer: 0.15,
-          playerChargeTimeScale: 1,
-          allyStunScale: 1,
+          playerChargeTimeScale: 0.7,
+          allyStunScale: 0.4,
           enemyHitsToKo: 3,
           aimDepthRows: 0.35,
         );

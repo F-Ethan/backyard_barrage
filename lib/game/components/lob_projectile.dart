@@ -309,7 +309,8 @@ class LobProjectile extends SpriteComponent {
 
   void _applyDepth() {
     priority = ArenaGrid.depthOrder(_hit.y);
-    final factor = ArenaGrid.depthScale(_hit.y, groundTrack: true);
+    // Farther up the yard (away from the camera) draws smaller.
+    final factor = ArenaGrid.ballScale(_hit.y);
     scale.setValues(factor, factor);
   }
 

@@ -1389,7 +1389,7 @@ void main() {
 
   testWidgets('right side charges and the screen glows', (tester) async {
     final game = (await boot(tester, MetaState())).game;
-    // The bell anchors below are the unscaled 3s hold. Hard keeps that hold.
+    // Hard fills the bar in 0.7 of the 3s rank-0 hold: 2.1s.
     game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));
     await tester.pump();
     expect(find.byKey(const Key('charge-zone')), findsOneWidget);
@@ -1408,9 +1408,16 @@ void main() {
     expect(find.byKey(const Key('charge-glow')), findsOneWidget);
     expect(find.byKey(const Key('power-bar')), findsNothing);
 
+    // A power meter stands beside the thrower on every difficulty.
+    expect(game.chargeHud.visibleCharge, isTrue);
+    final meter = game.chargeHud.meterRect;
+    final hand = game.players.first.throwOrigin;
+    expect(meter.right, lessThan(hand.x), reason: 'behind the throw arrow');
+    expect(meter.bottom, lessThan(hand.y + 20));
+
     game.update(0.9);
-    // A steady climb: 1.02s into the 3s rank-0 hold.
-    expect(game.charge, closeTo(1 / 3 + 2 / 3 * (1.02 / 3), 0.02));
+    // A steady climb: 1.02s into Hard's 2.1s hold.
+    expect(game.charge, closeTo(1 / 3 + 2 / 3 * (1.02 / 2.1), 0.02));
     game.update(2);
     expect(game.charge, greaterThan(0.98));
     game.releaseChargeZone();

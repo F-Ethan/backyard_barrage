@@ -66,6 +66,17 @@ class ArenaGrid {
   /// Full size at the near edge of the yard (toward the camera).
   static const double depthScaleNear = 1;
 
+  /// Snowball size at the far and near edges. Wider than the kids' range so
+  /// a ball thrown up or down the yard visibly shrinks or grows.
+  static const double ballScaleFar = 0.55;
+  static const double ballScaleNear = 1.2;
+
+  /// Drawn snowball size for a ground-track height.
+  static double ballScale(double y) {
+    final t = ((y - laneY(0)) / verticalSpan).clamp(0.0, 1.0);
+    return ballScaleFar + (ballScaleNear - ballScaleFar) * t;
+  }
+
   /// Drawn size for a yard height. Same factor on X and Y.
   ///
   /// Kids pass feet Y (`groundTrack: false`), which runs from [rowBack] to

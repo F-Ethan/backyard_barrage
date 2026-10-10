@@ -128,10 +128,33 @@ void main() {
     expect(find.text(r'Remove Ads · $1.99'), findsOneWidget);
     expect(find.byKey(const Key('restore-purchases')), findsOneWidget);
 
+    // A wrong answer at the grown-up check buys nothing.
     await tester.tap(find.byKey(const Key('remove-ads')));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    await _answerGate(tester, correct: false);
+    expect(catalog.buys, 0);
+    expect(removeAds.owned, isFalse);
+
+    await tester.tap(find.byKey(const Key('remove-ads')));
+    await tester.pumpAndSettle();
+    await _answerGate(tester, correct: true);
     expect(find.text('Ads removed'), findsOneWidget);
     expect(removeAds.owned, isTrue);
+    expect(catalog.buys, 1);
+  });
+
+  test('a double tap starts one purchase', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final catalog = _SlowCatalog();
+    final removeAds = RemoveAdsController(catalog: catalog, preferences: prefs);
+    await removeAds.prepare();
+    final first = removeAds.buy();
+    final second = removeAds.buy();
+    expect(removeAds.buying, isTrue);
+    await Future.wait([first, second]);
+    expect(catalog.buys, 1);
+    expect(removeAds.buying, isFalse);
   });
 
   testWidgets('settings stays calm when the product is missing', (
@@ -166,7 +189,8 @@ void main() {
 
     await tester.ensureVisible(find.byKey(const Key('restore-purchases')));
     await tester.tap(find.byKey(const Key('restore-purchases')));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    await _answerGate(tester, correct: true);
     expect(find.text(RemoveAdsCopy.restoreFailed), findsOneWidget);
     expect(removeAds.owned, isFalse);
   });
@@ -208,5 +232,45 @@ class _FakeCatalog implements RemoveAdsCatalog {
       onOwned?.call();
     }
     return restoreResult;
+  }
+}
+
+/// Answers the grown-up check: reads "What is a × b?" and taps the right
+/// (or a wrong) choice.
+Future<void> _answerGate(WidgetTester tester, {required bool correct}) async {
+  expect(find.byKey(const Key('parental-gate')), findsOneWidget);
+  final question = tester
+      .widget<Text>(find.byKey(const Key('parental-gate-question')))
+      .data!;
+  final numbers = RegExp(r'\d+').allMatches(question).toList();
+  final answer =
+      int.parse(numbers[0].group(0)!) * int.parse(numbers[1].group(0)!);
+  final Finder pick;
+  if (correct) {
+    pick = find.byKey(Key('parental-gate-$answer'));
+  } else {
+    pick = find.byWidgetPredicate((widget) {
+      final key = widget.key;
+      return key is ValueKey<String> &&
+          key.value.startsWith('parental-gate-') &&
+          int.tryParse(key.value.substring('parental-gate-'.length)) != null &&
+          key.value != 'parental-gate-$answer';
+    }).first;
+  }
+  await tester.tap(pick);
+  await tester.pumpAndSettle();
+  expect(find.byKey(const Key('parental-gate')), findsNothing);
+}
+
+/// A store whose purchase sheet takes a moment to come back.
+class _SlowCatalog extends _FakeCatalog {
+  _SlowCatalog() : super(price: r'$1.99');
+
+  @override
+  Future<bool> buy() async {
+    buys++;
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    onOwned?.call();
+    return true;
   }
 }

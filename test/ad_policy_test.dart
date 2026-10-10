@@ -67,6 +67,15 @@ void main() {
       AdConfig.removeAdsProductId,
       'dev.gamelogic.backyardbarrage.removeads',
     );
+    // Kid-safe: no tracking prompt, and the privacy manifest declares no
+    // tracking.
+    expect(plist, isNot(contains('NSUserTrackingUsageDescription')));
+    final privacy = File('ios/Runner/PrivacyInfo.xcprivacy').readAsStringSync();
+    expect(privacy, isNot(contains('<true/>')));
+    expect(
+      File('pubspec.yaml').readAsStringSync(),
+      isNot(contains('app_tracking_transparency')),
+    );
     final encryption = plist.indexOf(
       '<key>ITSAppUsesNonExemptEncryption</key>',
     );

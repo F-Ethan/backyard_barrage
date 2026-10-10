@@ -303,3 +303,7 @@ Avoid pay-to-win throw power.
 ---
 
 *Working title locked: Backyard Barrage. Seasons: Winter + Summer. Mobile Flutter iOS/Android. Plan version: 2026-10-01.*
+
+## Audience and ads (Oct 2026)
+
+General-audience listing, rated 4+, marketed as a family game, not in Apple's Kids Category. Because the game is aimed at kids, it is treated as directed to children: no iOS tracking prompt, no tracking in the privacy manifest, every ad request tagged with child age treatment and a G content ceiling, non-personalised, and only after consent allows ads. Remove Ads and Restore Purchases ask a grown-up question first.

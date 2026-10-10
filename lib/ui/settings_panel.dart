@@ -9,6 +9,7 @@ import 'barrage_colors.dart';
 import 'barrage_theme.dart';
 import 'draft_button.dart';
 import 'motion.dart';
+import 'parental_gate.dart';
 
 /// SFX, music, haptics, difficulty, and credits. Shared by the menu and
 /// pause.
@@ -176,7 +177,7 @@ class _RemoveAdsSection extends StatelessWidget {
       builder: (context, _) {
         final owned = removeAds.owned;
         final price = removeAds.priceLabel;
-        final canBuy = !owned && price != null;
+        final canBuy = !owned && price != null && !removeAds.buying;
         final label = owned
             ? 'Ads removed'
             : price != null
@@ -197,7 +198,13 @@ class _RemoveAdsSection extends StatelessWidget {
               height: 52,
               fontSize: 15,
               feel: feel,
-              onPressed: canBuy ? () => unawaited(removeAds.buy()) : null,
+              onPressed: canBuy
+                  ? () async {
+                      if (await askGrownUp(context, feel: feel)) {
+                        unawaited(removeAds.buy());
+                      }
+                    }
+                  : null,
             ),
             if (note != null) ...[
               SizedBox(height: tokens.space.sm),
@@ -218,7 +225,11 @@ class _RemoveAdsSection extends StatelessWidget {
               height: 52,
               fontSize: 15,
               feel: feel,
-              onPressed: () => unawaited(removeAds.restore()),
+              onPressed: () async {
+                if (await askGrownUp(context, feel: feel)) {
+                  unawaited(removeAds.restore());
+                }
+              },
             ),
           ],
         );

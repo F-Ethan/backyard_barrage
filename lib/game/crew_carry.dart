@@ -24,23 +24,28 @@ class CrewCarry {
   };
 
   /// HP for each kid going into the next wave. 0 means they sit it out.
+  /// [maxHps], when given, is each kid's own heart count (Health ranks);
+  /// otherwise every kid uses [maxHp].
   static List<int> next({
     required List<int> hp,
     required int maxHp,
+    List<int>? maxHps,
     required Difficulty difficulty,
     required bool carries,
     int healBonus = 0,
     bool reviveOne = false,
   }) {
+    int cap(int i) => maxHps != null && i < maxHps.length ? maxHps[i] : maxHp;
     if (!carries || difficulty == Difficulty.easy) {
-      return List.filled(hp.length, maxHp);
+      return [for (var i = 0; i < hp.length; i++) cap(i)];
     }
     final heal = baseHeal(difficulty) + healBonus;
     var reviveLeft = reviveOne;
     final next = <int>[];
-    for (final now in hp) {
+    for (var i = 0; i < hp.length; i++) {
+      final now = hp[i];
       if (now > 0) {
-        next.add((now + heal).clamp(1, maxHp));
+        next.add((now + heal).clamp(1, cap(i)));
       } else if (reviveLeft) {
         reviveLeft = false;
         next.add(1);

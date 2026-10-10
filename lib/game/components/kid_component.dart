@@ -172,7 +172,36 @@ class KidComponent extends SpriteComponent {
   int hp;
 
   /// Hits absorbed before HP or stun. Refilled at the start of each wave.
-  int shieldHits = 0;
+  int get shieldHits => _shieldHits;
+  set shieldHits(int value) {
+    _shieldHits = value < 0 ? 0 : value;
+    // The most it has held since it was last empty, so a used shield
+    // shows cracked.
+    _shieldTop = _shieldHits == 0
+        ? 0
+        : (_shieldHits > _shieldTop ? _shieldHits : _shieldTop);
+  }
+
+  int _shieldHits = 0;
+  int _shieldTop = 0;
+
+  /// The shield has blocked a hit and still has some left.
+  bool get shieldCracked => _shieldHits > 0 && _shieldHits < _shieldTop;
+
+  /// Called when a block uses the shield's last hit (to drop the broken
+  /// shield on the ground).
+  void Function(KidComponent kid)? onShieldBroken;
+
+  /// Spend one shield hit on a block. True when the shield took it.
+  bool blockWithShield() {
+    if (_shieldHits <= 0) return false;
+    _shieldHits -= 1;
+    if (_shieldHits == 0) {
+      _shieldTop = 0;
+      onShieldBroken?.call(this);
+    }
+    return true;
+  }
 
   bool _selected = false;
 
@@ -354,8 +383,7 @@ class KidComponent extends SpriteComponent {
       _refreshSprite();
       return;
     }
-    if (shieldHits > 0) {
-      shieldHits -= 1;
+    if (blockWithShield()) {
       _flash();
       return;
     }
@@ -639,6 +667,12 @@ class KidComponent extends SpriteComponent {
   /// kid; set once the image loads.
   static Sprite? shieldSprite;
 
+  /// The same shield after it has blocked a hit.
+  static Sprite? shieldCrackedSprite;
+
+  /// Drawn size of the art about the feet (rivals and bosses vary).
+  double get drawScale => _drawScale;
+
   /// Where the iron shield sits on this kid's standing art, as fractions
   /// of the 512² render (centre x, centre y, side), and whether it is
   /// flipped. Null for art with no mapped hand (the shield badge still
@@ -652,7 +686,9 @@ class KidComponent extends SpriteComponent {
   /// The iron shield in the kid's front hand, in the render's own space
   /// (the 512² art is drawn from a 471px square starting 20.5px in).
   void _drawHeldShield(Canvas canvas) {
-    final art = shieldSprite;
+    final art = shieldCracked
+        ? (shieldCrackedSprite ?? shieldSprite)
+        : shieldSprite;
     final spot = shieldSpot;
     if (art == null || spot == null || shieldHits <= 0 || !_standing) return;
     const crop = 471.0;

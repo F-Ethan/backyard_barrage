@@ -22,6 +22,7 @@ import 'package:backyard_barrage/game/components/fort_component.dart';
 import 'package:backyard_barrage/game/components/hound_component.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
 import 'package:backyard_barrage/game/components/lob_projectile.dart';
+import 'package:backyard_barrage/game/components/shield_pile.dart';
 import 'package:backyard_barrage/game/components/splash_particles.dart';
 import 'package:backyard_barrage/game/rival_type.dart';
 import 'package:backyard_barrage/game/throw_physics.dart';
@@ -3162,6 +3163,44 @@ void main() {
     game.openShopFromReport();
     game.continueFromShop();
     expect(game.kidKos, [0, 0, 0]);
+  });
+
+  testWidgets('a shield cracks, then drops broken and fades', (tester) async {
+    final meta = MetaState(coins: 1000);
+    expect(meta.buy('shield-1'), isTrue);
+    expect(meta.buy('shield-2'), isTrue);
+    final game = (await boot(tester, meta)).game;
+    final kid = game.players.single;
+    final hits = kid.shieldHits;
+    expect(hits, greaterThanOrEqualTo(2));
+    expect(kid.shieldCracked, isFalse);
+    final hp = kid.hp;
+
+    kid.takeHit();
+    expect(kid.hp, hp, reason: 'the shield took it');
+    expect(kid.shieldCracked, isTrue);
+    expect(game.world.children.whereType<ShieldPile>(), isEmpty);
+
+    while (kid.shieldHits > 0) {
+      kid.takeHit();
+    }
+    expect(kid.hp, hp);
+    expect(kid.shieldCracked, isFalse);
+    game.update(0.01);
+    final pile = game.world.children.whereType<ShieldPile>().single;
+    expect(pile.priority, lessThan(kid.priority), reason: 'behind the kid');
+    final settled = pile.position.y;
+    game.update(ShieldPile.fallSeconds + 0.05);
+    expect(pile.position.y, greaterThan(settled), reason: 'it falls');
+    // It stays where it fell when the kid walks off.
+    final at = pile.position.clone();
+    kid.position.add(Vector2(80, 0));
+    game.update(0.1);
+    expect(pile.position, at);
+    for (var i = 0; i < 40; i++) {
+      game.update(0.1);
+    }
+    expect(game.world.children.whereType<ShieldPile>(), isEmpty);
   });
 
   testWidgets('each kid starts with its own hearts and shield', (tester) async {

@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 
-import '../feel/feel_bus.dart';
 import '../game/backyard_barrage_game.dart';
 import '../meta/meta_state.dart';
 import 'barrage_colors.dart';
 import 'barrage_theme.dart';
 import 'coin_amount.dart';
 import 'draft_button.dart';
-import 'motion.dart';
 import 'power_up_ui.dart';
+import 'report_kit.dart';
 
-/// Between a wave clear and the shop: what the wave paid, then each kid's
-/// hearts now and going into the next wave, with a heal or a revive.
+/// Between a wave clear and the skills: what the wave paid, then a card per
+/// kid with their knockouts and their state now → going into the next wave,
+/// with a heal or a revive. Laid out like the skill menu, with the next
+/// button fixed at the bottom.
 class WaveReport extends StatefulWidget {
   const WaveReport({super.key, required this.game});
 
@@ -32,179 +33,98 @@ class _WaveReportState extends State<WaveReport> {
     final meta = game.meta;
     final tokens = context.tokens;
     final next = game.nextCrewHp;
-    return ModalShell(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
-        child: SheetSurface(
-          key: const Key('wave-report'),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Wave ${game.wave} report',
-                        style: BarrageType.title,
-                      ),
-                    ),
-                    TagPill(child: CoinAmount(amount: meta.coins)),
-                  ],
-                ),
-                SizedBox(height: tokens.space.sm),
-                const Text('Rewards', style: BarrageType.heading),
-                for (final line in game.waveRewards)
-                  Padding(
-                    padding: EdgeInsets.only(top: tokens.space.xs),
-                    child: Text(
-                      line,
-                      key: Key('report-reward-$line'),
-                      style: BarrageType.body,
-                    ),
-                  ),
-                SizedBox(height: tokens.space.md),
-                const Text('Your crew', style: BarrageType.heading),
-                for (var i = 0; i < next.length; i++)
-                  _KidRow(
-                    index: i,
-                    now: i < game.players.length ? game.players[i].hp : 0,
-                    next: next[i],
-                    max: meta.kidMaxHp(i),
-                    reviveCost: meta.reviveCost(i),
-                    healCost: MetaState.healCostFor(game.wave),
-                    coins: meta.coins,
-                    feel: game.feel,
-                    onRevive: () => _do(() => game.reviveKid(i)),
-                    onHeal: () => _do(() => game.healKid(i)),
-                  ),
-                SizedBox(height: tokens.space.md),
-                const Text('Your power-ups', style: BarrageType.heading),
-                if (meta.items.isEmpty)
-                  Text(
-                    'None yet. Buy some in the shop, or scare off a hound.',
-                    style: BarrageType.muted,
-                  ),
-                for (final entry in meta.items.entries)
-                  Padding(
-                    key: Key('report-item-${entry.key.name}'),
-                    padding: EdgeInsets.only(top: tokens.space.xs),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        PowerUpBadge(item: entry.key, size: 32),
-                        SizedBox(width: tokens.space.sm),
-                        Expanded(
-                          child: Text(
-                            '${entry.key.label} ×${entry.value}: '
-                            '${entry.key.detail}',
-                            style: BarrageType.body,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                SizedBox(height: tokens.space.md),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: DraftImageButton(
-                    key: const Key('report-continue'),
-                    label: 'To the shop',
-                    trailingIcon: Icons.arrow_forward_rounded,
-                    onPressed: game.openShopFromReport,
-                    width: 220,
-                    height: 54,
-                    fontSize: 17,
-                    feel: game.feel,
-                  ),
-                ),
-              ],
-            ),
+    final healCost = MetaState.healCostFor(game.wave);
+    return ReportSheet(
+      key: const Key('wave-report'),
+      title: 'Wave ${game.wave} report',
+      trailing: [TagPill(child: CoinAmount(amount: meta.coins))],
+      body: [
+        const ReportSection('Rewards'),
+        PillRow(
+          children: [
+            for (final reward in game.waveRewards)
+              RewardPill(key: Key('report-reward-$reward'), reward: reward),
+          ],
+        ),
+        const ReportSection('Your crew'),
+        for (var i = 0; i < next.length; i++)
+          KidCard(
+            key: Key('report-kid-$i'),
+            kid: i,
+            knockouts: game.kidKos[i],
+            hpNow: i < game.players.length ? game.players[i].hp : 0,
+            shieldNow: i < game.players.length ? game.players[i].shieldHits : 0,
+            hpNext: next[i],
+            shieldNext: meta.kidShield(i),
+            maxHp: meta.kidMaxHp(i),
+            action: _action(i, next[i], meta, healCost),
           ),
+        const ReportSection('Your power-ups'),
+        if (meta.items.isEmpty)
+          Text(
+            'None yet. Buy some in the skills, or scare off a hound.',
+            style: BarrageType.muted,
+          )
+        else
+          PillRow(
+            children: [
+              for (final entry in meta.items.entries)
+                ReportPill(
+                  key: Key('report-item-${entry.key.name}'),
+                  icon: PowerUpBadge(item: entry.key, size: 30),
+                  value: '×${entry.value}',
+                  caption: entry.key.label,
+                ),
+            ],
+          ),
+        SizedBox(height: tokens.space.sm),
+      ],
+      footer: Align(
+        alignment: Alignment.centerRight,
+        child: DraftImageButton(
+          key: const Key('report-continue'),
+          label: 'To the skills',
+          trailingIcon: Icons.arrow_forward_rounded,
+          onPressed: game.openShopFromReport,
+          width: 220,
+          height: 52,
+          fontSize: 17,
+          feel: game.feel,
         ),
       ),
     );
   }
-}
 
-class _KidRow extends StatelessWidget {
-  const _KidRow({
-    required this.index,
-    required this.now,
-    required this.next,
-    required this.max,
-    required this.reviveCost,
-    required this.healCost,
-    required this.coins,
-    required this.feel,
-    required this.onRevive,
-    required this.onHeal,
-  });
-
-  final int index;
-  final int now;
-  final int next;
-  final int max;
-  final int reviveCost;
-  final int healCost;
-  final int coins;
-  final FeelBus feel;
-  final VoidCallback onRevive;
-  final VoidCallback onHeal;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final down = next <= 0;
-    final heal = next - now;
-    final summary = down
-        ? 'Kid ${index + 1}: knocked out'
-        : 'Kid ${index + 1}: $now ♥${heal > 0 ? ' +$heal' : ''} → $next ♥ of $max';
-    final Widget action;
-    if (down) {
-      action = DraftImageButton(
-        key: Key('report-revive-$index'),
-        label: 'Revive · $reviveCost',
+  Widget? _action(int i, int next, MetaState meta, int healCost) {
+    final game = widget.game;
+    if (next <= 0) {
+      final cost = meta.reviveCost(i);
+      return DraftImageButton(
+        key: Key('report-revive-$i'),
+        label: 'Revive · $cost',
         leadingIcon: Icons.favorite_rounded,
-        enabled: coins >= reviveCost,
-        onPressed: onRevive,
-        width: 170,
+        enabled: meta.coins >= cost,
+        onPressed: () => _do(() => game.reviveKid(i)),
+        width: 160,
         height: 44,
         fontSize: 14,
-        feel: feel,
+        feel: game.feel,
       );
-    } else if (next < max) {
-      action = DraftImageButton(
-        key: Key('report-heal-$index'),
-        label: '+1 ♥ · $healCost',
-        secondary: true,
-        enabled: coins >= healCost,
-        onPressed: onHeal,
-        width: 150,
-        height: 44,
-        fontSize: 14,
-        feel: feel,
-      );
-    } else {
-      action = const SizedBox.shrink();
     }
-    return Padding(
-      padding: EdgeInsets.only(top: tokens.space.sm),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              summary,
-              key: Key('report-kid-$index'),
-              style: BarrageType.body.copyWith(
-                color: down ? BarrageColors.ink.withValues(alpha: 0.6) : null,
-              ),
-            ),
-          ),
-          action,
-        ],
-      ),
-    );
+    if (next < meta.kidMaxHp(i)) {
+      return DraftImageButton(
+        key: Key('report-heal-$i'),
+        label: 'Heal · $healCost',
+        leadingIcon: Icons.favorite_rounded,
+        secondary: true,
+        enabled: meta.coins >= healCost,
+        onPressed: () => _do(() => game.healKid(i)),
+        width: 140,
+        height: 44,
+        fontSize: 14,
+        feel: game.feel,
+      );
+    }
+    return null;
   }
 }

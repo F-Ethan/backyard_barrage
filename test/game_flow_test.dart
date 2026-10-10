@@ -17,6 +17,7 @@ import 'package:backyard_barrage/game/components/boss_controller.dart';
 import 'package:backyard_barrage/game/components/coin_pop.dart';
 import 'package:backyard_barrage/game/components/enemy_controller.dart';
 import 'package:backyard_barrage/game/game_art.dart';
+import 'package:backyard_barrage/game/kid_colors.dart';
 import 'package:backyard_barrage/game/components/fort_component.dart';
 import 'package:backyard_barrage/game/components/hound_component.dart';
 import 'package:backyard_barrage/game/components/kid_component.dart';
@@ -1371,6 +1372,8 @@ void main() {
     }
     // Summer is switched off, so the shop offers no season choice.
     expect(find.byKey(const Key('season-winter')), findsNothing);
+    await tester.tap(find.byKey(const Key('shop-filter-team')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('skill-group-crew')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('skill-branch-team')));
@@ -1399,7 +1402,9 @@ void main() {
     await tester.pump();
     expect(find.text('Aim'), findsOneWidget);
     expect(find.text('Throw'), findsNothing);
-    expect(find.byKey(const Key('skill-branch-team')), findsOneWidget);
+    // Kid 1's own skills: the team's shared ones sit behind Team.
+    expect(find.byKey(const Key('skill-branch-team')), findsNothing);
+    expect(find.byKey(const Key('shop-filter-kid-1')), findsNothing);
 
     await tester.tap(find.byKey(const Key('skill-branch-aim')));
     await tester.pump();
@@ -1411,19 +1416,24 @@ void main() {
     expect(game.meta.owns('aim-1'), isFalse);
     expect(game.meta.crewSize, 1);
 
+    await tester.tap(find.byKey(const Key('shop-filter-team')));
+    await tester.pump();
+    expect(find.text('Aim'), findsNothing);
     await tester.tap(find.byKey(const Key('skill-branch-team')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('skill-team-2')));
     await tester.pump();
     expect(game.meta.crewSize, 2);
 
+    // Kid 2's button shows once they join; their skills sit behind it.
+    await tester.tap(find.byKey(const Key('shop-filter-kid-1')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('skill-branch-aim')));
     await tester.pump();
     expect(find.byKey(const Key('locked-aim-1')), findsNothing);
     expect(find.byKey(const Key('open-aim-1')), findsOneWidget);
     await tester.tap(find.byKey(const Key('skill-aim-1')));
     await tester.pump();
-    // Bot skills default to the teammate (Kid 2).
     expect(game.meta.ownsFor(1, 'aim-1'), isTrue);
     expect(game.meta.ownsFor(0, 'aim-1'), isFalse);
     expect(game.meta.allyAimScale, 0.72);
@@ -3023,7 +3033,8 @@ void main() {
     game.update(0.6);
     await tester.pump();
     expect(find.byKey(const Key('wave-report')), findsOneWidget);
-    expect(game.waveRewards.last, startsWith('Wave 1 clear'));
+    expect(game.waveRewards.last.source, 'Wave 1 clear');
+    expect(game.waveRewards.last.isCoins, isTrue);
     expect(game.nextCrewHp, [1, 0]);
 
     await tester.tap(find.byKey(const Key('report-revive-1')));
@@ -3041,6 +3052,48 @@ void main() {
     game.finishEntrance();
     expect(game.players[1].isKo, isFalse);
     expect(game.players[0].hp, 2);
+  });
+
+  testWidgets('the report credits knockouts to the kid who threw', (
+    tester,
+  ) async {
+    final game = (await boot(
+      tester,
+      MetaState(coins: 1000, skills: {'team-2'}),
+    )).game;
+    final thrower = game.players[1];
+    expect(thrower.tagColor, KidColors.of(1));
+    final rival = game.enemies.first..hp = 1;
+    game.debugKidHit(
+      LobProjectile(
+        sprite: thrower.sprite!,
+        position: thrower.throwOrigin,
+        velocity: Vector2(100, 0),
+        targets: game.enemies,
+        owner: thrower,
+        onHit: (_, _) {},
+      ),
+      rival,
+    );
+    expect(rival.isKo, isTrue);
+    expect(game.kidKos, [0, 1, 0]);
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.text('1 KO'), findsOneWidget);
+    expect(find.text('0 KOs'), findsOneWidget);
+    expect(find.byKey(const Key('report-next-1')), findsOneWidget);
+    expect(find.text('Wave 1 clear'), findsOneWidget);
+    // The next button sits in the fixed footer, on screen without a scroll.
+    final button = tester.getRect(find.byKey(const Key('report-continue')));
+    expect(button.bottom, lessThanOrEqualTo(tester.view.physicalSize.height));
+    // A new wave starts the count over.
+    game.openShopFromReport();
+    game.continueFromShop();
+    expect(game.kidKos, [0, 0, 0]);
   });
 
   testWidgets('each kid starts with its own hearts and shield', (tester) async {
@@ -3187,6 +3240,8 @@ void main() {
     game.update(0.6);
     await tester.pump();
     game.openShopFromReport();
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('shop-filter-team')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('skill-group-crew')));
     await tester.pump();

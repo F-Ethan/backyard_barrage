@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'meta_state.dart';
@@ -30,26 +31,56 @@ class SaveStore {
   }
 
   /// Write [active] into its mode slot. The other mode's coins and skills stay.
+  ///
+  /// When [active] is the cached profile's own wallet (the game plays on
+  /// the object the menu loaded), the write serializes it as it is when the
+  /// write runs. Copying the call-time snapshot back onto it would undo
+  /// anything earned while the write waited in the queue.
   Future<void> save(MetaState active) {
     final snap = WalletSnap.from(active);
-    _queue = _queue.then((_) async {
+    return _enqueue(() async {
       final profile = _profile ??= await _read();
-      profile.apply(snap);
+      final slot = profile.wallet(snap.mode, snap.difficulty);
+      if (identical(slot, active)) {
+        profile
+          ..season = active.season
+          ..mode = active.mode;
+      } else {
+        profile.apply(snap);
+      }
       await _write(profile);
     });
-    return _queue;
   }
 
   /// Write both wallets and the shared season. Used by the home screen.
   Future<void> saveProfile(PlayerSave profile) {
-    _queue = _queue.then((_) async {
+    return _enqueue(() async {
       _profile = profile;
       await _write(profile);
+    });
+  }
+
+  /// Runs [job] after every earlier write. A write that fails is logged and
+  /// skipped; it never blocks the writes queued after it.
+  Future<void> _enqueue(Future<void> Function() job) {
+    _queue = _queue.then((_) => job()).catchError((Object error) {
+      debugPrint('SaveStore: write failed: $error');
     });
     return _queue;
   }
 
+  /// Makes the next write throw, to test that the queue recovers.
+  @visibleForTesting
+  bool debugFailNextWrite = false;
+
+  /// Where an unreadable save is copied before a fresh one replaces it.
+  static const String corruptKey = '${storageKey}_unreadable';
+
   Future<void> _write(PlayerSave profile) async {
+    if (debugFailNextWrite) {
+      debugFailNextWrite = false;
+      throw StateError('test write failure');
+    }
     final prefs = await _instance();
     await prefs.setString(storageKey, jsonEncode(profile.toJson()));
   }
@@ -66,8 +97,11 @@ class SaveStore {
       if (decoded is Map) {
         return PlayerSave.fromJson(Map<String, dynamic>.from(decoded));
       }
-    } on FormatException {
-      return PlayerSave();
+    } catch (error) {
+      // Keep the unreadable save before the next write replaces it, so
+      // progress can still be recovered by hand.
+      debugPrint('SaveStore: unreadable save: $error');
+      await prefs.setString(corruptKey, raw);
     }
     return PlayerSave();
   }

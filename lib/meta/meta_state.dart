@@ -540,7 +540,7 @@ class MetaState {
     return MetaState(
       coins: _clampInt(_asInt(json['coins']), 0, maxCoins),
       skills: skills,
-      season: Season.tryParse(json['season'] as String?) ?? Season.winter,
+      season: Season.tryParse(_asString(json['season'])) ?? Season.winter,
       bestWave: _clampInt(_asInt(json['bestWave']), 0, 9999),
       score: _clampInt(_asInt(json['score']), 0, 999999999),
       bestScore: _clampInt(_asInt(json['bestScore']), 0, 999999999),
@@ -556,7 +556,7 @@ class MetaState {
             ]
           : null,
       difficulty: _readDifficulty(json['difficulty']),
-      mode: PlayMode.tryParse(json['mode'] as String?) ?? PlayMode.arcade,
+      mode: PlayMode.tryParse(_asString(json['mode'])) ?? PlayMode.arcade,
       ledger: RunLedger.fromJson(json['ledger']),
     );
   }
@@ -617,6 +617,8 @@ class MetaState {
     }
     return closed;
   }
+
+  static String? _asString(Object? value) => value is String ? value : null;
 
   static int _asInt(Object? value, [int fallback = 0]) {
     if (value is int) return value;

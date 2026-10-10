@@ -56,7 +56,7 @@ class ShieldPile extends SpriteComponent {
   }
 
   /// Seconds it lies there before fading, and the fade.
-  static const double holdSeconds = 2.5;
+  static const double holdSeconds = 5;
   static const double fadeSeconds = 0.6;
 
   /// It drops this far onto the snow before it settles.

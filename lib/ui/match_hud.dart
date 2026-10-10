@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../game/backyard_barrage_game.dart';
-import '../game/components/kid_component.dart';
 import '../game/game_art.dart';
 import '../meta/meta_state.dart';
 import '../meta/play_mode.dart';
@@ -116,15 +115,6 @@ class MatchHud extends StatelessWidget {
                             ),
                             SizedBox(width: tokens.space.sm),
                             _HudChip(
-                              key: const Key('hud-crew'),
-                              child: _HeartCluster(
-                                label: 'You',
-                                kids: game.players,
-                                idPrefix: 'you',
-                              ),
-                            ),
-                            SizedBox(width: tokens.space.sm),
-                            _HudChip(
                               key: const Key('hud-fort'),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -149,19 +139,14 @@ class MatchHud extends StatelessWidget {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  _HeartCluster(
-                                    label: 'Rivals',
-                                    // A big wave lists only those standing.
-                                    // The boss has its own bar; a big
-                                    // wave lists only those standing.
-                                    kids: [
-                                      for (final kid in game.enemies)
-                                        if (!kid.isBoss &&
-                                            (game.enemies.length <= 5 ||
-                                                !kid.isKo))
-                                          kid,
-                                    ],
-                                    idPrefix: 'rival',
+                                  // Hearts show over each kid now; the
+                                  // chip just counts who is left.
+                                  Text(
+                                    'Rivals ${game.enemies.where((kid) => !kid.isBoss && !kid.isKo).length}',
+                                    key: const Key('hud-rivals-left'),
+                                    style: BarrageType.heading.copyWith(
+                                      fontSize: 14,
+                                    ),
                                   ),
                                   if (game.rivalsWaiting > 0) ...[
                                     const SizedBox(width: 6),
@@ -292,74 +277,6 @@ class _BossBar extends StatelessWidget {
   }
 }
 
-class _HeartCluster extends StatelessWidget {
-  const _HeartCluster({
-    required this.label,
-    required this.kids,
-    required this.idPrefix,
-  });
-
-  final String label;
-  final List<KidComponent> kids;
-  final String idPrefix;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(label, style: BarrageType.overline.copyWith(letterSpacing: 0.6)),
-        const SizedBox(width: 6),
-        for (var row = 0; row < kids.length; row++) ...[
-          if (row > 0) const SizedBox(width: 6),
-          for (var i = 0; i < kids[row].maxHp; i++)
-            Padding(
-              padding: const EdgeInsets.only(right: 2),
-              child: _Heart(
-                key: Key('hud-heart-$idPrefix-$row-$i'),
-                full: i < kids[row].hp,
-              ),
-            ),
-        ],
-      ],
-    );
-  }
-}
-
-/// One HUD heart. Losing it pops the empty outline in; regaining it bounces.
-class _Heart extends StatelessWidget {
-  const _Heart({super.key, required this.full});
-
-  final bool full;
-
-  @override
-  Widget build(BuildContext context) {
-    final motion = context.motion;
-    final image = Image.asset(
-      full ? UiAssets.heart : UiAssets.heartEmpty,
-      key: ValueKey(full),
-      width: 20,
-      height: 20,
-    );
-    return SizedBox(
-      width: 20,
-      height: 20,
-      child: motion.reduced
-          ? image
-          : AnimatedSwitcher(
-              duration: motion.slow,
-              switchInCurve: motion.spring,
-              transitionBuilder: (child, animation) => ScaleTransition(
-                scale: Tween(begin: 1.6, end: 1.0).animate(animation),
-                child: FadeTransition(opacity: animation, child: child),
-              ),
-              child: image,
-            ),
-    );
-  }
-}
-
-/// Slim fort capsule. HP changes ease toward the new width.
 class _FortMeter extends StatelessWidget {
   const _FortMeter({required this.fraction});
 

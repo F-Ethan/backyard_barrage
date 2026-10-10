@@ -15,6 +15,7 @@ import 'package:backyard_barrage/game/components/fire_wave.dart';
 import 'package:backyard_barrage/game/components/ice_spike.dart';
 import 'package:backyard_barrage/game/components/boss_controller.dart';
 import 'package:backyard_barrage/game/components/coin_pop.dart';
+import 'package:backyard_barrage/game/components/damage_pop.dart';
 import 'package:backyard_barrage/game/components/enemy_controller.dart';
 import 'package:backyard_barrage/game/game_art.dart';
 import 'package:backyard_barrage/game/kid_colors.dart';
@@ -3195,6 +3196,56 @@ void main() {
     expect(game.kidKos, [0, 0, 0]);
   });
 
+  testWidgets('a hit shows a bar over the kid and pops the damage', (
+    tester,
+  ) async {
+    final meta = MetaState(coins: 1000);
+    expect(meta.buy('hp-1'), isTrue);
+    expect(meta.buy('shield-1'), isTrue);
+    final game = (await boot(tester, meta)).game;
+    final kid = game.players.single;
+    final rival = game.enemies.first;
+    expect(kid.healthBarVisible, isFalse);
+    expect(rival.healthBarVisible, isFalse);
+    expect(game.world.children.whereType<DamagePop>(), isEmpty);
+
+    // The shield takes the first: the bar shows, and "Blocked" pops.
+    kid.takeHit();
+    game.update(0.01);
+    game.update(0.01);
+    expect(kid.healthBarVisible, isTrue);
+    expect(game.world.children.whereType<DamagePop>().map((p) => p.text), [
+      'Blocked',
+    ]);
+    game.update(KidComponent.healthBarSeconds + 0.1);
+    expect(kid.healthBarVisible, isFalse, reason: 'hides after 1.5s');
+
+    // A heart lost: "-1", bar up again.
+    final hp = kid.hp;
+    kid.takeHit();
+    game.update(0.01);
+    game.update(0.01);
+    expect(kid.hp, hp - 1);
+    expect(game.world.children.whereType<DamagePop>().last.text, '-1');
+    expect(kid.healthBarVisible, isTrue);
+
+    // One heart left: the bar stays up (and flashes).
+    kid.hp = 1;
+    game.update(KidComponent.healthBarSeconds + 0.1);
+    expect(kid.onLastHit, isTrue);
+    expect(kid.healthBarVisible, isTrue);
+
+    // Rivals get the same bar.
+    rival.maxHp = 3;
+    rival.hp = 3;
+    game.update(0.01);
+    rival.takeHit();
+    game.update(0.01);
+    expect(rival.healthBarVisible || rival.isKo, isTrue);
+    // Bosses keep their own bar.
+    expect(game.boss, isNull);
+  });
+
   testWidgets('a shield cracks, then drops broken and fades', (tester) async {
     final meta = MetaState(coins: 1000);
     expect(meta.buy('shield-1'), isTrue);
@@ -3227,9 +3278,16 @@ void main() {
     kid.position.add(Vector2(80, 0));
     game.update(0.1);
     expect(pile.position, at);
-    for (var i = 0; i < 40; i++) {
-      game.update(0.1);
+    // It lies there five seconds, then fades. (Ticked on its own: the
+    // rivals would end the fight first.)
+    for (var i = 0; i < 45; i++) {
+      pile.updateTree(0.1);
     }
+    expect(pile.isRemoving || pile.isRemoved, isFalse);
+    for (var i = 0; i < 15; i++) {
+      pile.updateTree(0.1);
+    }
+    game.update(0.01);
     expect(game.world.children.whereType<ShieldPile>(), isEmpty);
   });
 
@@ -3473,7 +3531,7 @@ void main() {
     expect(game.phase, MatchPhase.fight);
     expect(game.overlays.isActive('hud'), isTrue);
     expect(find.byKey(const Key('pause-button')), findsOneWidget);
-    expect(find.byKey(const Key('hud-crew')), findsOneWidget);
+    expect(find.byKey(const Key('hud-crew')), findsNothing);
     expect(find.byKey(const Key('hud-fort')), findsOneWidget);
     expect(find.byKey(const Key('hud-coins')), findsOneWidget);
     expect(find.text('Wave 1'), findsOneWidget);
@@ -3485,10 +3543,6 @@ void main() {
       findsOneWidget,
     );
     expect(tester.getSize(find.byKey(const Key('pause-button'))).height, 56);
-    expect(
-      tester.getSize(find.byKey(const Key('hud-heart-you-0-0'))).width,
-      20,
-    );
     expect(game.world.children.whereType<TextComponent>(), isEmpty);
 
     final before = game.hudRevision.value;
@@ -3496,7 +3550,8 @@ void main() {
     game.update(0.016);
     await tester.pump();
     expect(game.hudRevision.value, isNot(before));
-    expect(find.byKey(const Key('hud-heart-you-0-1')), findsOneWidget);
+    // Hearts show over the kid now, not in the HUD.
+    expect(game.players.first.healthBarVisible, isTrue);
   });
 
   testWidgets('the design resolution fills a 1280x720 window', (tester) async {

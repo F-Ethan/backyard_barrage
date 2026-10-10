@@ -1086,6 +1086,7 @@ class BackyardBarrageGame extends FlameGame {
       kid.revive();
       kid.hp = crewHp[i];
       kid.shieldHits = meta.kidShield(i);
+      kid.syncHealthSeen();
       kid.position = Vector2(-_offstage - i * 36, goal.y);
       kid.setWalking(true);
       kid.syncDepth();

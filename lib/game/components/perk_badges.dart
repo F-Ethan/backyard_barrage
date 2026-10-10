@@ -46,7 +46,8 @@ class PerkBadges extends PositionComponent {
     if (shown.isEmpty) return;
     final total = shown.length * (iconSize + 4) - 4;
     var x = host.size.x / 2 - total / 2;
-    const y = -iconSize - 6;
+    // Above the overhead health bar.
+    const y = -iconSize - 26;
     for (final held in shown) {
       final icon = _icon(held.perk)!;
       icon.render(canvas, position: Vector2(x, y), size: Vector2.all(iconSize));

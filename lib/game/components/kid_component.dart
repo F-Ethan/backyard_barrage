@@ -8,6 +8,7 @@ import 'package:flutter/painting.dart' show TextPainter, TextSpan, TextStyle;
 import '../arena_grid.dart';
 import '../combat_rules.dart';
 import '../throw_physics.dart';
+import 'damage_pop.dart';
 
 enum KidSide { player, enemy }
 
@@ -555,6 +556,7 @@ class KidComponent extends SpriteComponent {
   void update(double dt) {
     super.update(dt);
     syncDepth();
+    _watchHealth(dt);
     var refresh = false;
     if (_stunTimer > 0) {
       _stunTimer -= dt;
@@ -656,7 +658,7 @@ class KidComponent extends SpriteComponent {
     if (scaled) canvas.restore();
     if (glint && _chargingPose && !isKo && !isStunned) _drawGlint(canvas);
     if (armored && !isKo) _drawArmor(canvas);
-    if (shieldHits > 0 && !isKo) _drawShieldBadge(canvas);
+    if (!isKo && !isBoss) _drawHealthBar(canvas);
   }
 
   /// Frost armor art (an ice bubble). Shared by every kid; set once the
@@ -707,34 +709,140 @@ class KidComponent extends SpriteComponent {
     canvas.restore();
   }
 
-  /// A small blue shield over the head with the hits it still blocks.
-  void _drawShieldBadge(Canvas canvas) {
-    final center = Offset(size.x / 2 + size.x * 0.28, size.y * 0.02);
-    const r = 15.0;
-    canvas.drawCircle(center, r + 2, Paint()..color = const Color(0xFFFFFFFF));
-    canvas.drawCircle(center, r, Paint()..color = const Color(0xFF3D7CFF));
+  /// Seconds the overhead health bar stays up after a hit.
+  static const double healthBarSeconds = 1.5;
+
+  double _barTimer = 0;
+  double _barClock = 0;
+  int? _seenHp;
+  int? _seenShield;
+
+  /// The overhead bar is showing (a recent hit, or one hit from down).
+  bool get healthBarVisible => !isKo && !isBoss && (_barTimer > 0 || onLastHit);
+
+  /// One more hit puts this kid down (and it could take more than one).
+  bool get onLastHit => !isKo && hp == 1 && maxHp > 1 && shieldHits == 0;
+
+  /// Take the current hearts and shield as the baseline, so setting them
+  /// between waves does not pop a "-1".
+  void syncHealthSeen() {
+    _seenHp = hp;
+    _seenShield = shieldHits;
+    _barTimer = 0;
+  }
+
+  /// Notices hearts or shield going down (from any hit, blast, or bite):
+  /// shows the bar and pops the damage.
+  void _watchHealth(double dt) {
+    _barClock += dt;
+    if (_barTimer > 0) _barTimer -= dt;
+    final seenHp = _seenHp ?? hp;
+    final seenShield = _seenShield ?? shieldHits;
+    final lost = seenHp - hp;
+    final blocked = seenShield - shieldHits;
+    if (lost > 0 || (blocked > 0 && !isKo)) {
+      _barTimer = healthBarSeconds;
+      final at = hitCenter - Vector2(0, size.y * scale.y * 0.55);
+      parent?.add(
+        lost > 0
+            ? DamagePop(text: '-$lost', position: at)
+            : DamagePop(
+                text: 'Blocked',
+                position: at,
+                color: const Color(0xFFBFD4FF),
+              ),
+      );
+    }
+    _seenHp = hp;
+    _seenShield = shieldHits;
+  }
+
+  /// A small bar over the head: one pip per heart, red and pulsing on the
+  /// last one, with a shield and the hits it still blocks at its left.
+  void _drawHealthBar(Canvas canvas) {
+    if (!healthBarVisible) return;
+    // Top of the hat: the art stands about 85% of its box, scaled about
+    // the feet.
+    final headTop = size.y * (1 - 0.851 * _drawScale);
+    const height = 10.0;
+    final width = size.x * 0.56;
+    final top = headTop - height - 8;
+    final left = size.x / 2 - width / 2;
+    final frame = RRect.fromRectAndRadius(
+      Rect.fromLTWH(left - 2, top - 2, width + 4, height + 4),
+      const Radius.circular(7),
+    );
+    canvas.drawRRect(frame, Paint()..color = const Color(0xCC1A2332));
+    final fraction = maxHp <= 0 ? 0.0 : hp / maxHp;
+    final last = onLastHit;
+    final pulse = last
+        ? 0.55 + 0.45 * (0.5 + 0.5 * math.sin(_barClock * 9))
+        : 1.0;
+    final fill = last
+        ? const Color(0xFFFF4D4D)
+        : (fraction > 0.5 ? const Color(0xFF2ECC71) : const Color(0xFFF1C40F));
+    final pips = maxHp.clamp(1, 10);
+    const gap = 2.0;
+    final pip = (width - gap * (pips - 1)) / pips;
+    final filled = maxHp <= 10 ? hp : (fraction * pips).ceil();
+    for (var i = 0; i < pips; i++) {
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(left + i * (pip + gap), top, pip, height),
+        const Radius.circular(3),
+      );
+      canvas.drawRRect(
+        rect,
+        Paint()
+          ..color = i < filled
+              ? fill.withValues(alpha: pulse)
+              : const Color(0x33FFFFFF),
+      );
+    }
+    if (last) {
+      canvas.drawRRect(
+        frame,
+        Paint()
+          ..color = const Color(0xFFFF4D4D).withValues(alpha: pulse)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
+    }
+    if (shieldHits > 0) {
+      _drawBarShield(canvas, Offset(left - 14, top + height / 2));
+    }
+  }
+
+  /// A small shield with its count, at the bar's left end.
+  void _drawBarShield(Canvas canvas, Offset center) {
     final shield = Path()
-      ..moveTo(center.dx, center.dy - 9)
-      ..lineTo(center.dx + 8, center.dy - 5)
+      ..moveTo(center.dx, center.dy - 11)
+      ..lineTo(center.dx + 10, center.dy - 7)
       ..quadraticBezierTo(
-        center.dx + 7,
+        center.dx + 9,
         center.dy + 6,
         center.dx,
-        center.dy + 10,
+        center.dy + 12,
       )
       ..quadraticBezierTo(
-        center.dx - 7,
+        center.dx - 9,
         center.dy + 6,
-        center.dx - 8,
-        center.dy - 5,
+        center.dx - 10,
+        center.dy - 7,
       )
       ..close();
-    canvas.drawPath(shield, Paint()..color = const Color(0x55FFFFFF));
+    canvas.drawPath(
+      shield,
+      Paint()
+        ..color = const Color(0xFFFFFFFF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3,
+    );
+    canvas.drawPath(shield, Paint()..color = const Color(0xFF3D7CFF));
     final text = TextPainter(
       text: TextSpan(
         text: '$shieldHits',
         style: const TextStyle(
-          fontSize: 15,
+          fontSize: 12,
           fontWeight: FontWeight.w900,
           color: Color(0xFFFFFFFF),
         ),

@@ -311,27 +311,32 @@ class _ShopOverlayState extends State<ShopOverlay> {
                       SizedBox(height: tokens.space.sm),
                       Row(
                         children: [
-                          const Spacer(),
-                          _FilterButton(
-                            key: const Key('shop-filter-team'),
-                            label: 'Team',
-                            color: tokens.ink,
-                            selected: !_items && _filter == null,
+                          // Whose skills show, under the left thumb and
+                          // away from Next wave.
+                          _FilterTabs(
+                            options: [
+                              (
+                                key: const Key('shop-filter-team'),
+                                label: 'Team',
+                                color: tokens.ink,
+                                ink: tokens.ink,
+                              ),
+                              for (var i = 0; i < meta.crewSize; i++)
+                                (
+                                  key: Key('shop-filter-kid-$i'),
+                                  label: 'Kid ${i + 1}',
+                                  color: KidColors.of(i),
+                                  ink: KidColors.deepOf(i),
+                                ),
+                            ],
+                            selected: _items
+                                ? null
+                                : (_filter == null ? 0 : _filter! + 1),
                             compact: compact,
-                            onTap: () => _selectFilter(null),
+                            onSelect: (index) =>
+                                _selectFilter(index == 0 ? null : index - 1),
                           ),
-                          for (var i = 0; i < meta.crewSize; i++) ...[
-                            SizedBox(width: tokens.space.xs),
-                            _FilterButton(
-                              key: Key('shop-filter-kid-$i'),
-                              label: 'Kid ${i + 1}',
-                              color: KidColors.of(i),
-                              selected: !_items && _filter == i,
-                              compact: compact,
-                              onTap: () => _selectFilter(i),
-                            ),
-                          ],
-                          SizedBox(width: tokens.space.md),
+                          const Spacer(),
                           DraftImageButton(
                             key: const Key('next-wave'),
                             label: fromDefeat ? 'Back' : 'Next wave',
@@ -1050,53 +1055,93 @@ class _ItemRow extends StatelessWidget {
   }
 }
 
-/// Team or Kid N by the Next wave button: a pill in that kid's color,
-/// filled when picked.
-class _FilterButton extends StatelessWidget {
-  const _FilterButton({
-    super.key,
-    required this.label,
-    required this.color,
+/// Team / Kid 1 / Kid 2 / Kid 3 in one pill track, like the group tabs
+/// up top: each label in its kid's color, the picked one filled in it.
+class _FilterTabs extends StatelessWidget {
+  const _FilterTabs({
+    required this.options,
     required this.selected,
     required this.compact,
-    required this.onTap,
+    required this.onSelect,
   });
 
-  final String label;
-  final Color color;
-  final bool selected;
+  final List<({Key key, String label, Color color, Color ink})> options;
+
+  /// Index into [options], or null while the Items tab is open.
+  final int? selected;
   final bool compact;
-  final VoidCallback onTap;
+  final ValueChanged<int> onSelect;
+
+  static const double tabWidth = 76;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     final motion = context.motion;
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: PressScale(
-        pressedScale: 0.95,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: motion.fast,
-          height: compact ? 40 : 44,
-          padding: EdgeInsets.symmetric(horizontal: tokens.space.md),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected ? color : tokens.surface,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: color, width: 2),
-          ),
-          child: Text(
-            label,
-            maxLines: 1,
-            style: BarrageType.button.copyWith(
-              fontSize: 14,
-              color: selected ? tokens.onPrimary : tokens.ink,
+    final current = selected;
+    return Container(
+      height: compact ? 44 : 48,
+      width: tabWidth * options.length + 6,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: tokens.lockedFill,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Stack(
+        children: [
+          if (current != null)
+            AnimatedPositioned(
+              duration: motion.medium,
+              curve: motion.spring,
+              left: tabWidth * current,
+              top: 0,
+              bottom: 0,
+              width: tabWidth,
+              child: AnimatedContainer(
+                duration: motion.fast,
+                decoration: BoxDecoration(
+                  color: options[current].color,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color: options[current].color.withValues(alpha: 0.4),
+                      blurRadius: 14,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+              ),
             ),
+          Row(
+            children: [
+              for (var i = 0; i < options.length; i++)
+                SizedBox(
+                  width: tabWidth,
+                  child: Semantics(
+                    button: true,
+                    selected: i == current,
+                    child: GestureDetector(
+                      key: options[i].key,
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onSelect(i),
+                      child: Center(
+                        child: AnimatedDefaultTextStyle(
+                          duration: motion.fast,
+                          style: BarrageType.button.copyWith(
+                            fontSize: 15,
+                            color: i == current
+                                ? tokens.onPrimary
+                                : options[i].ink,
+                          ),
+                          child: Text(options[i].label, maxLines: 1),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-        ),
+        ],
       ),
     );
   }

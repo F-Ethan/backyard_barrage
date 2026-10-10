@@ -34,9 +34,13 @@ class AdConfig {
   static const String androidInterstitialId =
       'ca-app-pub-3940256099942544/1033173712';
 
-  /// Wall-clock gap after an interstitial that actually showed.
-  /// The timer is for the app session. It is not saved.
-  static const Duration interstitialCooldown = Duration(minutes: 3);
+  /// Fight time between interstitials when there is no boss or loss to
+  /// show one after. The timer is for the app session. It is not saved.
+  static const Duration interstitialEvery = Duration(minutes: 5);
+
+  /// Fight time a boss or loss interstitial waits after the last one, so
+  /// a quick loss right after a boss does not show two in a row.
+  static const Duration interstitialMinGap = Duration(minutes: 1);
 
   /// Non-consumable Remove Ads product. Its price is set in App Store
   /// Connect; the game shows the store's localized price.

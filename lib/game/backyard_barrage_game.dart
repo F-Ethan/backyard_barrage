@@ -27,6 +27,7 @@ import 'boss.dart';
 import 'combat_rules.dart';
 import 'game_art.dart';
 import 'crew_carry.dart';
+import 'enemy_perks.dart';
 import 'rival_type.dart';
 import 'components/boss_controller.dart';
 import 'components/charge_indicator.dart';
@@ -41,6 +42,7 @@ import 'components/impact_burst.dart';
 import 'components/kid_component.dart';
 import 'components/lob_projectile.dart';
 import 'components/overlay_banner.dart';
+import 'components/perk_badges.dart';
 import 'components/splash_particles.dart';
 import 'throw_physics.dart';
 
@@ -143,7 +145,32 @@ class BackyardBarrageGame extends FlameGame {
   final List<FortComponent> extraForts = [];
 
   /// Every fort a snowball can meet.
-  List<FortComponent> get _allForts => [fort, ...extraForts, enemyFort];
+  List<FortComponent> get _allForts => [
+    fort,
+    ...extraForts,
+    enemyFort,
+    ...enemyExtraForts,
+  ];
+
+  /// Extra rival forts this wave ([RivalFortRules.extras]).
+  final List<FortComponent> enemyExtraForts = [];
+
+  /// Perks each rival carries this wave (from wave 10).
+  final Map<KidComponent, List<HeldPerk>> _perks = {};
+
+  @visibleForTesting
+  List<HeldPerk> perksOf(KidComponent kid) => _perks[kid] ?? const [];
+
+  @visibleForTesting
+  void debugGivePerks(KidComponent kid, List<HeldPerk> perks) =>
+      _givePerks(kid, perks);
+
+  @visibleForTesting
+  void debugTickPerks(double dt) => _tickPerks(dt);
+
+  /// Rival team Frost armor time left.
+  double _rivalArmorTime = 0;
+  double get rivalArmorLeft => _rivalArmorTime;
   late ChargeIndicator chargeHud;
   late SeasonKit _kit;
   late SpriteComponent _bg;
@@ -517,6 +544,15 @@ class BackyardBarrageGame extends FlameGame {
     _entrance.add((kid: kid, goal: goal));
     kid.add(brain);
     _boss = kid;
+    _givePerks(
+      kid,
+      EnemyPerkRules.rollBoss(
+        wave,
+        BossRules.appearance(wave),
+        feel.settings.difficulty,
+        _rng,
+      ),
+    );
   }
 
   /// A boss lobs its big ball (magma, or a giant snowball). It bursts
@@ -585,6 +621,21 @@ class BackyardBarrageGame extends FlameGame {
     final at = shot.hitPosition;
     final radius = MetaState.baseBlastRadius * PowerUp.splatScale * 1.5;
     _burst(shot.position, power: 2);
+    if (shot.owner?.side == KidSide.enemy) {
+      // A rival's Big splat: one hit on every kid in the splash.
+      for (final kid in List.of(players)) {
+        if (kid.isKo || identical(kid, struck)) continue;
+        final dx = (kid.hitCenter.x - at.x) / radius;
+        final dy = (kid.hitCenter.y - at.y) / (ArenaGrid.rowStep * 1.5);
+        if (dx * dx + dy * dy > 1) continue;
+        _bossHitKid(kid);
+      }
+      return;
+    }
+    if (_rivalArmorTime > 0) {
+      feel.armorBlocked();
+      return;
+    }
     for (final rival in List.of(enemies)) {
       if (rival.isKo || identical(rival, struck)) continue;
       final dx = (rival.hitCenter.x - at.x) / radius;
@@ -596,6 +647,7 @@ class BackyardBarrageGame extends FlameGame {
         rival.takeHit(stunScale: meta.stunScaleFor(ally: false));
       }
       rival.recoil(shot.facing);
+      _rivalHurt(rival);
     }
     resolveKnockouts();
   }
@@ -1026,31 +1078,51 @@ class BackyardBarrageGame extends FlameGame {
         cover.hp = cover.maxHp;
       }
     }
-    enemyFort.applyStage(
-      nextStage: 1,
-      intactSprite: _rivalFortIntact[1]!,
-      damagedSprite: _rivalFortDamaged[1]!,
-      collapsedSprite: _rivalFortCollapsed!,
-    );
+    // The rival side builds up too: a random stage, and from wave 8 extra
+    // forts of the same stage.
+    final rivalStage = RivalFortRules.stage(wave, _rng);
+    final rivalExtras = RivalFortRules.extras(wave, _rng);
+    while (enemyExtraForts.length > rivalExtras) {
+      enemyExtraForts.removeLast().removeFromParent();
+    }
+    while (enemyExtraForts.length < rivalExtras) {
+      final extra = FortComponent(
+        side: KidSide.enemy,
+        sprite: _rivalFortIntact[rivalStage]!,
+        position: ArenaGrid.fortAnchor(KidSide.enemy),
+        size: ArenaGrid.fortDrawSize,
+      );
+      enemyExtraForts.add(extra);
+      world.add(extra);
+    }
+    for (final cover in [enemyFort, ...enemyExtraForts]) {
+      cover.applyStage(
+        nextStage: rivalStage,
+        intactSprite: _rivalFortIntact[rivalStage]!,
+        damagedSprite: _rivalFortDamaged[rivalStage]!,
+        collapsedSprite: _rivalFortCollapsed!,
+      );
+    }
     fort.placeOnRow(ArenaGrid.rollFortRow(_rng));
     enemyFort.placeOnRow(ArenaGrid.rollFortRow(_rng));
-    _placeExtraForts();
+    _layoutExtraForts(fort, extraForts);
+    _layoutExtraForts(enemyFort, enemyExtraForts);
     _showWaveIntro();
     _publishHud();
     unawaited(feel.enterBattle(meta.season));
   }
 
-  /// Drops each extra fort on a random spot in the player's half that does
+  /// Drops each extra fort on a random spot in its side's half that does
   /// not overlap another fort: a different column pair, or at least two
   /// rows apart. A bad first pick can leave no room for the next, so the
   /// whole layout is retried; a fort that still finds no room sits the
   /// wave out (hidden, no cover).
-  void _placeExtraForts() {
+  void _layoutExtraForts(FortComponent main, List<FortComponent> extras) {
     List<(int, int)>? best;
     for (var attempt = 0; attempt < 40; attempt++) {
-      final taken = <(int, int)>[(fort.coverColumn, fort.coverRow)];
+      final taken = <(int, int)>[(main.coverColumn, main.coverRow)];
       final layout = <(int, int)>[];
-      for (var i = 0; i < extraForts.length; i++) {
+      for (var i = 0; i < extras.length; i++) {
         final spots = <(int, int)>[
           for (var row = 1; row < ArenaGrid.rows - 1; row++)
             for (
@@ -1071,10 +1143,10 @@ class BackyardBarrageGame extends FlameGame {
         layout.add(pick);
       }
       if (best == null || layout.length > best.length) best = layout;
-      if (layout.length == extraForts.length) break;
+      if (layout.length == extras.length) break;
     }
-    for (var i = 0; i < extraForts.length; i++) {
-      final extra = extraForts[i];
+    for (var i = 0; i < extras.length; i++) {
+      final extra = extras[i];
       if (i < best!.length) {
         extra
           ..opacity = 1
@@ -1141,6 +1213,11 @@ class BackyardBarrageGame extends FlameGame {
   KidComponent _spawnRival(RivalType type, int index, {bool walkOn = false}) {
     final rival = RivalProfile.of(type);
     final kid = _makeRival(type, index);
+    final perks = EnemyPerkRules.rollRival(
+      wave,
+      feel.settings.difficulty,
+      _rng,
+    );
     final Vector2 goal;
     if (index < ArenaGrid.enemySlots.length) {
       final slot = ArenaGrid.enemySlots[index];
@@ -1186,9 +1263,166 @@ class BackyardBarrageGame extends FlameGame {
         playerChargeSeconds: _baseChargeSeconds,
         profile: rival,
         onWindup: rival.glint ? feel.frostGlint : null,
+        windupBoost: _quickHands(perks),
       ),
     );
+    _givePerks(kid, perks);
     return kid;
+  }
+
+  double _quickHands(List<HeldPerk> perks) {
+    for (final held in perks) {
+      if (held.perk == EnemyPerk.quickHands) {
+        return EnemyPerkRules.windupScale(held.level);
+      }
+    }
+    return 1;
+  }
+
+  /// Puts [perks] on [kid]: shields up front, badges over its head.
+  void _givePerks(KidComponent kid, List<HeldPerk> perks) {
+    if (perks.isEmpty) return;
+    _perks[kid] = perks;
+    for (final held in perks) {
+      if (held.perk == EnemyPerk.shield) {
+        kid.shieldHits += held.level;
+        held.uses = 0; // shown by the shield badge, not a perk icon
+      }
+    }
+    kid.add(
+      PerkBadges(
+        host: kid,
+        perks: perks,
+        icons: _powerUpSprites,
+        countdownSeconds: EnemyPerkRules.countdown(feel.settings.difficulty),
+      ),
+    );
+  }
+
+  /// A hurt rival with an unused Hot cocoa drinks it: +level hearts (a
+  /// boss heals a quarter of its health).
+  void _rivalHurt(KidComponent kid) {
+    if (kid.isKo || kid.hp >= kid.maxHp) return;
+    for (final held in _perks[kid] ?? const <HeldPerk>[]) {
+      if (held.perk != EnemyPerk.cocoa || held.spent) continue;
+      held.uses = 0;
+      final heal = kid.isBoss ? (kid.maxHp / 4).ceil() : held.level;
+      kid.hp = math.min(kid.maxHp, kid.hp + heal);
+      world.add(
+        CoinPop(
+          amount: heal,
+          label: '+$heal ♥',
+          position: kid.hitCenter - Vector2(0, 90),
+        ),
+      );
+      feel.powerUpUsed(PowerUp.hotCocoa);
+      _publishHud();
+      return;
+    }
+  }
+
+  /// Area perks count down while the fight runs; one that reaches zero on
+  /// a rival still standing goes off for its whole side.
+  void _tickPerks(double dt) {
+    if (_rivalArmorTime > 0) {
+      _rivalArmorTime -= dt;
+      if (_rivalArmorTime <= 0) {
+        for (final rival in enemies) {
+          rival.armored = false;
+        }
+      }
+    }
+    if (phase != MatchPhase.fight || _settling) return;
+    for (final entry in _perks.entries) {
+      final kid = entry.key;
+      if (kid.isKo) continue;
+      for (final held in entry.value) {
+        if (!held.perk.area || held.spent) continue;
+        held.countdown -= dt;
+        if (held.countdown > 0) continue;
+        held.uses = 0;
+        _fireAreaPerk(kid, held);
+      }
+    }
+  }
+
+  void _fireAreaPerk(KidComponent kid, HeldPerk held) {
+    final item = held.perk.item;
+    if (item != null) feel.powerUpUsed(item);
+    final label = switch (held.perk) {
+      EnemyPerk.freezeAll => 'Freeze!',
+      EnemyPerk.teamCocoa => 'Cocoa!',
+      _ => 'Armor!',
+    };
+    world.add(
+      CoinPop(
+        amount: 0,
+        label: label,
+        position: kid.hitCenter - Vector2(0, 90),
+      ),
+    );
+    switch (held.perk) {
+      case EnemyPerk.freezeAll:
+        for (final player in players) {
+          if (!player.isKo) player.freeze(EnemyPerkRules.freezeSeconds);
+        }
+        _endActiveThrow();
+      case EnemyPerk.teamCocoa:
+        for (final rival in enemies) {
+          if (!rival.isKo) rival.hp = math.min(rival.maxHp, rival.hp + 1);
+        }
+      case EnemyPerk.teamArmor:
+        _rivalArmorTime = EnemyPerkRules.armorSeconds;
+        for (final rival in enemies) {
+          rival.armored = !rival.isKo;
+        }
+      default:
+        break;
+    }
+    _publishHud();
+  }
+
+  /// A rival knocked out with potions it never used may drop each one for
+  /// the crew ([EnemyPerkRules.dropChance]).
+  void _dropPerks(KidComponent kid) {
+    final perks = _perks.remove(kid);
+    if (perks == null) return;
+    for (final held in perks) {
+      final item = held.perk.item;
+      if (item == null || held.spent) continue;
+      held.uses = 0;
+      if (_rng.nextDouble() >= EnemyPerkRules.dropChance) continue;
+      meta.replaceItems({...meta.items, item: meta.itemCount(item) + 1});
+      waveRewards.add('Dropped by a rival: +1 ${item.label}');
+      world.add(
+        CoinPop(
+          amount: 0,
+          label: '+1 ${item.label}',
+          position: kid.hitCenter - Vector2(0, 130),
+        ),
+      );
+      feel.purchased();
+    }
+  }
+
+  /// A rival's throw carries its Big splat or Fort cracker: the ball is
+  /// drawn as the potion and spends one use.
+  void _armRivalShot(KidComponent enemy, LobProjectile shot) {
+    for (final held in _perks[enemy] ?? const <HeldPerk>[]) {
+      if (held.spent) continue;
+      if (held.perk == EnemyPerk.bigSplat) {
+        held.uses -= 1;
+        shot.splat = true;
+        shot.sprite = _powerUpSprites[PowerUp.bigSplat];
+        return;
+      }
+      if (held.perk == EnemyPerk.fortCracker) {
+        held.uses = 0;
+        shot.cracker = true;
+        shot.sprite = _powerUpSprites[PowerUp.fortCracker];
+        return;
+      }
+    }
   }
 
   /// A rival cell no standing rival is on, preferring empty rows.
@@ -1271,6 +1505,8 @@ class BackyardBarrageGame extends FlameGame {
     _rivalTypes.clear();
     _reserve.clear();
     _arrivals.clear();
+    _perks.clear();
+    _rivalArmorTime = 0;
     _boss = null;
     _bossType = null;
   }
@@ -2016,6 +2252,7 @@ class BackyardBarrageGame extends FlameGame {
     var paid = 0;
     for (final kid in enemies) {
       if (!kid.isKo || !_paidKills.add(kid)) continue;
+      _dropPerks(kid);
       paid += MetaState.coinsForKnockout(wave);
     }
     if (paid == 0) return;
@@ -2077,6 +2314,7 @@ class BackyardBarrageGame extends FlameGame {
       radiusScale: radiusScale,
     );
     if (magma) _magmaShots.add(shot);
+    _armRivalShot(enemy, shot);
     return shot;
   }
 
@@ -2368,6 +2606,7 @@ class BackyardBarrageGame extends FlameGame {
     }
     _magmaSplash(shot);
     target.recoil(shot.facing);
+    if (target.side == KidSide.enemy) _rivalHurt(target);
     _punch(knockedOut: target.isKo);
     if (target.isKo && target.side == KidSide.enemy) {
       world.add(
@@ -2399,6 +2638,7 @@ class BackyardBarrageGame extends FlameGame {
     final fromPlayer = owner != null && owner.side == KidSide.player;
     final ally = target.side == KidSide.player;
     if (ally && _armorTime > 0) return false; // Frost armor
+    if (!ally && _rivalArmorTime > 0) return false; // a rival's team armor
     final hits = fromPlayer
         ? meta.kidHits(math.max(0, players.indexOf(owner)))
         : 1;
@@ -2424,7 +2664,7 @@ class BackyardBarrageGame extends FlameGame {
       feel.impact(meta.season);
       return;
     }
-    if (shot.cracker && cover.side == KidSide.enemy) {
+    if (shot.cracker && cover.side != shot.owner?.side) {
       cover.collapse();
       // A whole fort coming down lands harder than a chip.
       _burst(shot.position, power: 1.6);
@@ -2829,6 +3069,7 @@ class BackyardBarrageGame extends FlameGame {
     }
     _tickHound(dt);
     _tickWalkOns(dt);
+    _tickPerks(dt);
     if (_armorTime > 0) {
       _armorTime -= dt;
       if (_armorTime <= 0) {

@@ -10,6 +10,7 @@ import 'package:backyard_barrage/game/arena_grid.dart';
 import 'package:backyard_barrage/game/backyard_barrage_game.dart';
 import 'package:backyard_barrage/game/boss.dart';
 import 'package:backyard_barrage/game/combat_rules.dart';
+import 'package:backyard_barrage/game/enemy_perks.dart';
 import 'package:backyard_barrage/game/components/fire_wave.dart';
 import 'package:backyard_barrage/game/components/ice_spike.dart';
 import 'package:backyard_barrage/game/components/boss_controller.dart';
@@ -3052,6 +3053,124 @@ void main() {
     expect(game.players[1].hp, 4);
     expect(game.players[0].shieldHits, 1);
     expect(game.players[1].shieldHits, 0);
+  });
+
+  testWidgets('a rival Freeze all counts down; knocking it out stops it', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState(crewSize: 2))).game;
+    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.easy));
+    final rival = game.enemies.first;
+    final freeze = HeldPerk(EnemyPerk.freezeAll, 1, countdown: 20);
+    game.debugGivePerks(rival, [freeze]);
+    game.debugTickPerks(19.5);
+    expect(game.players.first.isFrozen, isFalse, reason: 'still counting');
+    game.debugTickPerks(0.6);
+    expect(freeze.spent, isTrue);
+    expect(game.players.where((kid) => kid.isFrozen), hasLength(2));
+
+    // A second one is cancelled by a knockout first.
+    await tester.pumpWidget(const SizedBox.shrink());
+    final again = (await boot(tester, MetaState())).game;
+    final carrier = again.enemies.first;
+    final second = HeldPerk(EnemyPerk.freezeAll, 1, countdown: 15);
+    again.debugGivePerks(carrier, [second]);
+    again.debugTickPerks(5);
+    knockOut([carrier]);
+    again.resolveKnockouts();
+    again.debugTickPerks(20);
+    expect(again.players.first.isFrozen, isFalse);
+  });
+
+  testWidgets('rival team armor blocks hits; cocoa heals; shields block', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.wave = 4;
+    game.startWave();
+    game.finishEntrance();
+    final [a, b, c] = game.enemies;
+    final kid = game.players.first;
+    LobProjectile shot() => LobProjectile(
+      sprite: kid.sprite!,
+      position: kid.throwOrigin,
+      velocity: Vector2(100, 0),
+      targets: game.enemies,
+      owner: kid,
+      onHit: (_, _) {},
+    );
+    // Shield perk: the first hit is blocked.
+    game.debugGivePerks(b, [HeldPerk(EnemyPerk.shield, 2)]);
+    expect(b.shieldHits, 2);
+    final bHp = b.hp;
+    game.applySnowballHit(shot: shot(), target: b);
+    expect(b.hp, bHp);
+    expect(b.shieldHits, 1);
+    // Cocoa perk: a hurt rival heals once.
+    game.debugGivePerks(c, [HeldPerk(EnemyPerk.cocoa, 1)]);
+    final full = c.hp;
+    game.debugKidHit(shot(), c);
+    expect(c.hp, full, reason: 'hit for 1, healed 1');
+    expect(game.perksOf(c).single.spent, isTrue);
+    // Team armor: after its countdown every rival shrugs off hits.
+    final armor = HeldPerk(EnemyPerk.teamArmor, 1, countdown: 1);
+    game.debugGivePerks(a, [armor]);
+    game.debugTickPerks(1.1);
+    expect(game.rivalArmorLeft, greaterThan(0));
+    final aHp = a.hp;
+    expect(game.applySnowballHit(shot: shot(), target: a), isFalse);
+    expect(a.hp, aHp);
+  });
+
+  testWidgets('a rival Big splat hits kids nearby; a cracker flattens a fort', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState(crewSize: 2))).game;
+    final [one, two] = game.players;
+    two.position = one.position + Vector2(40, ArenaGrid.rowStep * 0.5);
+    final rival = game.enemies.first;
+    final splat = LobProjectile(
+      sprite: rival.sprite!,
+      position: one.hitCenter.clone(),
+      velocity: Vector2.zero(),
+      targets: game.players,
+      owner: rival,
+      onHit: (_, _) {},
+    )..splat = true;
+    game.debugGroundMiss(splat);
+    expect(one.hp, lessThan(one.maxHp));
+    expect(two.hp, lessThan(two.maxHp));
+
+    final crack = LobProjectile(
+      sprite: rival.sprite!,
+      position: game.fort.position.clone(),
+      velocity: Vector2.zero(),
+      targets: game.players,
+      owner: rival,
+      onHit: (_, _) {},
+    )..cracker = true;
+    crack.struckFort = game.fort;
+    crack.fortDamage = true;
+    game.debugFortHit(crack);
+    expect(game.fort.isCollapsed, isTrue);
+  });
+
+  testWidgets('late waves bring upgraded and extra rival forts', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.wave = 31;
+    game.startWave();
+    expect(game.enemyFort.stage, 3);
+    expect(game.enemyExtraForts, hasLength(2));
+    for (final extra in game.enemyExtraForts) {
+      expect(extra.side, KidSide.enemy);
+      expect(extra.stage, 3);
+    }
+    game.wave = 2;
+    game.startWave();
+    expect(game.enemyFort.stage, 1);
+    expect(game.enemyExtraForts, isEmpty);
   });
 
   testWidgets('Easy hides Recovery in the shop', (tester) async {

@@ -44,6 +44,7 @@ class EnemyController extends Component {
     this.aimJitterScale,
     this.profile = const RivalProfile(),
     this.onWindup,
+    this.windupBoost = 1,
   }) : _cycle = initialDelay,
        _seenHp = host.hp;
 
@@ -82,6 +83,9 @@ class EnemyController extends Component {
   /// Called as each windup starts (the frost kid glint sound).
   final void Function()? onWindup;
 
+  /// Extra multiplier on the windup (a rival's Quick hands perk).
+  final double windupBoost;
+
   _AiPhase _phase = _AiPhase.wait;
   double _cycle;
   double _elapsed = 0;
@@ -100,7 +104,9 @@ class EnemyController extends Component {
   double get _telegraph {
     final player =
         playerChargeSeconds?.call() ?? CombatRules.playerChargeSeconds(0);
-    return tuning().botChargeSeconds(player) * profile.windupScale;
+    return tuning().botChargeSeconds(player) *
+        profile.windupScale *
+        windupBoost;
   }
 
   /// Charge pose before a bot releases. Tests check Easy and Normal stay

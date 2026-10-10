@@ -354,7 +354,7 @@ class KidComponent extends SpriteComponent {
       _refreshSprite();
       return;
     }
-    if (side == KidSide.player && shieldHits > 0) {
+    if (shieldHits > 0) {
       shieldHits -= 1;
       _flash();
       return;

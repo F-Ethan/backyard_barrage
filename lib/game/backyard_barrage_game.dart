@@ -27,6 +27,7 @@ import 'boss.dart';
 import 'combat_rules.dart';
 import 'game_art.dart';
 import 'crew_carry.dart';
+import 'crew_snapshot.dart';
 import 'enemy_perks.dart';
 import 'rival_type.dart';
 import 'components/boss_controller.dart';
@@ -264,6 +265,11 @@ class BackyardBarrageGame extends FlameGame {
   /// What the last defeat did: the wave a retry starts on, coins lost, and
   /// coins refunded (Arcade's checkpoint). Null before any defeat.
   CheckpointResult? lastDefeat;
+
+  /// The crew as it went down, and as the loss left it (before any
+  /// shopping), for the defeat summary.
+  CrewSnapshot? defeatBefore;
+  CrewSnapshot? defeatAfter;
 
   /// Points the last defeat took off the score.
   int lastScorePenalty = 0;
@@ -2084,7 +2090,19 @@ class BackyardBarrageGame extends FlameGame {
     _clearShots();
     feel.defeated();
     lastScorePenalty = meta.scoreDefeat(wave);
+    defeatBefore = CrewSnapshot.of(meta, [
+      for (var i = 0; i < players.length; i++)
+        KidState(
+          hp: players[i].hp,
+          maxHp: meta.kidMaxHp(i),
+          shield: players[i].shieldHits,
+          upgrades: meta.kidUpgrades(i),
+        ),
+    ]);
     final result = meta.resetRun(lostOn: wave);
+    defeatAfter = CrewSnapshot.of(meta, [
+      for (var i = 0; i < players.length; i++) KidState.fresh(meta, i),
+    ]);
     lastDefeat = result;
     carriedCoins = meta.coins;
     _pendingCrewHp = null;

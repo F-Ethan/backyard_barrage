@@ -567,12 +567,20 @@ class SkillTree {
 
   static bool isPersonal(SkillBranch branch) => personal.contains(branch);
 
-  /// A kid's own branches that keep them standing (the rest of their own
-  /// branches make them hit harder or faster).
+  /// A kid's own branches that keep them standing.
   static const Set<SkillBranch> personalDefense = {
     SkillBranch.health,
     SkillBranch.shield,
     SkillBranch.poise,
+  };
+
+  /// A kid's own branches that make them a better teammate when the game
+  /// plays them (aim, Quicker pals, Faster pals). The rest of their own
+  /// branches (Throw, Harder hit) are attack.
+  static const Set<SkillBranch> personalCrew = {
+    SkillBranch.aim,
+    SkillBranch.reaction,
+    SkillBranch.charge,
   };
 
   /// Saved key for kid [kid] owning node [id] (for example `k1:shield-2`).

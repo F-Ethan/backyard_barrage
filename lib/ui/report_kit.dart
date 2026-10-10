@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../game/crew_snapshot.dart';
 import '../game/kid_colors.dart';
 import '../game/wave_reward.dart';
 import '../seasons/season.dart';
@@ -190,59 +191,82 @@ class RewardPill extends StatelessWidget {
   }
 }
 
-/// A kid's hearts and shields at one moment, in a pill.
+/// A kid's state at one moment, in a pill: hearts and shield on top,
+/// their own upgrade counts (attack, defense, crew) under them.
 class KidStatusPill extends StatelessWidget {
   const KidStatusPill({
     super.key,
-    required this.hp,
-    required this.maxHp,
-    required this.shield,
+    required this.state,
     required this.caption,
     this.tint,
   });
 
-  final int hp;
-  final int maxHp;
-  final int shield;
+  final KidState state;
   final String caption;
   final Color? tint;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final down = hp <= 0;
+    final down = state.hp <= 0;
     final ink = down ? tokens.inkMuted : tokens.ink;
     final value = BarrageType.heading.copyWith(fontSize: 15, color: ink);
-    return TagPill(
-      color: tint?.withValues(alpha: 0.12),
-      borderColor: (tint ?? tokens.hairline).withValues(alpha: 0.5),
-      padding: EdgeInsets.symmetric(
-        horizontal: tokens.space.md,
-        vertical: tokens.space.xs,
+    final up = state.upgrades;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: tint?.withValues(alpha: 0.12) ?? tokens.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: (tint ?? tokens.hairline).withValues(alpha: 0.5),
+        ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                down ? UiAssets.heartEmpty : UiAssets.heart,
-                width: 20,
-                height: 20,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: tokens.space.sm + 2,
+          vertical: tokens.space.xs,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!state.inCrew)
+              Text('Not in crew', style: value)
+            else ...[
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    down ? UiAssets.heartEmpty : UiAssets.heart,
+                    width: 20,
+                    height: 20,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    down ? 'Down' : '${state.hp}/${state.maxHp}',
+                    style: value,
+                  ),
+                  if (state.shield > 0 && !down) ...[
+                    SizedBox(width: tokens.space.sm),
+                    Icon(Icons.shield_rounded, size: 18, color: tokens.primary),
+                    const SizedBox(width: 2),
+                    Text('${state.shield}', style: value),
+                  ],
+                ],
               ),
-              const SizedBox(width: 3),
-              Text(down ? 'Down' : '$hp/$maxHp', style: value),
-              if (shield > 0) ...[
-                SizedBox(width: tokens.space.sm),
-                Icon(Icons.shield_rounded, size: 18, color: tokens.primary),
-                const SizedBox(width: 2),
-                Text('$shield', style: value),
-              ],
+              const SizedBox(height: 3),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  UpgradeChip(kind: UpgradeKind.attack, count: up.attack),
+                  const SizedBox(width: 3),
+                  UpgradeChip(kind: UpgradeKind.defense, count: up.defense),
+                  const SizedBox(width: 3),
+                  UpgradeChip(kind: UpgradeKind.crew, count: up.crew),
+                ],
+              ),
             ],
-          ),
-          Text(caption, style: BarrageType.muted.copyWith(fontSize: 11)),
-        ],
+            Text(caption, style: BarrageType.muted.copyWith(fontSize: 11)),
+          ],
+        ),
       ),
     );
   }
@@ -288,35 +312,27 @@ class KidPortrait extends StatelessWidget {
 }
 
 /// A kid's report card: picture and name in their color, knockouts, their
-/// state at the end of the wave → the state they start the next one in,
-/// and a button (heal or revive) at the right.
+/// state [now] → the state they start the next wave in ([next]), and a
+/// button (heal or revive) at the right. The wave report and the defeat
+/// summary both use it.
 class KidCard extends StatelessWidget {
   const KidCard({
     super.key,
     required this.kid,
     required this.knockouts,
-    required this.hpNow,
-    required this.shieldNow,
-    required this.hpNext,
-    required this.shieldNext,
-    required this.maxHp,
-    this.attack = 0,
-    this.defense = 0,
+    required this.now,
+    required this.next,
+    this.nowCaption = 'Wave end',
+    this.nextCaption = 'Next wave',
     this.action,
   });
 
   final int kid;
   final int knockouts;
-
-  /// Their own upgrade ranks: attack (throw, hit, aim) and defense
-  /// (hearts, shield, shake it off).
-  final int attack;
-  final int defense;
-  final int hpNow;
-  final int shieldNow;
-  final int hpNext;
-  final int shieldNext;
-  final int maxHp;
+  final KidState now;
+  final KidState next;
+  final String nowCaption;
+  final String nextCaption;
   final Widget? action;
 
   @override
@@ -333,10 +349,10 @@ class KidCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          KidPortrait(kid: kid, down: hpNow <= 0),
+          KidPortrait(kid: kid, down: now.hp <= 0),
           SizedBox(width: tokens.space.md),
           SizedBox(
-            width: 104,
+            width: 76,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -352,25 +368,6 @@ class KidCard extends StatelessWidget {
                   key: Key('report-kos-$kid'),
                   style: BarrageType.muted,
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  key: Key('report-upgrades-$kid'),
-                  children: [
-                    _UpgradeChip(
-                      icon: Icons.flash_on_rounded,
-                      count: attack,
-                      color: const Color(0xFFE67E22),
-                      label: 'Attack upgrades',
-                    ),
-                    const SizedBox(width: 4),
-                    _UpgradeChip(
-                      icon: Icons.shield_rounded,
-                      count: defense,
-                      color: tokens.primary,
-                      label: 'Defense upgrades',
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
@@ -381,18 +378,15 @@ class KidCard extends StatelessWidget {
               runSpacing: tokens.space.xs,
               children: [
                 KidStatusPill(
-                  hp: hpNow,
-                  maxHp: maxHp,
-                  shield: shieldNow,
-                  caption: 'Wave end',
+                  key: Key('report-now-$kid'),
+                  state: now,
+                  caption: nowCaption,
                 ),
                 Icon(Icons.arrow_forward_rounded, color: tokens.inkMuted),
                 KidStatusPill(
                   key: Key('report-next-$kid'),
-                  hp: hpNext,
-                  maxHp: maxHp,
-                  shield: hpNext > 0 ? shieldNext : 0,
-                  caption: 'Next wave',
+                  state: next,
+                  caption: nextCaption,
                   tint: color,
                 ),
               ],
@@ -405,26 +399,33 @@ class KidCard extends StatelessWidget {
   }
 }
 
-/// A tiny icon and count: how many attack or defense upgrades a kid has.
-class _UpgradeChip extends StatelessWidget {
-  const _UpgradeChip({
-    required this.icon,
-    required this.count,
-    required this.color,
-    required this.label,
-  });
+/// The three kinds of a kid's own upgrades.
+enum UpgradeKind {
+  attack('Attack', Icons.flash_on_rounded, Color(0xFFE67E22)),
+  defense('Defense', Icons.health_and_safety_rounded, Color(0xFF3D7CFF)),
+  crew('Crew', Icons.groups_rounded, Color(0xFF16A085));
 
-  final IconData icon;
-  final int count;
-  final Color color;
+  const UpgradeKind(this.label, this.icon, this.color);
+
   final String label;
+  final IconData icon;
+  final Color color;
+}
+
+/// A tiny icon and count: how many upgrades of one kind a kid has.
+class UpgradeChip extends StatelessWidget {
+  const UpgradeChip({super.key, required this.kind, required this.count});
+
+  final UpgradeKind kind;
+  final int count;
 
   @override
   Widget build(BuildContext context) {
+    final color = kind.color;
     return Semantics(
-      label: '$label: $count',
+      label: '${kind.label} upgrades: $count',
       child: Container(
-        padding: const EdgeInsets.fromLTRB(4, 1, 7, 1),
+        padding: const EdgeInsets.fromLTRB(3, 1, 6, 1),
         decoration: BoxDecoration(
           color: color.withValues(alpha: count > 0 ? 0.16 : 0.06),
           borderRadius: BorderRadius.circular(999),
@@ -433,15 +434,15 @@ class _UpgradeChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              icon,
-              size: 15,
+              kind.icon,
+              size: 14,
               color: count > 0 ? color : color.withValues(alpha: 0.4),
             ),
             const SizedBox(width: 2),
             Text(
               '$count',
               style: BarrageType.heading.copyWith(
-                fontSize: 13,
+                fontSize: 12,
                 color: count > 0 ? BarrageColors.ink : BarrageColors.inkMuted,
               ),
             ),

@@ -319,3 +319,12 @@ General-audience listing, rated 4+, marketed as a family game, not in Apple's Ki
 
 - After every wave clear, a **wave report** comes before the shop: what the wave paid (power-ups from a scared hound or a boss, knockout coins, the clear bonus), then each kid's hearts now and going into the next wave (after the carry heal). A down kid can be revived for 100 coins, doubling each time that same kid is revived (100, 200, 400…); a hurt kid can buy a heart back for a third of that wave's clear bonus (never under 20: about 40 at wave 10, 175 at wave 20). It also lists the power-ups you hold and what each does. "To the shop" opens the shop.
 - **Per-kid skills.** Health (new: +1 max heart a rank, three ranks), Shield, Shake it off, Quicker throw, Harder hit (one more hit a rank, whoever throws), Sharper aim, Quicker pals, and Faster pals belong to each kid; the shop shows a Kid 1 / 2 / 3 picker on those branches (the bot-only three default to Kid 2). They cost 60% of the catalog price. Crew, Recovery, Fort, More forts, Open fort, Wider splat, and Heavy hit stay shared. A kid keeps their skills through being knocked out. Older saves give every kid the personal ranks they owned when skills were shared.
+
+## Rival perks and forts (Oct 2026)
+
+- From wave 10 each rival has a 10% chance (+2% a wave, at most 40%) of carrying perks, shown as icons over its head. Level 1 on waves 10–19, 2 on 20–29, 3 from 30; from wave 20 a carrier can roll a second perk (25%), from 30 a third (25%).
+  - Shield: blocks 1 / 2 / 3 hits (the shield badge). Hot cocoa: heals 1 / 2 / 3 the first time it is hurt. Quick hands: windup ×0.85 / 0.75 / 0.65. Big splat: its next 1 / 2 / 3 throws burst on landing and hit every kid nearby. Fort cracker: its next throw knocks a fort flat.
+  - Team potions run a countdown ring over the rival: 20 / 15 / 10s (Easy / Normal / Hard). Knock that rival out first and it is cancelled. Freeze all freezes the crew for 1.5s; team Hot cocoa heals every rival 1; team Frost armor shields every rival for 3s.
+  - A rival knocked out with a potion it never used drops it for the crew half the time (logged in the wave report).
+- Bosses: none the first time, then one more perk each time a boss returns (up to three), from Shield, Hot cocoa (a quarter of its health), and the three team potions.
+- Rival forts: stage 1 early, sometimes 2 from wave 5, 2 or 3 from wave 10, 3 from wave 20. Extra rival forts: maybe one from wave 8, one (sometimes two) from wave 15, two from wave 25, laid out like the crew's extra forts.

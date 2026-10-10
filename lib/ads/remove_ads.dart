@@ -118,8 +118,22 @@ class RemoveAdsController extends ChangeNotifier {
     _notify();
   }
 
+  /// True while a purchase is in flight; a second tap does nothing.
+  bool get buying => _buying;
+  var _buying = false;
+
   Future<void> buy() async {
-    if (owned) return;
+    if (owned || _buying) return;
+    _buying = true;
+    try {
+      await _buy();
+    } finally {
+      _buying = false;
+      _notify();
+    }
+  }
+
+  Future<void> _buy() async {
     note = null;
     if (!productReady) {
       note = RemoveAdsCopy.unavailable;

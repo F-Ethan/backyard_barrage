@@ -66,8 +66,7 @@ void main() {
           ?SeasonAssets.rivalPose(type, pose),
       ...GameArt.flameImages,
       ...BossArt.all,
-      for (final type in RivalType.values)
-        ...SeasonAssets.rivalWalkCycle(type),
+      for (final type in RivalType.values) ...SeasonAssets.rivalWalkCycle(type),
       for (final frame in HoundComponent.frames)
         HoundComponent.framePath(frame),
       for (final arena in Arena.values) arena.background,

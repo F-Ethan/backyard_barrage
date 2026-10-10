@@ -1,14 +1,28 @@
 import 'dart:async';
 
-import 'package:app_tracking_transparency/app_tracking_transparency.dart';
-import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'ad_config.dart';
 import 'end_ad.dart';
 import 'remove_ads.dart';
 
-/// UMP consent, the iOS tracking prompt, then an interstitial when allowed.
+/// Ad settings for a game aimed at kids (a 4+ family game, general
+/// audience): child age treatment (no personalisation or tracking) and only
+/// G-rated ads.
+RequestConfiguration get kidSafeRequestConfiguration => RequestConfiguration(
+  ageRestrictedTreatment: AgeRestrictedTreatment.child,
+  maxAdContentRating: MaxAdContentRating.g,
+);
+
+/// Every interstitial request: non-personalised.
+const AdRequest kidSafeRequest = AdRequest(nonPersonalizedAds: true);
+
+/// UMP consent, then a kid-safe interstitial when allowed.
+///
+/// The game is treated as directed to children (a 4+ family game), so it
+/// never shows the iOS tracking prompt, and every ad request is tagged
+/// child-directed and under the age of consent, rated G, and
+/// non-personalised. Consent is checked again before every load.
 class MobileEndAd extends EndAd {
   MobileEndAd(this.removeAds);
 
@@ -29,57 +43,62 @@ class MobileEndAd extends EndAd {
       params,
       () async {
         await ConsentForm.loadAndShowConsentFormIfRequired((_) async {
-          await _requestTracking();
           await _startAdsIfAllowed();
         });
       },
       (_) async {
-        await _requestTracking();
         await _startAdsIfAllowed();
       },
     );
   }
 
-  Future<void> _requestTracking() async {
-    if (removeAds.owned) return;
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
-    try {
-      final status = await AppTrackingTransparency.trackingAuthorizationStatus;
-      if (removeAds.owned || status != TrackingStatus.notDetermined) return;
-      await AppTrackingTransparency.requestTrackingAuthorization();
-    } catch (_) {
-      // The prompt is iOS-only. A missing plugin must not block the game.
-    }
-  }
+  var _started = false;
 
   Future<void> _startAdsIfAllowed() async {
     if (removeAds.owned) return;
     try {
       if (!await ConsentInformation.instance.canRequestAds()) return;
+      await MobileAds.instance.updateRequestConfiguration(
+        kidSafeRequestConfiguration,
+      );
       await MobileAds.instance.initialize();
+      _started = true;
       _load();
     } catch (_) {}
   }
 
+  /// Loads the next interstitial, only after the SDK started with the
+  /// kid-safe settings and only while consent still allows ads.
   void _load() {
-    if (removeAds.owned || _loading || _ready != null) return;
+    if (removeAds.owned || _loading || _ready != null || !_started) return;
     // A release build without a live unit shows no ads, never test ads.
     if (AdConfig.interstitialId.isEmpty) return;
     _loading = true;
-    unawaited(
-      InterstitialAd.load(
-        adUnitId: AdConfig.interstitialId,
-        request: const AdRequest(),
-        adLoadCallback: InterstitialAdLoadCallback(
-          onAdLoaded: (ad) {
-            _loading = false;
-            _ready = ad;
-          },
-          onAdFailedToLoad: (_) {
-            _loading = false;
-            _ready = null;
-          },
-        ),
+    unawaited(_loadIfAllowed());
+  }
+
+  Future<void> _loadIfAllowed() async {
+    try {
+      if (!await ConsentInformation.instance.canRequestAds()) {
+        _loading = false;
+        return;
+      }
+    } catch (_) {
+      _loading = false;
+      return;
+    }
+    await InterstitialAd.load(
+      adUnitId: AdConfig.interstitialId,
+      request: kidSafeRequest,
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          _loading = false;
+          _ready = ad;
+        },
+        onAdFailedToLoad: (_) {
+          _loading = false;
+          _ready = null;
+        },
       ),
     );
   }

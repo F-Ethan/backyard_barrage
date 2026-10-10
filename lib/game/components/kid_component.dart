@@ -166,7 +166,9 @@ class KidComponent extends SpriteComponent {
   Color? _aura;
   Paint? _auraPaint;
   double _auraAge = 0;
-  final int maxHp;
+
+  /// Hearts when full. A player kid's can grow between waves (Health).
+  int maxHp;
   int hp;
 
   /// Hits absorbed before HP or stun. Refilled at the start of each wave.

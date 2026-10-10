@@ -490,6 +490,8 @@ void main() {
     game.update(0.7);
     game.update(0.6);
     await tester.pump();
+    game.openShopFromReport();
+    await tester.pump();
     expect(find.text('Next wave'), findsOneWidget);
     expect(find.byKey(const Key('buy-throw')), findsOneWidget);
 
@@ -573,6 +575,8 @@ void main() {
     game.resolveKnockouts();
     game.update(0.7);
     game.update(0.6);
+    await tester.pump();
+    game.openShopFromReport();
     await tester.pump();
     await tester.tap(find.text('Next wave'));
     await tester.pump();
@@ -747,6 +751,8 @@ void main() {
     game.update(0.7);
     game.update(0.6);
     await tester.pump();
+    game.openShopFromReport();
+    await tester.pump();
     expect(game.phase, MatchPhase.shop);
     game.continueFromShop();
     game.finishEntrance();
@@ -754,20 +760,19 @@ void main() {
     return game;
   }
 
-  testWidgets('Campaign on Normal heals one and the KOd kid leaves the crew', (
+  testWidgets('Campaign on Normal heals one; the KOd kid stays down', (
     tester,
   ) async {
     final game = await nextWaveWithHurtCrew(
       tester,
       difficulty: Difficulty.normal,
     );
-    expect(game.players, hasLength(1));
+    expect(game.players, hasLength(2), reason: 'kids stay in the crew');
     expect(game.players[0].hp, 2);
+    expect(game.players[1].isKo, isTrue, reason: 'down until revived');
     expect(game.selectedKid, game.players[0]);
     expect(game.phase, MatchPhase.fight);
-    expect(game.meta.owns('team-2'), isFalse, reason: 'spot reopens');
-    expect(game.meta.ledger.kidLosses, 1);
-    expect(game.meta.costOf('team-2'), 30, reason: '20 × 1.5');
+    expect(game.meta.owns('team-2'), isTrue);
   });
 
   testWidgets('Campaign on Hard carries health as it is', (tester) async {
@@ -775,8 +780,8 @@ void main() {
       tester,
       difficulty: Difficulty.hard,
     );
-    expect(game.players, hasLength(1));
     expect(game.players[0].hp, 1);
+    expect(game.players[1].isKo, isTrue);
   });
 
   testWidgets('Easy brings the whole crew back full in both modes', (
@@ -803,7 +808,7 @@ void main() {
       mode: PlayMode.campaign,
     );
     expect(hard.players[0].hp, 1, reason: 'Hard: no heal');
-    expect(hard.players, hasLength(1), reason: 'Hard: the KOd kid left');
+    expect(hard.players[1].isKo, isTrue, reason: 'Hard: still down');
     await tester.pumpWidget(const SizedBox.shrink());
     final normal = await nextWaveWithHurtCrew(
       tester,
@@ -811,7 +816,7 @@ void main() {
       mode: PlayMode.campaign,
     );
     expect(normal.players[0].hp, 2, reason: 'Normal: +1');
-    expect(normal.players, hasLength(1), reason: 'Normal: the KOd kid left');
+    expect(normal.players[1].isKo, isTrue, reason: 'Normal: still down');
   });
 
   testWidgets('a teammate looks up and down the yard while winding up', (
@@ -868,14 +873,15 @@ void main() {
     game.pauseMatch();
     game.exitToMenu();
     expect(meta.resumeWave, 2);
-    expect(meta.resumeCrewHp, [1]);
+    expect(meta.resumeCrewHp, [1, 0]);
 
     await tester.pumpWidget(const SizedBox.shrink());
     final again = (await boot(tester, meta)).game;
     again.feel.apply(again.feel.settings.copyWith(difficulty: Difficulty.hard));
     expect(again.wave, 2);
-    expect(again.players, hasLength(1));
+    expect(again.players, hasLength(2));
     expect(again.players[0].hp, 1);
+    expect(again.players[1].isKo, isTrue);
     expect(meta.resumeCrewHp, isNull);
   });
 
@@ -1113,6 +1119,8 @@ void main() {
     game.update(0.7);
     game.update(0.6);
     await tester.pump();
+    game.openShopFromReport();
+    await tester.pump();
     await tester.tap(find.byKey(const Key('shop-tab-items')));
     await tester.pump();
     expect(find.byKey(const Key('shop-items')), findsOneWidget);
@@ -1269,7 +1277,7 @@ void main() {
     await tester.tap(find.byKey(const Key('buy-throw')));
     await tester.pump();
     expect(game.meta.throwRank, 1);
-    expect(game.meta.coins, 40 - SkillTree.node('throw-1')!.cost);
+    expect(game.meta.coins, 40 - game.meta.costOf('throw-1'));
     expect(game.wave, 1);
 
     await tester.tap(find.byKey(const Key('next-wave')));
@@ -1282,7 +1290,7 @@ void main() {
     expect(game.phase, MatchPhase.entering);
     game.finishEntrance();
     expect(game.meta.throwRank, 1);
-    expect(game.meta.coins, 40 - SkillTree.node('throw-1')!.cost);
+    expect(game.meta.coins, 40 - game.meta.costOf('throw-1'));
     expect(game.meta.crewSize, 1);
     expect(game.players, hasLength(1));
     expect(game.wave, 1);
@@ -1328,6 +1336,8 @@ void main() {
     game.resolveKnockouts();
     game.update(0.7);
     game.update(0.6);
+    await tester.pump();
+    game.openShopFromReport();
     await tester.pump();
     expect(tester.takeException(), isNull);
     expect(find.byKey(const Key('buy-throw')), findsOneWidget);
@@ -1376,6 +1386,8 @@ void main() {
     game.update(0.7);
     game.update(0.6);
     await tester.pump();
+    game.openShopFromReport();
+    await tester.pump();
 
     expect(find.byKey(const Key('skill-group-fight')), findsOneWidget);
     expect(find.byKey(const Key('skill-branch-throwSpeed')), findsOneWidget);
@@ -1410,7 +1422,9 @@ void main() {
     expect(find.byKey(const Key('open-aim-1')), findsOneWidget);
     await tester.tap(find.byKey(const Key('skill-aim-1')));
     await tester.pump();
-    expect(game.meta.owns('aim-1'), isTrue);
+    // Bot skills default to the teammate (Kid 2).
+    expect(game.meta.ownsFor(1, 'aim-1'), isTrue);
+    expect(game.meta.ownsFor(0, 'aim-1'), isFalse);
     expect(game.meta.allyAimScale, 0.72);
   });
 
@@ -1438,6 +1452,8 @@ void main() {
     game.update(0.7);
     game.update(0.6);
     await tester.pump();
+    game.openShopFromReport();
+    await tester.pump();
     expect(find.text('Next wave'), findsOneWidget);
   });
 
@@ -1450,6 +1466,8 @@ void main() {
     game.resolveKnockouts();
     game.update(0.7);
     game.update(0.6);
+    await tester.pump();
+    game.openShopFromReport();
     await tester.pump();
 
     booted.pulses.kinds.clear();
@@ -1475,6 +1493,8 @@ void main() {
     expect(game.bannerListenable.value?.label, 'KO!');
     game.update(0.7);
     game.update(0.6);
+    await tester.pump();
+    game.openShopFromReport();
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('Next wave'), findsOneWidget);
@@ -2985,6 +3005,55 @@ void main() {
     expect(game.lastDefeat!.wave, 10);
   });
 
+  testWidgets('the wave report revives a kid (dearer each time) and heals', (
+    tester,
+  ) async {
+    final booted = await boot(
+      tester,
+      MetaState(coins: 1000, skills: {'team-2'}),
+    );
+    final game = booted.game;
+    game.feel.apply(game.feel.settings.copyWith(difficulty: Difficulty.hard));
+    game.players[0].hp = 1;
+    knockOut([game.players[1]]);
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+    expect(find.byKey(const Key('wave-report')), findsOneWidget);
+    expect(game.waveRewards.last, startsWith('Wave 1 clear'));
+    expect(game.nextCrewHp, [1, 0]);
+
+    await tester.tap(find.byKey(const Key('report-revive-1')));
+    await tester.pump();
+    expect(game.nextCrewHp, [1, game.meta.kidMaxHp(1)]);
+    expect(game.meta.reviveCost(1), 200);
+    await tester.tap(find.byKey(const Key('report-heal-0')));
+    await tester.pump();
+    expect(game.nextCrewHp[0], 2);
+
+    await tester.tap(find.byKey(const Key('report-continue')));
+    await tester.pump();
+    expect(find.byKey(const Key('wave-report')), findsNothing);
+    game.continueFromShop();
+    game.finishEntrance();
+    expect(game.players[1].isKo, isFalse);
+    expect(game.players[0].hp, 2);
+  });
+
+  testWidgets('each kid starts with its own hearts and shield', (tester) async {
+    final meta = MetaState(coins: 1000, skills: {'team-2'});
+    expect(meta.buy('hp-1', kid: 1), isTrue);
+    expect(meta.buy('shield-1', kid: 0), isTrue);
+    final game = (await boot(tester, meta)).game;
+    expect(game.players[0].maxHp, 3);
+    expect(game.players[1].maxHp, 4);
+    expect(game.players[1].hp, 4);
+    expect(game.players[0].shieldHits, 1);
+    expect(game.players[1].shieldHits, 0);
+  });
+
   testWidgets('Easy hides Recovery in the shop', (tester) async {
     await _useSurface(tester, const Size(844, 390));
     final booted = await boot(
@@ -2997,6 +3066,8 @@ void main() {
     game.resolveKnockouts();
     game.update(0.7);
     game.update(0.6);
+    await tester.pump();
+    game.openShopFromReport();
     await tester.pump();
     await tester.tap(find.byKey(const Key('skill-group-crew')));
     await tester.pump();

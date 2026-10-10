@@ -4,6 +4,7 @@ import 'skill_effects.dart';
 /// a node can be bought only after its parent.
 enum SkillBranch {
   team('Team'),
+  health('Health'),
   recovery('Recovery'),
   fort('Fort'),
   moreForts('More forts'),
@@ -36,6 +37,7 @@ enum SkillGroup {
   List<SkillBranch> get branches => switch (this) {
     SkillGroup.crew => const [
       SkillBranch.team,
+      SkillBranch.health,
       SkillBranch.recovery,
       SkillBranch.aim,
       SkillBranch.reaction,
@@ -66,7 +68,7 @@ enum SkillGroup {
 
 /// Why a node cannot be bought yet. Coins are separate: an open node can
 /// still be too expensive.
-enum SkillLock { open, parent, teammate, easyHeals }
+enum SkillLock { open, parent, teammate, easyHeals, recruit }
 
 /// One purchase. Each rank in a chain costs more than the one before
 /// ([SkillTree.rankCost]): ×2.5 through the hand-made ranks, then ×3 for as
@@ -93,12 +95,9 @@ class SkillNode {
   bool get needsTeammate => switch (branch) {
     SkillBranch.aim || SkillBranch.reaction || SkillBranch.charge => true,
     SkillBranch.recovery => id == 'revive-1',
-    // Ranks 3 and 4, then every even rank past 4, only power up teammates.
-    SkillBranch.damage => switch (SkillTree.rankOf(id)) {
-      3 || 4 => true,
-      final rank => rank > 4 && rank.isEven,
-    },
     SkillBranch.team ||
+    SkillBranch.health ||
+    SkillBranch.damage ||
     SkillBranch.fort ||
     SkillBranch.moreForts ||
     SkillBranch.throwSpeed ||
@@ -119,6 +118,7 @@ class SkillTree {
 
   static const teammateLockReason = 'Get a friend on your team first.';
   static const easyHealsReason = 'On Easy, everyone heals for free.';
+  static const recruitLockReason = 'Get this kid on your team first.';
 
   /// Price of the [rank]th node (1-based) in a chain that starts at [base]
   /// and has [handLength] hand-made ranks, rounded to the nearest 5.
@@ -176,6 +176,30 @@ class SkillTree {
       detail: 'One more friend. Now there are three of you.',
       cost: 50,
       parentId: 'team-2',
+    ),
+    // Health (each kid): more max hearts.
+    SkillNode(
+      id: 'hp-1',
+      branch: SkillBranch.health,
+      title: 'Tough kid',
+      detail: 'This kid gets 1 more heart.',
+      cost: 30,
+    ),
+    SkillNode(
+      id: 'hp-2',
+      branch: SkillBranch.health,
+      title: 'Tough kid II',
+      detail: 'One more heart again.',
+      cost: 75,
+      parentId: 'hp-1',
+    ),
+    SkillNode(
+      id: 'hp-3',
+      branch: SkillBranch.health,
+      title: 'Tough kid III',
+      detail: 'One more heart. Six in all.',
+      cost: 190,
+      parentId: 'hp-2',
     ),
     // Recovery: both modes carry health between waves on Normal and Hard
     // (see CrewCarry). These soften that.
@@ -254,14 +278,14 @@ class SkillTree {
       id: 'throw-1',
       branch: SkillBranch.throwSpeed,
       title: 'Quicker throw',
-      detail: 'Get your throw ready faster, and it flies harder.',
+      detail: 'Gets its throw ready faster, and it flies harder.',
       cost: 10,
     ),
     SkillNode(
       id: 'throw-2',
       branch: SkillBranch.throwSpeed,
       title: 'Quicker throw II',
-      detail: 'Get your throw ready even faster.',
+      detail: 'Gets its throw ready even faster.',
       cost: 25,
       parentId: 'throw-1',
     ),
@@ -269,7 +293,7 @@ class SkillTree {
       id: 'throw-3',
       branch: SkillBranch.throwSpeed,
       title: 'Quicker throw III',
-      detail: 'Get your throw ready even faster.',
+      detail: 'Gets its throw ready even faster.',
       cost: 65,
       parentId: 'throw-2',
     ),
@@ -277,7 +301,7 @@ class SkillTree {
       id: 'throw-4',
       branch: SkillBranch.throwSpeed,
       title: 'Quicker throw IV',
-      detail: 'Get your throw ready even faster.',
+      detail: 'Gets its throw ready even faster.',
       cost: 155,
       parentId: 'throw-3',
     ),
@@ -285,7 +309,7 @@ class SkillTree {
       id: 'throw-5',
       branch: SkillBranch.throwSpeed,
       title: 'Quicker throw V',
-      detail: 'Your fastest throw yet.',
+      detail: 'Its fastest throw yet.',
       cost: 390,
       parentId: 'throw-4',
     ),
@@ -293,14 +317,14 @@ class SkillTree {
       id: 'poise-1',
       branch: SkillBranch.poise,
       title: 'Shake it off',
-      detail: 'When you get hit, you get back up faster.',
+      detail: 'Gets back up faster after a hit.',
       cost: 12,
     ),
     SkillNode(
       id: 'poise-2',
       branch: SkillBranch.poise,
       title: 'Shake it off II',
-      detail: 'Get back up even faster.',
+      detail: 'Gets back up even faster.',
       cost: 30,
       parentId: 'poise-1',
     ),
@@ -308,7 +332,7 @@ class SkillTree {
       id: 'poise-3',
       branch: SkillBranch.poise,
       title: 'Shake it off III',
-      detail: 'Get back up even faster.',
+      detail: 'Gets back up even faster.',
       cost: 75,
       parentId: 'poise-2',
     ),
@@ -316,7 +340,7 @@ class SkillTree {
       id: 'poise-4',
       branch: SkillBranch.poise,
       title: 'Shake it off IV',
-      detail: 'Get back up even faster.',
+      detail: 'Gets back up even faster.',
       cost: 190,
       parentId: 'poise-3',
     ),
@@ -355,14 +379,14 @@ class SkillTree {
       id: 'aim-1',
       branch: SkillBranch.aim,
       title: 'Sharper aim',
-      detail: 'Your friends aim better.',
+      detail: 'Aims better when it throws on its own.',
       cost: 12,
     ),
     SkillNode(
       id: 'aim-2',
       branch: SkillBranch.aim,
       title: 'Sharper aim II',
-      detail: 'Your friends aim even better.',
+      detail: 'Aims even better on its own.',
       cost: 30,
       parentId: 'aim-1',
     ),
@@ -370,7 +394,7 @@ class SkillTree {
       id: 'aim-3',
       branch: SkillBranch.aim,
       title: 'Sharper aim III',
-      detail: 'Your friends aim even better.',
+      detail: 'Aims even better on its own.',
       cost: 75,
       parentId: 'aim-2',
     ),
@@ -378,14 +402,14 @@ class SkillTree {
       id: 'react-1',
       branch: SkillBranch.reaction,
       title: 'Quicker pals',
-      detail: 'Your friends throw more often.',
+      detail: 'Throws more often when it plays on its own.',
       cost: 12,
     ),
     SkillNode(
       id: 'react-2',
       branch: SkillBranch.reaction,
       title: 'Quicker pals II',
-      detail: 'Your friends throw even more often.',
+      detail: 'Throws even more often on its own.',
       cost: 30,
       parentId: 'react-1',
     ),
@@ -393,7 +417,7 @@ class SkillTree {
       id: 'react-3',
       branch: SkillBranch.reaction,
       title: 'Quicker pals III',
-      detail: 'Your friends throw even more often.',
+      detail: 'Throws even more often on its own.',
       cost: 75,
       parentId: 'react-2',
     ),
@@ -401,14 +425,14 @@ class SkillTree {
       id: 'charge-1',
       branch: SkillBranch.charge,
       title: 'Faster pals',
-      detail: 'Your friends get their throws ready faster.',
+      detail: 'Gets its throw ready faster when it plays on its own.',
       cost: 12,
     ),
     SkillNode(
       id: 'charge-2',
       branch: SkillBranch.charge,
       title: 'Faster pals II',
-      detail: 'Your friends get ready even faster.',
+      detail: 'Gets ready even faster on its own.',
       cost: 30,
       parentId: 'charge-1',
     ),
@@ -416,7 +440,7 @@ class SkillTree {
       id: 'charge-3',
       branch: SkillBranch.charge,
       title: 'Faster pals III',
-      detail: 'Your friends get ready even faster.',
+      detail: 'Gets ready even faster on its own.',
       cost: 75,
       parentId: 'charge-2',
     ),
@@ -424,14 +448,14 @@ class SkillTree {
       id: 'shield-1',
       branch: SkillBranch.shield,
       title: 'Shield',
-      detail: 'Each of your kids blocks 1 hit every wave.',
+      detail: 'Blocks 1 hit every wave.',
       cost: 20,
     ),
     SkillNode(
       id: 'shield-2',
       branch: SkillBranch.shield,
       title: 'Shield II',
-      detail: 'Each of your kids blocks 2 hits every wave.',
+      detail: 'Blocks 2 hits every wave.',
       cost: 50,
       parentId: 'shield-1',
     ),
@@ -439,7 +463,7 @@ class SkillTree {
       id: 'shield-3',
       branch: SkillBranch.shield,
       title: 'Shield III',
-      detail: 'Each of your kids blocks 3 hits every wave.',
+      detail: 'Blocks 3 hits every wave.',
       cost: 125,
       parentId: 'shield-2',
     ),
@@ -485,14 +509,14 @@ class SkillTree {
       id: 'damage-1',
       branch: SkillBranch.damage,
       title: 'Harder hit',
-      detail: 'Your snowballs hit twice as hard.',
+      detail: 'Snowballs hit twice as hard.',
       cost: 25,
     ),
     SkillNode(
       id: 'damage-2',
       branch: SkillBranch.damage,
       title: 'Harder hit II',
-      detail: 'Your snowballs hit three times as hard.',
+      detail: 'Snowballs hit 3 times as hard.',
       cost: 65,
       parentId: 'damage-1',
     ),
@@ -500,7 +524,7 @@ class SkillTree {
       id: 'damage-3',
       branch: SkillBranch.damage,
       title: 'Harder hit III',
-      detail: 'Your friends\' snowballs hit twice as hard.',
+      detail: 'Snowballs hit 4 times as hard.',
       cost: 155,
       parentId: 'damage-2',
     ),
@@ -508,7 +532,7 @@ class SkillTree {
       id: 'damage-4',
       branch: SkillBranch.damage,
       title: 'Harder hit IV',
-      detail: 'Your friends\' snowballs hit three times as hard.',
+      detail: 'Snowballs hit 5 times as hard.',
       cost: 390,
       parentId: 'damage-3',
     ),
@@ -527,6 +551,35 @@ class SkillTree {
   };
 
   static List<SkillNode> chain(SkillBranch branch) => _chains[branch]!;
+
+  /// Branches each kid owns separately; the rest are shared by the team.
+  /// One kid can go for defence while another hits harder.
+  static const Set<SkillBranch> personal = {
+    SkillBranch.health,
+    SkillBranch.shield,
+    SkillBranch.poise,
+    SkillBranch.throwSpeed,
+    SkillBranch.damage,
+    SkillBranch.aim,
+    SkillBranch.reaction,
+    SkillBranch.charge,
+  };
+
+  static bool isPersonal(SkillBranch branch) => personal.contains(branch);
+
+  /// Saved key for kid [kid] owning node [id] (for example `k1:shield-2`).
+  static String kidKey(int kid, String id) => 'k$kid:$id';
+
+  /// Splits a saved key into the kid (null for a team node) and node id.
+  static (int?, String) parseKey(String key) {
+    final match = RegExp(r'^k(\d):(.+)$').firstMatch(key);
+    if (match == null) return (null, key);
+    return (int.parse(match.group(1)!), match.group(2)!);
+  }
+
+  /// Personal ranks cost this much of the catalog price, because each kid
+  /// buys them separately.
+  static const double personalPriceScale = 0.6;
 
   /// Chains that keep going past their hand-made ranks. Team (the crew
   /// stays at three), Recovery, and Lanes stop where they are.
@@ -572,18 +625,19 @@ class SkillTree {
   ) {
     return switch (branch) {
       SkillBranch.team ||
+      SkillBranch.health ||
       SkillBranch.recovery ||
       SkillBranch.lanes ||
       SkillBranch.moreForts => null,
       SkillBranch.throwSpeed => (r) => (
         'throw-$r',
         'Quicker throw ${roman(r)}',
-        'Get your throw ready even faster.',
+        'Gets its throw ready even faster.',
       ),
       SkillBranch.poise => (r) => (
         'poise-$r',
         'Shake it off ${roman(r)}',
-        'Get back up even faster.',
+        'Gets back up even faster.',
       ),
       SkillBranch.pressure => (r) => (
         'pressure-$r',
@@ -593,22 +647,22 @@ class SkillTree {
       SkillBranch.aim => (r) => (
         'aim-$r',
         'Sharper aim ${roman(r)}',
-        'Your friends aim even better.',
+        'Aims even better on its own.',
       ),
       SkillBranch.reaction => (r) => (
         'react-$r',
         'Quicker pals ${roman(r)}',
-        'Your friends throw even more often.',
+        'Throws even more often on its own.',
       ),
       SkillBranch.charge => (r) => (
         'charge-$r',
         'Faster pals ${roman(r)}',
-        'Your friends get ready even faster.',
+        'Gets ready even faster on its own.',
       ),
       SkillBranch.shield => (r) => (
         'shield-$r',
         'Shield ${roman(r)}',
-        'Each of your kids blocks ${SkillEffects.shield(r)} hits every wave.',
+        'Blocks ${SkillEffects.shield(r)} hits every wave.',
       ),
       SkillBranch.blast => (r) => (
         'blast-$r',
@@ -618,10 +672,7 @@ class SkillTree {
       SkillBranch.damage => (r) => (
         'damage-$r',
         'Harder hit ${roman(r)}',
-        r.isOdd
-            ? 'Your snowballs hit ${SkillEffects.manualHits(r)} times as hard.'
-            : "Your friends' snowballs hit "
-                  '${SkillEffects.botHits(r)} times as hard.',
+        'Snowballs hit ${SkillEffects.kidHits(r)} times as hard.',
       ),
       // The fort chain is two stages, then packed-snow HP ranks.
       SkillBranch.fort => (r) => (

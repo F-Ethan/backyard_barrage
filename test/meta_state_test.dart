@@ -56,7 +56,11 @@ void main() {
       expect(meta.throwRank, MetaState.maxThrowRank);
       // The throw chain keeps going past the hand-made ranks, at ×3.
       expect(meta.nextThrowNode!.id, 'throw-6');
-      expect(meta.nextThrowCost, 390 * 3);
+      expect(
+        meta.nextThrowCost,
+        700,
+        reason: '390 × 3, at the 60% personal price',
+      );
       expect(meta.coins, greaterThanOrEqualTo(0));
     });
 
@@ -71,7 +75,7 @@ void main() {
       );
       meta.buy('shield-1');
       meta.resetRun();
-      expect(meta.coins, 80 - SkillTree.node('shield-1')!.cost);
+      expect(meta.coins, 80 - meta.costOf('shield-1'));
       expect(meta.skills, isEmpty);
       expect(meta.crewSize, 1);
       expect(meta.fortStage, 1);
@@ -96,7 +100,7 @@ void main() {
       meta.buy('shield-1');
       meta.resetRun();
       expect(meta.mode, PlayMode.campaign);
-      expect(meta.coins, 80 - SkillTree.node('shield-1')!.cost);
+      expect(meta.coins, 80 - meta.costOf('shield-1'));
       expect(meta.owns('team-2'), isTrue);
       expect(meta.owns('team-3'), isTrue);
       expect(meta.owns('fort-2'), isTrue);
@@ -157,6 +161,9 @@ void main() {
         [
           'team-2:20',
           'team-3:50',
+          'hp-1:30',
+          'hp-2:75',
+          'hp-3:190',
           'mend-1:20',
           'mend-2:50',
           'revive-1:125',
@@ -218,8 +225,6 @@ void main() {
           'charge-1',
           'charge-2',
           'charge-3',
-          'damage-3',
-          'damage-4',
         ],
       );
     });
@@ -250,33 +255,28 @@ void main() {
       }
       expect(solo.skillLock('aim-2'), SkillLock.parent);
       expect(solo.lockReason('aim-2'), SkillTree.parentLockReason);
+      // Harder hit is personal and needs no teammate: one more hit a rank.
       expect(solo.buy('damage-1'), isTrue);
       expect(solo.buy('damage-2'), isTrue);
       expect(solo.hitsFor(manualThrow: true), 3);
-      expect(solo.skillLock('damage-3'), SkillLock.teammate);
-      expect(solo.lockReason('damage-3'), SkillTree.teammateLockReason);
-      expect(solo.skillLock('damage-4'), SkillLock.parent);
-      expect(solo.buy('damage-3'), isFalse);
-      expect(solo.hitsFor(manualThrow: false), 1);
+      expect(solo.skillLock('damage-3'), SkillLock.open);
       expect(solo.allyAimScale, 1);
       expect(solo.skillLock('throw-1'), SkillLock.open);
       expect(solo.skillLock('fort-2'), SkillLock.open);
 
       expect(solo.buy('team-2'), isTrue);
       expect(solo.crewSize, 2);
-      expect(solo.skillLock('aim-1'), SkillLock.open);
-      expect(solo.lockReason('aim-1'), isNull);
-      expect(solo.buy('aim-1'), isTrue);
+      expect(solo.skillLock('aim-1', kid: 1), SkillLock.open);
+      expect(solo.lockReason('aim-1', kid: 1), isNull);
+      // The bot skills go on the teammate (kid 2 in the shop).
+      expect(solo.buy('aim-1', kid: 1), isTrue);
       expect(solo.allyAimScale, 0.72);
-      expect(solo.buy('react-1'), isTrue);
+      expect(solo.buy('react-1', kid: 1), isTrue);
       expect(solo.allyGapScale, 0.84);
-      expect(solo.buy('charge-1'), isTrue);
+      expect(solo.buy('charge-1', kid: 1), isTrue);
       expect(solo.allyChargeScale, 0.86);
-      expect(solo.buy('damage-3'), isTrue);
-      expect(solo.hitsFor(manualThrow: false), 2);
-      expect(solo.skillLock('damage-4'), SkillLock.open);
-      expect(solo.buy('damage-4'), isTrue);
-      expect(solo.hitsFor(manualThrow: false), 3);
+      expect(solo.buy('damage-1', kid: 1), isTrue);
+      expect(solo.kidHits(1), 2);
     });
 
     test('a save that already owns teammate nodes does not gain a kid', () {
@@ -289,8 +289,7 @@ void main() {
       expect(saved.allyAimScale, 0.72);
       expect(saved.allyGapScale, 0.68);
       expect(saved.allyChargeScale, 0.86);
-      expect(saved.hitsFor(manualThrow: true), 3);
-      expect(saved.hitsFor(manualThrow: false), 2);
+      expect(saved.hitsFor(manualThrow: true), 4, reason: 'rank 3: 1 + 3');
       expect(saved.skillLock('aim-1'), SkillLock.open);
       expect(saved.skillLock('aim-2'), SkillLock.teammate);
       expect(saved.buy('aim-2'), isFalse);
@@ -302,7 +301,7 @@ void main() {
       expect(again.crewSize, 1);
       expect(again.owns('team-2'), isFalse);
       expect(again.allyAimScale, 0.72);
-      expect(again.hitsFor(manualThrow: false), 2);
+      expect(again.hitsFor(manualThrow: false), 4);
     });
 
     test('a node stays locked until its parent is owned', () {
@@ -319,14 +318,12 @@ void main() {
       expect(meta.stunScaleFor(ally: true), 0.82);
       expect(meta.stunScaleFor(ally: false), 1);
       expect(meta.hitsFor(manualThrow: true), 1);
-      expect(meta.hitsFor(manualThrow: false), 1);
       expect(meta.buy('damage-1'), isTrue);
       expect(meta.hitsFor(manualThrow: true), 2);
-      expect(meta.hitsFor(manualThrow: false), 1);
       expect(meta.buy('damage-2'), isTrue);
       expect(meta.hitsFor(manualThrow: true), 3);
       expect(meta.buy('damage-3'), isTrue);
-      expect(meta.hitsFor(manualThrow: false), 2);
+      expect(meta.kidHits(0), 4, reason: 'per kid: one more each rank');
       expect(meta.blastScale, 1);
       expect(meta.shieldCharges, 0);
     });
@@ -334,7 +331,7 @@ void main() {
     test('the hand-made tree fits one long run; the rest keeps going', () {
       int sum(Iterable<SkillNode> nodes) =>
           nodes.fold<int>(0, (total, node) => total + node.cost);
-      expect(sum(SkillTree.handNodes), 3647);
+      expect(sum(SkillTree.handNodes), 3942);
       var waves = 0;
       for (var wave = 1; wave <= 20; wave++) {
         waves += MetaState.coinsForWave(wave);
@@ -377,7 +374,7 @@ void main() {
       }
       expect(SkillTree.node('fort-hp-3')!.parentId, 'fort-hp-2');
       expect(SkillTree.node('damage-5')!.needsTeammate, isFalse);
-      expect(SkillTree.node('damage-6')!.needsTeammate, isTrue);
+      expect(SkillTree.node('damage-6')!.needsTeammate, isFalse);
     });
 
     test('each rank costs 2.5x the last, then 3x, 4x past the hand ranks', () {
@@ -729,9 +726,10 @@ void main() {
       expect(easy.buy('mend-1'), isFalse);
     });
 
-    test('Recovery sits in the Crew tab after Team', () {
-      expect(SkillGroup.crew.branches.take(2), [
+    test('Recovery sits in the Crew tab after Team and Health', () {
+      expect(SkillGroup.crew.branches.take(3), [
         SkillBranch.team,
+        SkillBranch.health,
         SkillBranch.recovery,
       ]);
       expect(SkillTree.chain(SkillBranch.recovery).map((n) => n.id), [
@@ -801,21 +799,62 @@ void main() {
       expect(MetaState.opensStage(12), isFalse);
     });
 
-    test('a lost teammate reopens the top crew spot at 1.5x a loss', () {
-      final meta = MetaState(skills: {'team-2', 'team-3'});
-      expect(meta.loseKid(), isTrue);
-      expect(meta.crewSize, 2);
-      expect(meta.owns('team-3'), isFalse);
-      expect(meta.costOf('team-3'), 75);
-      expect(meta.loseKid(), isTrue);
-      expect(meta.crewSize, 1);
-      expect(meta.costOf('team-2'), 45, reason: '20 × 2.25');
-      expect(meta.loseKid(), isFalse, reason: 'the lead kid is not for sale');
-      expect(meta.ledger.kidLosses, 2);
-      expect(meta.costOf('throw-1'), 10, reason: 'only crew nodes rise');
-      meta.coins = 45;
-      expect(meta.buy('team-2'), isTrue);
-      expect(meta.coins, 0);
+    test('personal skills belong to one kid; team skills to everyone', () {
+      final meta = MetaState(coins: 1000, skills: {'team-2', 'team-3'});
+      expect(meta.buy('shield-1', kid: 1), isTrue);
+      expect(meta.ownsFor(1, 'shield-1'), isTrue);
+      expect(meta.ownsFor(0, 'shield-1'), isFalse);
+      expect(meta.kidShield(1), 1);
+      expect(meta.kidShield(0), 0);
+      expect(meta.skills, contains('k1:shield-1'));
+      // Personal ranks cost 60% of the catalog price.
+      expect(meta.costOf('shield-1'), 10, reason: '20 × 0.6 → 10 (to 5s)');
+      expect(meta.costOf('fort-2'), 15, reason: 'team price unchanged');
+      // Health adds hearts to that kid only.
+      expect(meta.buy('hp-1', kid: 2), isTrue);
+      expect(meta.kidMaxHp(2), MetaState.baseKidHp + 1);
+      expect(meta.kidMaxHp(0), MetaState.baseKidHp);
+      // Harder hit is per kid: one more hit per rank.
+      expect(meta.buy('damage-1', kid: 0), isTrue);
+      expect(meta.kidHits(0), 2);
+      expect(meta.kidHits(1), 1);
+      expect(meta.bestKidHits, 2);
+    });
+
+    test('a kid not on the crew yet cannot buy personal skills', () {
+      final meta = MetaState(coins: 1000);
+      expect(meta.skillLock('shield-1', kid: 1), SkillLock.recruit);
+      expect(meta.buy('shield-1', kid: 1), isFalse);
+      expect(meta.buy('shield-1', kid: 0), isTrue);
+    });
+
+    test('older saves give their shared personal skills to every kid', () {
+      final meta = MetaState.fromJson({
+        'skills': ['team-2', 'shield-2', 'throw-1', 'fort-2'],
+      });
+      for (var kid = 0; kid < MetaState.maxCrew; kid++) {
+        expect(meta.ownsFor(kid, 'shield-2'), isTrue, reason: 'kid $kid');
+        expect(meta.ownsFor(kid, 'shield-1'), isTrue, reason: 'parent');
+        expect(meta.kidThrowRank(kid), 1);
+      }
+      expect(meta.owns('fort-2'), isTrue);
+      final back = MetaState.fromJson(meta.toJson());
+      expect(back.skills, meta.skills);
+    });
+
+    test('reviving the same kid doubles its price; heals are flat', () {
+      final meta = MetaState(coins: 1000, skills: {'team-2'});
+      expect(meta.reviveCost(1), 100);
+      expect(meta.buyRevive(1), isTrue);
+      expect(meta.reviveCost(1), 200);
+      expect(meta.reviveCost(0), 100, reason: 'each kid counts its own');
+      expect(meta.buyRevive(1), isTrue);
+      expect(meta.reviveCost(1), 400);
+      expect(meta.coins, 700);
+      expect(meta.buyHeal(), isTrue);
+      expect(meta.coins, 700 - MetaState.healCost);
+      final back = MetaState.fromJson(meta.toJson());
+      expect(back.reviveCost(1), 400);
     });
 
     test('each Revive bought makes the next 1.5x dearer', () {
@@ -840,13 +879,13 @@ void main() {
       expect(meta.buy('throw-2'), isTrue);
       expect(meta.buyItem(PowerUp.hotCocoa), isTrue);
       expect(meta.buy('team-2'), isTrue);
-      meta.loseKid();
+      expect(meta.buyRevive(0), isFalse, reason: 'not enough coins left');
       final result = meta.resetRun(lostOn: 8);
       expect(result.wave, 6);
       expect(result.coinsLost, 20);
-      expect(result.refunded, 25 + 30 + 20);
+      expect(result.refunded, 15 + 30 + 20);
       expect(meta.coins, 120);
-      expect(meta.skills, {'throw-1'});
+      expect(meta.skills, {'k0:throw-1', 'k1:throw-1', 'k2:throw-1'});
       expect(meta.itemCount(PowerUp.hotCocoa), 0);
       expect(meta.ledger.kidLosses, 0);
       // The retry starts from the new total; a second loss costs nothing more.

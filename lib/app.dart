@@ -17,6 +17,7 @@ import 'ui/match_hud.dart';
 import 'ui/pause_overlay.dart';
 import 'ui/settings_panel.dart';
 import 'ui/shop_overlay.dart';
+import 'ui/wave_report.dart';
 
 class BackyardBarrageApp extends StatefulWidget {
   const BackyardBarrageApp({
@@ -214,6 +215,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               onAdPrivacy: widget.onAdPrivacy,
               removeAds: widget.removeAds,
             ),
+            'report': (context, game) => WaveReport(game: game),
             'shop': (context, game) => ShopOverlay(game: game),
             'defeat': (context, game) => DefeatOverlay(game: game),
           },

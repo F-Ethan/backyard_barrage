@@ -37,6 +37,10 @@ abstract final class SkillEffects {
   /// Fort HP on top of the stage. +4 a rank.
   static int fortHp(int rank) => 4 * math.max(rank, 0);
 
+  /// Hits from one kid's snowball (Harder hit is per kid now): one more
+  /// per rank, whoever is throwing.
+  static int kidHits(int rank) => 1 + math.max(rank, 0);
+
   /// Hits from the player's own throw. Odd ranks past 4 add one.
   static int manualHits(int rank) {
     if (rank <= 0) return 1;

@@ -45,12 +45,22 @@ class _ShopOverlayState extends State<ShopOverlay> {
   /// The Items tab (one-use power-ups) is showing instead of a skill group.
   bool _items = false;
   SkillBranch _branch = SkillBranch.throwSpeed;
+
+  /// Whose personal skills the open branch shows (Health, Shield, …).
+  int _kid = 0;
   _Purchase? _lastPurchase;
   int _purchaseSerial = 0;
 
+  /// The kid a purchase in the open branch goes to: [_kid] for a personal
+  /// branch, 0 (unused) for a team one.
+  int get _owner => SkillTree.isPersonal(_branch)
+      ? _kid.clamp(0, widget.game.meta.crewSize - 1)
+      : 0;
+
   Future<void> _buy(SkillNode node) async {
-    final cost = widget.game.meta.costOf(node.id);
-    if (!widget.game.meta.buy(node.id)) return;
+    final kid = _owner;
+    final cost = widget.game.meta.costOf(node.id, kid: kid);
+    if (!widget.game.meta.buy(node.id, kid: kid)) return;
     widget.game.feel.purchased();
     setState(() {
       _lastPurchase = _Purchase(node.id, cost, ++_purchaseSerial);
@@ -96,8 +106,21 @@ class _ShopOverlayState extends State<ShopOverlay> {
   void _selectBranch(SkillBranch branch) {
     if (branch == _branch) return;
     widget.game.feel.uiTap();
-    setState(() => _branch = branch);
+    setState(() {
+      _branch = branch;
+      // Bot-only skills default to the first teammate: the lead kid is
+      // usually the one you throw with.
+      if (_botBranches.contains(branch) && widget.game.meta.crewSize > 1) {
+        _kid = 1;
+      }
+    });
   }
+
+  static const _botBranches = {
+    SkillBranch.aim,
+    SkillBranch.reaction,
+    SkillBranch.charge,
+  };
 
   /// Branches in [group] with something this difficulty can buy. Easy
   /// hides Recovery: it already heals everyone between waves.
@@ -123,7 +146,9 @@ class _ShopOverlayState extends State<ShopOverlay> {
       for (final node in SkillTree.chain(_branch))
         if (!meta.hidesNode(node.id)) node,
     ];
-    final next = full.indexWhere((node) => !meta.owns(node.id));
+    final owner = _owner;
+    final personal = SkillTree.isPersonal(_branch);
+    final next = full.indexWhere((node) => !meta.ownsFor(owner, node.id));
     final from = next < 0
         ? math.max(0, full.length - 1)
         : math.max(0, next - 1);
@@ -212,11 +237,25 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                               Text(
                                                 hiddenOwned > 0
                                                     ? 'Ranks 1–$hiddenOwned owned. Each rank unlocks the next.'
-                                                    : 'Each rank unlocks the next.',
+                                                    : personal
+                                                    ? 'Each kid buys their own.'
+                                                    : 'Shared by the whole crew.',
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: BarrageType.muted,
                                               ),
+                                              if (personal) ...[
+                                                SizedBox(
+                                                  height: tokens.space.xs,
+                                                ),
+                                                _KidPicker(
+                                                  count: meta.crewSize,
+                                                  selected: _kid,
+                                                  onSelect: (kid) => setState(
+                                                    () => _kid = kid,
+                                                  ),
+                                                ),
+                                              ],
                                               SizedBox(height: tokens.space.sm),
                                               for (
                                                 var i = 0;
@@ -227,13 +266,19 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                                   node: chain[i],
                                                   cost: meta.costOf(
                                                     chain[i].id,
+                                                    kid: owner,
                                                   ),
-                                                  owned: meta.owns(chain[i].id),
+                                                  owned: meta.ownsFor(
+                                                    owner,
+                                                    chain[i].id,
+                                                  ),
                                                   lockReason: meta.lockReason(
                                                     chain[i].id,
+                                                    kid: owner,
                                                   ),
                                                   affordable: meta.canBuy(
                                                     chain[i].id,
+                                                    kid: owner,
                                                   ),
                                                   continues:
                                                       from + i <
@@ -376,6 +421,36 @@ class _Header extends StatelessWidget {
 }
 
 /// Crew / Fight / Defense tabs with a sliding selected pill.
+/// Kid 1 / Kid 2 / Kid 3 for the personal branches.
+class _KidPicker extends StatelessWidget {
+  const _KidPicker({
+    required this.count,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final int count;
+  final int selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return Wrap(
+      spacing: tokens.space.xs,
+      children: [
+        for (var i = 0; i < count; i++)
+          ChoiceChip(
+            key: Key('shop-kid-$i'),
+            label: Text('Kid ${i + 1}'),
+            selected: i == selected,
+            onSelected: (_) => onSelect(i),
+          ),
+      ],
+    );
+  }
+}
+
 class _GroupTabs extends StatelessWidget {
   const _GroupTabs({
     required this.selected,

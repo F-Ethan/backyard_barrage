@@ -42,10 +42,12 @@ class MetaState {
       _skills.addAll(_closed(skills));
     } else {
       _skills.addAll(
-        SkillTree.legacyNodes(
-          crewSize: crewSize,
-          fortStage: fortStage,
-          throwRank: throwRank,
+        _closed(
+          SkillTree.legacyNodes(
+            crewSize: crewSize,
+            fortStage: fortStage,
+            throwRank: throwRank,
+          ),
         ),
       );
     }
@@ -203,11 +205,77 @@ class MetaState {
     return taken;
   }
 
+  /// Owned nodes: team nodes by id, personal nodes per kid as
+  /// [SkillTree.kidKey] (`k0:shield-1`). Snapshots, checkpoints, and saves
+  /// copy this one set, so each kid's skills ride along everywhere.
   final Set<String> _skills = {};
 
   Set<String> get skills => Set.unmodifiable(_skills);
 
-  bool owns(String id) => _skills.contains(id);
+  /// A team node, or a personal node owned by the lead kid (kid 0).
+  bool owns(String id) => ownsFor(0, id);
+
+  /// Whether kid [kid] owns [id] (a team node is owned by everyone).
+  bool ownsFor(int kid, String id) {
+    final node = SkillTree.node(id);
+    if (node != null && SkillTree.isPersonal(node.branch)) {
+      return _skills.contains(SkillTree.kidKey(kid, id));
+    }
+    return _skills.contains(id);
+  }
+
+  /// Hearts a kid starts a wave with at most: 3, plus Health ranks.
+  static const int baseKidHp = 3;
+
+  int kidMaxHp(int kid) =>
+      baseKidHp + _ownedPrefix(SkillBranch.health, kid: kid);
+
+  int kidShield(int kid) =>
+      SkillEffects.shield(_ownedPrefix(SkillBranch.shield, kid: kid));
+
+  /// That kid's stun, as a share of the base lock.
+  double kidPoise(int kid) =>
+      SkillEffects.poise(_ownedPrefix(SkillBranch.poise, kid: kid));
+
+  int kidThrowRank(int kid) => _ownedPrefix(SkillBranch.throwSpeed, kid: kid);
+
+  /// Hits that kid's snowball lands, whether you or its bot threw it.
+  int kidHits(int kid) =>
+      SkillEffects.kidHits(_ownedPrefix(SkillBranch.damage, kid: kid));
+
+  /// Bot aim scatter, wait between throws, and windup for that kid when it
+  /// plays on its own.
+  double kidAimScale(int kid) =>
+      SkillEffects.aim(_ownedPrefix(SkillBranch.aim, kid: kid));
+  double kidGapScale(int kid) =>
+      SkillEffects.gap(_ownedPrefix(SkillBranch.reaction, kid: kid));
+  double kidChargeScale(int kid) =>
+      SkillEffects.charge(_ownedPrefix(SkillBranch.charge, kid: kid));
+
+  /// The hardest-hitting kid in the crew (bosses scale to this).
+  int get bestKidHits =>
+      [for (var i = 0; i < crewSize; i++) kidHits(i)].reduce(math.max);
+
+  /// Coins to revive kid [kid] after the wave: 100, then double for each
+  /// time that same kid has been revived.
+  int reviveCost(int kid) => 100 * math.pow(2, ledger.revivesOf(kid)).toInt();
+
+  /// Coins for one heart back between waves.
+  static const int healCost = 20;
+
+  bool buyRevive(int kid) {
+    final cost = reviveCost(kid);
+    if (coins < cost) return false;
+    coins -= cost;
+    ledger.addRevive(kid);
+    return true;
+  }
+
+  bool buyHeal() {
+    if (coins < healCost) return false;
+    coins -= healCost;
+    return true;
+  }
 
   int get crewSize => 1 + _ownedPrefix(SkillBranch.team).clamp(0, 2);
 
@@ -217,7 +285,8 @@ class MetaState {
     return 1;
   }
 
-  int get throwRank => _ownedPrefix(SkillBranch.throwSpeed);
+  /// The lead kid's throw rank.
+  int get throwRank => kidThrowRank(0);
 
   /// Extra fort HP from the packed-snow chain, on top of the stage.
   int get fortBonusHp => SkillEffects.fortHp(_hpRank);
@@ -230,8 +299,8 @@ class MetaState {
     return rank;
   }
 
-  int get shieldCharges =>
-      SkillEffects.shield(_ownedPrefix(SkillBranch.shield));
+  /// The lead kid's shield charges.
+  int get shieldCharges => kidShield(0);
 
   bool get passesOwnFort => owns('lanes');
 
@@ -240,32 +309,24 @@ class MetaState {
 
   double get blastScale => SkillEffects.blast(_ownedPrefix(SkillBranch.blast));
 
-  double get allyAimScale => SkillEffects.aim(_ownedPrefix(SkillBranch.aim));
+  /// The second kid's bot skills (the first teammate).
+  double get allyAimScale => kidAimScale(1);
+  double get allyGapScale => kidGapScale(1);
+  double get allyChargeScale => kidChargeScale(1);
 
-  double get allyGapScale =>
-      SkillEffects.gap(_ownedPrefix(SkillBranch.reaction));
+  /// Hits from the lead kid's snowball.
+  int hitsFor({required bool manualThrow}) => kidHits(0);
 
-  double get allyChargeScale =>
-      SkillEffects.charge(_ownedPrefix(SkillBranch.charge));
-
-  /// Hits one of your snowballs applies. The manual thrower reaches 2, then 3.
-  /// Teammate bots stay at 1 until the later damage nodes.
-  int hitsFor({required bool manualThrow}) {
-    final rank = _ownedPrefix(SkillBranch.damage);
-    return manualThrow
-        ? SkillEffects.manualHits(rank)
-        : SkillEffects.botHits(rank);
-  }
-
-  /// Multiplier on the base stun lock. Allies use poise. Rivals use pressure.
+  /// Multiplier on the base stun lock. Allies use the lead kid's poise.
+  /// Rivals use the team's pressure.
   double stunScaleFor({required bool ally}) {
-    if (ally) return SkillEffects.poise(_ownedPrefix(SkillBranch.poise));
+    if (ally) return kidPoise(0);
     return SkillEffects.pressure(_ownedPrefix(SkillBranch.pressure));
   }
 
-  SkillNode? nextIn(SkillBranch branch) {
+  SkillNode? nextIn(SkillBranch branch, {int kid = 0}) {
     for (final node in SkillTree.chain(branch)) {
-      if (!owns(node.id)) return node;
+      if (!ownsFor(kid, node.id)) return node;
     }
     return null;
   }
@@ -291,15 +352,14 @@ class MetaState {
 
   int? _costOrNull(SkillNode? node) => node == null ? null : costOf(node.id);
 
-  /// What node [id] costs now. Crew nodes go up 1.5× for every teammate
-  /// lost so far; everything else is the catalog price.
-  int costOf(String id) {
+  /// What node [id] costs. Personal ranks cost
+  /// [SkillTree.personalPriceScale] of the catalog price, because each kid
+  /// buys its own.
+  int costOf(String id, {int kid = 0}) {
     final node = SkillTree.node(id);
     if (node == null) return 0;
-    if (node.branch != SkillBranch.team || ledger.kidLosses == 0) {
-      return node.cost;
-    }
-    return _round5(node.cost * math.pow(1.5, ledger.kidLosses).toDouble());
+    if (!SkillTree.isPersonal(node.branch)) return node.cost;
+    return math.max(5, _round5(node.cost * SkillTree.personalPriceScale));
   }
 
   static int _round5(double price) => ((price / 5) + 0.5).floor() * 5;
@@ -310,20 +370,24 @@ class MetaState {
 
   bool get canBuyThrow => canBuy(nextThrowNode?.id);
 
-  bool canBuy(String? id) {
+  bool canBuy(String? id, {int kid = 0}) {
     if (id == null) return false;
     final node = SkillTree.node(id);
-    if (node == null || owns(id)) return false;
-    if (skillLock(id) != SkillLock.open) return false;
-    return coins >= costOf(id);
+    if (node == null || ownsFor(kid, id)) return false;
+    if (skillLock(id, kid: kid) != SkillLock.open) return false;
+    return coins >= costOf(id, kid: kid);
   }
 
-  /// Parent chain first, then the second-kid gate. Owned nodes are open.
-  SkillLock skillLock(String id) {
+  /// Parent chain first, then the recruit and second-kid gates. Owned
+  /// nodes are open. [kid] picks whose personal chain to check.
+  SkillLock skillLock(String id, {int kid = 0}) {
     final node = SkillTree.node(id);
-    if (node == null || owns(id)) return SkillLock.open;
+    if (node == null || ownsFor(kid, id)) return SkillLock.open;
+    if (SkillTree.isPersonal(node.branch) && kid >= crewSize) {
+      return SkillLock.recruit;
+    }
     final parent = node.parentId;
-    if (parent != null && !owns(parent)) return SkillLock.parent;
+    if (parent != null && !ownsFor(kid, parent)) return SkillLock.parent;
     if (node.branch == SkillBranch.recovery) {
       if (difficulty == Difficulty.easy) return SkillLock.easyHeals;
     }
@@ -332,17 +396,22 @@ class MetaState {
   }
 
   /// Copy for a greyed node. Null when the node is owned or ready to buy.
-  String? lockReason(String id) => switch (skillLock(id)) {
-    SkillLock.open => null,
-    SkillLock.parent => SkillTree.parentLockReason,
-    SkillLock.teammate => SkillTree.teammateLockReason,
-    SkillLock.easyHeals => SkillTree.easyHealsReason,
-  };
+  String? lockReason(String id, {int kid = 0}) =>
+      switch (skillLock(id, kid: kid)) {
+        SkillLock.open => null,
+        SkillLock.parent => SkillTree.parentLockReason,
+        SkillLock.teammate => SkillTree.teammateLockReason,
+        SkillLock.easyHeals => SkillTree.easyHealsReason,
+        SkillLock.recruit => SkillTree.recruitLockReason,
+      };
 
-  bool buy(String id) {
-    if (!canBuy(id)) return false;
-    coins -= costOf(id);
-    _skills.add(id);
+  bool buy(String id, {int kid = 0}) {
+    if (!canBuy(id, kid: kid)) return false;
+    coins -= costOf(id, kid: kid);
+    final node = SkillTree.node(id)!;
+    _skills.add(
+      SkillTree.isPersonal(node.branch) ? SkillTree.kidKey(kid, id) : id,
+    );
     return true;
   }
 
@@ -351,20 +420,6 @@ class MetaState {
   bool hidesNode(String id) =>
       difficulty == Difficulty.easy &&
       SkillTree.node(id)?.branch == SkillBranch.recovery;
-
-  /// A teammate was knocked out and not brought back: their spot in the
-  /// crew opens up again, and the crew nodes cost more from now on.
-  /// Returns false when there was no teammate to lose.
-  bool loseKid() {
-    final owned = [
-      for (final node in SkillTree.chain(SkillBranch.team))
-        if (owns(node.id)) node.id,
-    ];
-    if (owned.isEmpty) return false;
-    _skills.remove(owned.last);
-    ledger.kidLosses += 1;
-    return true;
-  }
 
   bool buyExtraKid() {
     final next = nextKidNode;
@@ -411,6 +466,7 @@ class MetaState {
       ..checkpointSkills = Set.of(_skills)
       ..checkpointItems = Map.of(_items)
       ..checkpointKidLosses = ledger.kidLosses
+      ..checkpointKidRevives.setAll(0, ledger.kidRevives)
       ..checkpointReviveBought = ledger.reviveBought
       ..earnedSinceCheckpoint = 0;
   }
@@ -433,6 +489,7 @@ class MetaState {
       replaceSkills(ledger.checkpointSkills);
       replaceItems(ledger.checkpointItems);
       ledger.kidLosses = ledger.checkpointKidLosses;
+      ledger.kidRevives.setAll(0, ledger.checkpointKidRevives);
       ledger.reviveBought = ledger.checkpointReviveBought;
       coins = ledger.checkpointCoins + kept;
     } else {
@@ -474,6 +531,7 @@ class MetaState {
       ..kidLosses = 0
       ..reviveBought = 0
       ..clearCheckpoint();
+    ledger.kidRevives.setAll(0, [0, 0, 0]);
     return const CheckpointResult(wave: 1, coinsLost: 0, refunded: 0);
   }
 
@@ -528,7 +586,9 @@ class MetaState {
       skills = {
         if (raw is List)
           for (final id in raw)
-            if (id is String && SkillTree.node(id) != null) id,
+            if (id is String &&
+                SkillTree.node(SkillTree.parseKey(id).$2) != null)
+              id,
       };
     } else {
       skills = SkillTree.legacyNodes(
@@ -593,11 +653,11 @@ class MetaState {
     return {if (single > 0) Difficulty.normal: single};
   }
 
-  int _ownedPrefix(SkillBranch branch) {
+  int _ownedPrefix(SkillBranch branch, {int kid = 0}) {
     var count = 0;
     for (final node in SkillTree.chain(branch)) {
       if (branch == SkillBranch.fort && node.id.startsWith('fort-hp')) break;
-      if (!owns(node.id)) break;
+      if (!ownsFor(kid, node.id)) break;
       count += 1;
     }
     return count;
@@ -605,14 +665,28 @@ class MetaState {
 
   int get fortHpRank => _hpRank;
 
+  /// [owned] plus every parent back to each chain's root. A personal node
+  /// saved without a kid (an older save, or a test) goes to every kid, so
+  /// nobody loses a rank they had when skills were shared.
   static Set<String> _closed(Set<String> owned) {
     final closed = <String>{};
-    for (final id in owned) {
-      var cursor = SkillTree.node(id);
-      while (cursor != null) {
-        if (!closed.add(cursor.id)) break;
-        final parent = cursor.parentId;
-        cursor = parent == null ? null : SkillTree.node(parent);
+    for (final key in owned) {
+      final (kid, id) = SkillTree.parseKey(key);
+      final node = SkillTree.node(id);
+      if (node == null) continue;
+      final kids = SkillTree.isPersonal(node.branch)
+          ? (kid == null
+                ? [for (var k = 0; k < maxCrew; k++) k]
+                : [kid.clamp(0, maxCrew - 1)])
+          : <int?>[null];
+      for (final k in kids) {
+        SkillNode? cursor = node;
+        while (cursor != null) {
+          final next = k == null ? cursor.id : SkillTree.kidKey(k, cursor.id);
+          if (!closed.add(next)) break;
+          final parent = cursor.parentId;
+          cursor = parent == null ? null : SkillTree.node(parent);
+        }
       }
     }
     return closed;

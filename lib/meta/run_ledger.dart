@@ -15,10 +15,30 @@ class RunLedger {
     this.checkpointKidLosses = 0,
     this.checkpointReviveBought = 0,
     this.earnedSinceCheckpoint = 0,
+    List<int>? kidRevives,
+    List<int>? checkpointKidRevives,
   }) : checkpointSkills = checkpointSkills ?? {},
-       checkpointItems = checkpointItems ?? {};
+       checkpointItems = checkpointItems ?? {},
+       kidRevives = _three(kidRevives),
+       checkpointKidRevives = _three(checkpointKidRevives);
 
-  /// Teammates lost so far. Each one makes the crew nodes cost more.
+  static List<int> _three(List<int>? from) => [
+    for (var i = 0; i < 3; i++) from != null && i < from.length ? from[i] : 0,
+  ];
+
+  /// Times each kid has been revived between waves. Each revive of the
+  /// same kid costs twice the last.
+  final List<int> kidRevives;
+  final List<int> checkpointKidRevives;
+
+  int revivesOf(int kid) => kid >= 0 && kid < 3 ? kidRevives[kid] : 0;
+
+  void addRevive(int kid) {
+    if (kid >= 0 && kid < 3) kidRevives[kid] += 1;
+  }
+
+  /// Unused since kids stay in the crew when knocked out; kept so older
+  /// saves still read.
   int kidLosses;
 
   /// Revive potions bought so far. Each one makes the next cost more.
@@ -49,6 +69,8 @@ class RunLedger {
     checkpointKidLosses: checkpointKidLosses,
     checkpointReviveBought: checkpointReviveBought,
     earnedSinceCheckpoint: earnedSinceCheckpoint,
+    kidRevives: List.of(kidRevives),
+    checkpointKidRevives: List.of(checkpointKidRevives),
   );
 
   /// Forget the checkpoint (a fresh run).
@@ -60,11 +82,13 @@ class RunLedger {
     checkpointKidLosses = 0;
     checkpointReviveBought = 0;
     earnedSinceCheckpoint = 0;
+    checkpointKidRevives.setAll(0, [0, 0, 0]);
   }
 
   Map<String, Object> toJson() => {
     'kidLosses': kidLosses,
     'reviveBought': reviveBought,
+    'kidRevives': kidRevives,
     if (hasCheckpoint)
       'checkpoint': {
         'wave': checkpointWave,
@@ -74,15 +98,20 @@ class RunLedger {
         'kidLosses': checkpointKidLosses,
         'reviveBought': checkpointReviveBought,
         'earned': earnedSinceCheckpoint,
+        'kidRevives': checkpointKidRevives,
       },
   };
 
   factory RunLedger.fromJson(Object? raw) {
     if (raw is! Map) return RunLedger();
     final cp = raw['checkpoint'];
+    List<int>? revives(Object? list) =>
+        list is List ? [for (final v in list) _int(v, 0, 99)] : null;
     final ledger = RunLedger(
       kidLosses: _int(raw['kidLosses'], 0, 999),
       reviveBought: _int(raw['reviveBought'], 0, 999),
+      kidRevives: revives(raw['kidRevives']),
+      checkpointKidRevives: cp is Map ? revives(cp['kidRevives']) : null,
     );
     if (cp is Map) {
       ledger

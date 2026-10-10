@@ -152,12 +152,15 @@ class MatchHud extends StatelessWidget {
                                   _HeartCluster(
                                     label: 'Rivals',
                                     // A big wave lists only those standing.
-                                    kids: game.enemies.length <= 5
-                                        ? game.enemies
-                                        : [
-                                            for (final kid in game.enemies)
-                                              if (!kid.isKo) kid,
-                                          ],
+                                    // The boss has its own bar; a big
+                                    // wave lists only those standing.
+                                    kids: [
+                                      for (final kid in game.enemies)
+                                        if (!kid.isBoss &&
+                                            (game.enemies.length <= 5 ||
+                                                !kid.isKo))
+                                          kid,
+                                    ],
                                     idPrefix: 'rival',
                                   ),
                                   if (game.rivalsWaiting > 0) ...[
@@ -185,6 +188,10 @@ class MatchHud extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (game.boss != null) ...[
+                      const SizedBox(height: 6),
+                      _BossBar(game: game),
+                    ],
                     if (fighting) ...[
                       const SizedBox(height: 6),
                       const FittedBox(
@@ -231,6 +238,55 @@ class _HudChip extends StatelessWidget {
           vertical: tokens.space.sm,
         ),
         child: child,
+      ),
+    );
+  }
+}
+
+/// The boss's name and a bar that drains with each hit.
+class _BossBar extends StatelessWidget {
+  const _BossBar({required this.game});
+
+  final BackyardBarrageGame game;
+
+  @override
+  Widget build(BuildContext context) {
+    final boss = game.boss!;
+    final tokens = context.tokens;
+    final fraction = boss.maxHp <= 0 ? 0.0 : boss.hp / boss.maxHp;
+    return _HudChip(
+      key: const Key('boss-bar'),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            game.bossType?.label ?? 'Boss',
+            style: BarrageType.heading.copyWith(
+              fontSize: 14,
+              color: const Color(0xFF9B59B6),
+            ),
+          ),
+          SizedBox(width: tokens.space.sm),
+          SizedBox(
+            width: 180,
+            height: 12,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ColoredBox(color: tokens.lockedFill),
+                  FractionallySizedBox(
+                    key: const Key('boss-bar-fill'),
+                    alignment: Alignment.centerLeft,
+                    widthFactor: fraction.clamp(0.0, 1.0),
+                    child: const ColoredBox(color: Color(0xFF9B59B6)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

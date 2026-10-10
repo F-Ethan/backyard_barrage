@@ -315,8 +315,42 @@ class KidComponent extends SpriteComponent {
     _refreshSprite();
   }
 
+  /// A boss: each hit costs one HP with a short flinch, never a stun or a
+  /// knockdown, so it keeps attacking.
+  bool isBoss = false;
+
+  /// Seconds a boss shows its hit pose.
+  static const double bossFlinchSeconds = 0.25;
+
+  /// A pose shown instead of the usual ones (a boss's special move). Null
+  /// goes back to normal. The hit flash still draws over it.
+  Sprite? get posedOverride => _posedOverride;
+  set posedOverride(Sprite? next) {
+    _posedOverride = next;
+    _refreshSprite();
+  }
+
+  Sprite? _posedOverride;
+
+  /// Draw-only height above the feet (a boss hop). Hits and depth ignore it.
+  double lift = 0;
+
   void takeHit({double stunScale = 1}) {
     if (isKo) return;
+    if (isBoss) {
+      hp -= 1;
+      if (hp <= 0) {
+        hp = 0;
+        _posedOverride = null;
+        lift = 0;
+        _applyKoLook();
+        return;
+      }
+      _flash();
+      _hitPoseTimer = bossFlinchSeconds;
+      _refreshSprite();
+      return;
+    }
     if (side == KidSide.player && shieldHits > 0) {
       shieldHits -= 1;
       _flash();
@@ -431,6 +465,11 @@ class KidComponent extends SpriteComponent {
   void _refreshSprite() {
     if (isKo || _downTimer > 0) {
       sprite = koSprite;
+      return;
+    }
+    final override = _posedOverride;
+    if (override != null) {
+      sprite = override;
       return;
     }
     if (_hitPoseTimer > 0) {
@@ -574,9 +613,15 @@ class KidComponent extends SpriteComponent {
       canvas.scale(_drawScale);
       canvas.translate(-feet.dx, -feet.dy);
     }
+    final lifted = lift > 0 && !isKo;
+    if (lifted) {
+      canvas.save();
+      canvas.translate(0, -lift / ((scale.y == 0 ? 1 : scale.y) * _drawScale));
+    }
     final moved = _applyFeelTransform(canvas);
     _renderPosed(canvas);
     if (moved) canvas.restore();
+    if (lifted) canvas.restore();
     if (scaled) canvas.restore();
     if (glint && _chargingPose && !isKo && !isStunned) _drawGlint(canvas);
     if (armored && !isKo) _drawArmor(canvas);

@@ -401,9 +401,12 @@ class MetaState {
   static bool opensStage(int wave) => stageStart(wave) == wave;
 
   /// Lock in the build at the start of [wave]'s stage (Arcade).
-  void takeCheckpoint(int wave) {
+  ///
+  /// [exact] locks in at [wave] itself (a boss wave gets its own
+  /// checkpoint, so a loss retries just the boss).
+  void takeCheckpoint(int wave, {bool exact = false}) {
     ledger
-      ..checkpointWave = stageStart(wave)
+      ..checkpointWave = exact ? wave : stageStart(wave)
       ..checkpointCoins = coins
       ..checkpointSkills = Set.of(_skills)
       ..checkpointItems = Map.of(_items)
@@ -435,7 +438,7 @@ class MetaState {
     } else {
       coins = math.max(0, coins - (earned - kept));
     }
-    takeCheckpoint(wave);
+    takeCheckpoint(wave, exact: true);
     return CheckpointResult(
       wave: wave,
       coinsLost: earned - kept,

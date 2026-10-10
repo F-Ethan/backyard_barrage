@@ -147,6 +147,11 @@ class FeelBus {
     unawaited(audio.playSfx(AudioCues.houndHowl));
   }
 
+  /// Any boss cue from [AudioCues]: roars, throws, specials, hits.
+  void boss(String cue) {
+    unawaited(audio.playSfx(cue));
+  }
+
   void houndWhimper() {
     unawaited(audio.playSfx(AudioCues.houndWhimper));
   }

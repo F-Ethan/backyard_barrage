@@ -10,6 +10,7 @@ import 'package:flutter/painting.dart';
 
 import '../ads/ad_policy.dart';
 import '../ads/end_ad.dart';
+import '../audio/game_audio.dart';
 import '../feel/feel_bus.dart';
 import '../meta/difficulty.dart';
 import '../meta/game_settings.dart';
@@ -22,16 +23,20 @@ import '../seasons/arena.dart';
 import '../seasons/season.dart';
 import '../seasons/season_kit.dart';
 import 'arena_grid.dart';
+import 'boss.dart';
 import 'combat_rules.dart';
 import 'game_art.dart';
 import 'crew_carry.dart';
 import 'rival_type.dart';
+import 'components/boss_controller.dart';
 import 'components/charge_indicator.dart';
 import 'components/coin_pop.dart';
 import 'components/coin_carry.dart';
 import 'components/enemy_controller.dart';
+import 'components/fire_wave.dart';
 import 'components/fort_component.dart';
 import 'components/hound_component.dart';
+import 'components/ice_spike.dart';
 import 'components/impact_burst.dart';
 import 'components/kid_component.dart';
 import 'components/lob_projectile.dart';
@@ -100,6 +105,36 @@ class BackyardBarrageGame extends FlameGame {
   /// What kind of rival [kid] is. Player kids and unknowns read as ghosts.
   RivalType rivalTypeOf(KidComponent kid) =>
       _rivalTypes[kid] ?? RivalType.snowGhost;
+
+  // Bosses: art loaded once, and the boss on the yard (if any).
+  final Map<BossType, KidPoseSprites> _bossPoses = {};
+  final Map<BossType, List<Sprite>> _bossSpecials = {};
+  Sprite? _magmaBall;
+  Sprite? _magmaImpact;
+  Sprite? _fireWaveSprite;
+  Sprite? _shockwaveSprite;
+  List<Sprite> _spikeSprites = const [];
+  KidComponent? _boss;
+  BossType? _bossType;
+  BossType? _lastBoss;
+  bool _bossRewarded = false;
+  final Set<LobProjectile> _magmaShots = {};
+
+  /// Body box of a boss next to a rival's [ArenaGrid.kidSize]: its hit
+  /// circle is this much bigger too.
+  static const double bossSizeScale = 1.6;
+
+  /// Boss art is drawn this much over its body box (about twice a rival).
+  static const double bossDrawScale = 1.5;
+
+  /// The boss on the yard this wave, or null.
+  KidComponent? get boss => _boss;
+  BossType? get bossType => _bossType;
+  bool get isBossWave => BossRules.isBossWave(wave);
+
+  @visibleForTesting
+  BossController? get bossBrain =>
+      _boss?.children.whereType<BossController>().firstOrNull;
 
   late FortComponent fort;
   late FortComponent enemyFort;
@@ -388,6 +423,212 @@ class BackyardBarrageGame extends FlameGame {
     }
   }
 
+  /// Boss renders share the rivals' 512² framing (feet on y=471), so they
+  /// load with the same square crop.
+  Future<Sprite> _bossSprite(String path) => loadSprite(
+    path,
+    srcPosition: Vector2(20.5, 0),
+    srcSize: Vector2.all(471),
+  );
+
+  Future<void> _loadBossArt() async {
+    for (final type in BossType.values) {
+      Future<Sprite> pose(String name) => _bossSprite(BossArt.pose(type, name));
+      final windup = await pose('windup');
+      final idle = await pose('idle');
+      _bossPoses[type] = KidPoseSprites(
+        idle: idle,
+        walk: await _bossSprite(BossArt.walk(type).first),
+        charge: windup,
+        throwPose: await pose('throw'),
+        hit: await pose('hit'),
+        ko: await pose('ko'),
+        pickup: idle,
+        turn30l: windup,
+        turn15l: windup,
+        turn15r: windup,
+        turn30r: windup,
+        koDrop: 0,
+        drawScale: bossDrawScale,
+        walkCycle: [
+          for (final path in BossArt.walk(type)) await _bossSprite(path),
+        ],
+      );
+      _bossSpecials[type] = [
+        for (final path in BossArt.specials(type)) await _bossSprite(path),
+      ];
+    }
+    _magmaBall = await loadSprite(BossArt.magmaBall);
+    _magmaImpact = await loadSprite(BossArt.magmaImpact);
+    _fireWaveSprite = await loadSprite(BossArt.fireWave);
+    _shockwaveSprite = await loadSprite(BossArt.shockwave);
+    _spikeSprites = [
+      for (final path in BossArt.iceSpikes) await loadSprite(path),
+    ];
+  }
+
+  /// Walks this wave's boss on: a random one (never the last one again),
+  /// tougher each time a boss comes back.
+  void _spawnBoss() {
+    final type = BossRules.pick(_rng, last: _lastBoss);
+    _lastBoss = type;
+    _bossType = type;
+    _bossRewarded = false;
+    final hits = BossRules.hits(
+      feel.settings.difficulty,
+      BossRules.appearance(wave),
+    );
+    final kid = KidComponent(
+      side: KidSide.enemy,
+      poses: _bossPoses[type]!,
+      position: Vector2.zero(),
+      size: Vector2.all(ArenaGrid.kidSize * bossSizeScale),
+      maxHp: hits,
+    )..isBoss = true;
+    final brain = BossController(
+      host: kid,
+      type: type,
+      players: players,
+      rng: _rng,
+      difficulty: feel.settings.difficulty,
+      isFighting: () => phase == MatchPhase.fight && !_settling,
+      specialSprites: _bossSpecials[type]!,
+      onThrow: _bossThrow,
+      onWaveWindup: (boss, laneY) {
+        world.add(
+          WaveWarning(
+            laneY: laneY,
+            startX: boss.position.x - 40,
+            seconds: BossRules.waveWindupSeconds,
+          ),
+        );
+        feel.boss(AudioCues.magmaWaveCharge);
+      },
+      onWave: _bossWave,
+      onHop: (_) => feel.boss(AudioCues.ogreHop),
+      onSlam: _bossSlam,
+    );
+    final goal = ArenaGrid.cellCenter(KidSide.enemy, brain.homeColumn, 3);
+    kid.position = Vector2(worldWidth + _offstage, goal.y);
+    kid.setWalking(true);
+    kid.syncDepth();
+    enemies.add(kid);
+    world.add(kid);
+    _entrance.add((kid: kid, goal: goal));
+    kid.add(brain);
+    _boss = kid;
+  }
+
+  void _bossThrow(KidComponent boss, KidComponent target, Vector2 aim) {
+    final magma = _bossType == BossType.magma;
+    feel.boss(magma ? AudioCues.magmaThrow : AudioCues.ogreThrow);
+    _onEnemyFire(
+      boss,
+      target,
+      1,
+      aimAt: aim,
+      sprite: magma ? _magmaBall : null,
+      radiusScale: magma ? 1.5 : 1.6,
+      quiet: true,
+      magma: magma,
+    );
+  }
+
+  void _bossWave(KidComponent boss, double laneY) {
+    feel.boss(AudioCues.magmaWaveRelease);
+    world.add(
+      FireWave(
+        sprite: _fireWaveSprite!,
+        laneY: laneY,
+        startX: boss.position.x - 60,
+        players: players,
+        forts: [fort, ...extraForts],
+        onKidHit: _bossHitKid,
+        onFortHit: (cover) {
+          final wasStanding = cover.standing;
+          for (var i = 0; i < FireWave.fortDamage; i++) {
+            cover.takeHit();
+          }
+          _burst(Vector2(cover.position.x, laneY), power: 1.2);
+          if (wasStanding && cover.isCollapsed) {
+            feel.fortCollapsed();
+          } else {
+            feel.fortHit();
+          }
+          _publishHud();
+        },
+      ),
+    );
+  }
+
+  void _bossSlam(KidComponent boss) {
+    feel.boss(AudioCues.ogreCrash);
+    _punch(knockedOut: true);
+    final ring = _shockwaveSprite;
+    if (ring != null) {
+      world.add(
+        _FadingSprite(
+          sprite: ring,
+          position: boss.position.clone(),
+          size: Vector2(320, 160),
+          seconds: 0.5,
+        ),
+      );
+    }
+    var sounded = false;
+    for (final kid in players) {
+      if (kid.isKo) continue;
+      world.add(
+        IceSpike(
+          frames: _spikeSprites,
+          feet: kid.position.clone(),
+          warnSeconds: BossRules.spikeWarnSeconds(feel.settings.difficulty),
+          players: players,
+          onKidHit: _bossHitKid,
+          onBurst: () {
+            if (sounded) return;
+            sounded = true;
+            feel.boss(AudioCues.iceSpikes);
+          },
+        ),
+      );
+    }
+  }
+
+  /// A heat wave or ice spike lands on [kid]: the same as a snowball hit
+  /// (Frost armor and shields block it).
+  void _bossHitKid(KidComponent kid) {
+    if (phase != MatchPhase.fight || kid.isKo) return;
+    if (_armorTime > 0) {
+      feel.armorBlocked();
+      return;
+    }
+    final selected = identical(kid, _selected);
+    final scale = meta.stunScaleFor(ally: true) * _tuning().allyStunScale;
+    kid.takeHit(stunScale: scale);
+    kid.recoil(-1);
+    _burst(kid.hitCenter, depthY: kid.hitCenter.y);
+    feel.kidHit(knockedOut: kid.isKo, season: meta.season);
+    _punch(knockedOut: kid.isKo);
+    if (selected && (kid.isKo || kid.isStunned)) {
+      _endActiveThrow();
+      _setSelected(_firstReady(players) ?? _firstLiving(players));
+    }
+    resolveKnockouts();
+  }
+
+  void _clearBossFx() {
+    for (final fx in [
+      ...world.children.whereType<FireWave>(),
+      ...world.children.whereType<WaveWarning>(),
+      ...world.children.whereType<IceSpike>(),
+      ...world.children.whereType<_FadingSprite>(),
+    ]) {
+      fx.removeFromParent();
+    }
+    _magmaShots.clear();
+  }
+
   /// Feet spots for yard props, clear of both crews' columns and the river:
   /// along the back of the yard, and the far front-right corner (the
   /// front-left holds the power-up buttons).
@@ -489,6 +730,7 @@ class BackyardBarrageGame extends FlameGame {
       land: await hound('land'),
       hit: await hound('hit'),
     );
+    await _loadBossArt();
     for (final arena in Arena.values) {
       _arenaArt[arena] = await loadSprite(arena.background);
     }
@@ -580,6 +822,7 @@ class BackyardBarrageGame extends FlameGame {
       kid.applyPoses(kit.playerPoses);
     }
     for (final kid in enemies) {
+      if (kid.isBoss) continue;
       kid.applyPoses(kit.posesFor(rivalTypeOf(kid)));
     }
   }
@@ -604,10 +847,16 @@ class BackyardBarrageGame extends FlameGame {
     phase = MatchPhase.entering;
     _entrance.clear();
 
-    if (meta.mode == PlayMode.campaign &&
-        (MetaState.opensStage(wave) || !meta.ledger.hasCheckpoint) &&
-        meta.ledger.checkpointWave != MetaState.stageStart(wave)) {
-      meta.takeCheckpoint(wave);
+    if (meta.mode == PlayMode.campaign) {
+      if (isBossWave) {
+        // A boss wave is its own checkpoint: a loss retries just the boss.
+        if (meta.ledger.checkpointWave != wave) {
+          meta.takeCheckpoint(wave, exact: true);
+        }
+      } else if ((MetaState.opensStage(wave) || !meta.ledger.hasCheckpoint) &&
+          meta.ledger.checkpointWave != MetaState.stageStart(wave)) {
+        meta.takeCheckpoint(wave);
+      }
     }
 
     final crewHp = _nextCrewHp();
@@ -640,12 +889,18 @@ class BackyardBarrageGame extends FlameGame {
     _setSelected(_firstLiving(players));
     _ensureAllyBrains();
 
-    final count = CombatRules.enemyCountForWave(wave);
+    // A boss wave is the boss plus a growing escort; the first comes alone.
+    final bossWave = isBossWave;
+    if (bossWave) _spawnBoss();
+    final count = bossWave
+        ? BossRules.supportFor(wave)
+        : CombatRules.enemyCountForWave(wave);
     final lineup = RivalRoster.forWave(count: count, rng: _rng);
-    final starting = math.min(count, WavePlan.fieldStart);
+    final first = bossWave ? 1 : 0;
+    final starting = math.min(count, WavePlan.fieldStart - first);
     for (var i = 0; i < starting; i++) {
-      final kid = _spawnRival(lineup[i], i);
-      kid.position.x = worldWidth + _offstage + i * 36;
+      final kid = _spawnRival(lineup[i], i + first);
+      kid.position.x = worldWidth + _offstage + (i + first) * 36;
       kid.syncDepth();
     }
     _reserve.addAll(lineup.skip(starting));
@@ -921,6 +1176,8 @@ class BackyardBarrageGame extends FlameGame {
     _rivalTypes.clear();
     _reserve.clear();
     _arrivals.clear();
+    _boss = null;
+    _bossType = null;
   }
 
   // Ice hounds: rolled at wave start, released partway into the fight.
@@ -959,6 +1216,8 @@ class BackyardBarrageGame extends FlameGame {
   void _rollHound() {
     _clearHound();
     _waveFight = 0;
+    // No hounds on a boss wave: the boss is the fight.
+    if (isBossWave) return;
     _houndTimes.addAll(
       HoundComponent.scheduleFor(
         wave: wave,
@@ -1114,6 +1373,7 @@ class BackyardBarrageGame extends FlameGame {
     for (final shot in world.children.whereType<LobProjectile>().toList()) {
       shot.removeFromParent();
     }
+    _clearBossFx();
   }
 
   void continueFromShop() {
@@ -1299,7 +1559,9 @@ class BackyardBarrageGame extends FlameGame {
     phase = MatchPhase.clearing;
     _endActiveThrow();
     _clearShots();
-    lastReward = MetaState.coinsForWave(wave);
+    lastReward =
+        MetaState.coinsForWave(wave) *
+        (isBossWave ? BossRules.coinMultiplier : 1);
     meta.earn(lastReward);
     lastWaveScore = meta.scoreWaveClear(wave);
     meta.noteWaveCleared(wave);
@@ -1425,6 +1687,22 @@ class BackyardBarrageGame extends FlameGame {
 
   /// Center title for the walk-on. Cleared when the crews reach their spots.
   void _showWaveIntro() {
+    final bossType = _bossType;
+    if (bossType != null) {
+      _showBanner(
+        'BOSS!',
+        subtitle: '${bossType.label} · Wave $wave',
+        fontSize: 60,
+        color: const Color(0xFF9B59B6),
+      );
+      _pendingBanner = _Banner.waveIntro;
+      _bannerTime = 0;
+      feel.boss(AudioCues.bossIntro);
+      feel.boss(
+        bossType == BossType.magma ? AudioCues.magmaRoar : AudioCues.ogreRoar,
+      );
+      return;
+    }
     _showBanner(
       'Wave $wave',
       subtitle: meta.mode == PlayMode.campaign
@@ -1547,6 +1825,17 @@ class BackyardBarrageGame extends FlameGame {
   }
 
   void _payKnockouts() {
+    final boss = _boss;
+    if (boss != null && boss.isKo && !_bossRewarded) {
+      _bossRewarded = true;
+      feel.boss(
+        _bossType == BossType.magma
+            ? AudioCues.magmaDefeat
+            : AudioCues.ogreDefeat,
+      );
+      feel.boss(AudioCues.bossDefeated);
+      rewardRandomItems(BossRules.rewardItems, at: boss.hitCenter);
+    }
     var paid = 0;
     for (final kid in enemies) {
       if (!kid.isKo || !_paidKills.add(kid)) continue;
@@ -1570,9 +1859,13 @@ class BackyardBarrageGame extends FlameGame {
     KidComponent? target,
     double rangeScale, {
     Vector2? aimAt,
+    Sprite? sprite,
+    double radiusScale = 1,
+    bool quiet = false,
+    bool magma = false,
   }) {
     if (phase != MatchPhase.fight || enemy.isKo) return;
-    feel.enemyReleased();
+    if (!quiet) feel.enemyReleased();
     final cell = ArenaGrid.nearestCell(KidSide.enemy, enemy.position);
     final targetRow = target == null
         ? cell.row
@@ -1592,7 +1885,14 @@ class BackyardBarrageGame extends FlameGame {
       trackY: enemy.hitCenter.y,
       targetY: point?.y,
     );
-    _spawnShot(owner: enemy, lob: lob, targets: players);
+    final shot = _spawnShot(
+      owner: enemy,
+      lob: lob,
+      targets: players,
+      sprite: sprite,
+      radiusScale: radiusScale,
+    );
+    if (magma) _magmaShots.add(shot);
   }
 
   void _onAllyFire(
@@ -1794,15 +2094,17 @@ class BackyardBarrageGame extends FlameGame {
     _spawnShot(owner: kid, lob: lob, targets: enemies, manualThrow: true);
   }
 
-  void _spawnShot({
+  LobProjectile _spawnShot({
     required KidComponent owner,
     required RowLob lob,
     required List<KidComponent> targets,
     bool manualThrow = false,
+    Sprite? sprite,
+    double radiusScale = 1,
   }) {
     final fromPlayer = owner.side == KidSide.player;
     final shot = LobProjectile(
-      sprite: _kit.projectile,
+      sprite: sprite ?? _kit.projectile,
       position: owner.throwOrigin.clone(),
       velocity: lob.velocity.clone(),
       targets: targets,
@@ -1816,7 +2118,7 @@ class BackyardBarrageGame extends FlameGame {
           ? MetaState.baseBlastRadius *
                 meta.blastScale *
                 (manualThrow && _splatArmed ? PowerUp.splatScale : 1)
-          : MetaState.baseBlastRadius,
+          : MetaState.baseBlastRadius * radiusScale,
       groundTrack: lob.groundTrack,
       throwerRow: lob.throwerRow,
       throwerColumn: lob.throwerColumn,
@@ -1845,6 +2147,7 @@ class BackyardBarrageGame extends FlameGame {
       hudRevision.value++;
     }
     world.add(shot);
+    return shot;
   }
 
   @visibleForTesting
@@ -1859,7 +2162,16 @@ class BackyardBarrageGame extends FlameGame {
       feel.armorBlocked();
       return;
     }
-    feel.kidHit(knockedOut: target.isKo, season: meta.season);
+    if (target.isBoss) {
+      final magma = _bossType == BossType.magma;
+      if (!target.isKo) {
+        feel.boss(magma ? AudioCues.magmaHit : AudioCues.ogreHit);
+      }
+      feel.impact(meta.season);
+    } else {
+      feel.kidHit(knockedOut: target.isKo, season: meta.season);
+    }
+    _magmaSplash(shot);
     target.recoil(shot.facing);
     _punch(knockedOut: target.isKo);
     if (target.isKo && target.side == KidSide.enemy) {
@@ -1933,6 +2245,17 @@ class BackyardBarrageGame extends FlameGame {
   void _onGroundMiss(LobProjectile shot) {
     _burst(shot.position, power: 0.6);
     feel.impact(meta.season);
+    _magmaSplash(shot);
+  }
+
+  /// A magma ball lands with its own lava-and-steam splash.
+  void _magmaSplash(LobProjectile shot) {
+    if (!_magmaShots.remove(shot)) return;
+    final splash = _magmaImpact;
+    if (splash != null) {
+      world.add(ImpactBurst(sprite: splash, position: shot.position.clone()));
+    }
+    feel.boss(AudioCues.magmaImpact);
   }
 
   void _burst(Vector2 at, {double? depthY, double power = 1}) {
@@ -2400,4 +2723,33 @@ class _ArenaInput extends PositionComponent with DragCallbacks {
 
   @override
   void render(Canvas canvas) {}
+}
+
+/// A one-shot picture that grows a little and fades (the ogre's slam ring).
+class _FadingSprite extends SpriteComponent {
+  _FadingSprite({
+    required Sprite sprite,
+    required Vector2 position,
+    required Vector2 size,
+    required this.seconds,
+  }) : super(
+         sprite: sprite,
+         position: position,
+         size: size,
+         anchor: Anchor.center,
+         priority: ArenaGrid.depthOrder(position.y) + 3,
+       );
+
+  final double seconds;
+  double _age = 0;
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    _age += dt;
+    final t = (_age / seconds).clamp(0.0, 1.0);
+    scale.setAll(0.7 + 0.5 * t);
+    opacity = 1 - t;
+    if (_age >= seconds) removeFromParent();
+  }
 }

@@ -54,6 +54,8 @@ flutter:
     - assets/images/characters/rivals/frostkid/
     - assets/images/characters/rivals/hellhound/
     - assets/images/characters/rivals/rusher/
+    - assets/images/characters/bosses/magma/
+    - assets/images/characters/bosses/ogre/
     - assets/images/forts/
     - assets/images/forts/rival/
     - assets/images/projectiles/
@@ -64,6 +66,7 @@ flutter:
     - assets/images/ui/powerups/
     - assets/images/ui_modern/
     - assets/images/vfx/
+    - assets/images/vfx/boss/
     - assets/images/world/
     - assets/fonts/fredoka/OFL.txt
 

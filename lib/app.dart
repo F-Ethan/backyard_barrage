@@ -154,12 +154,13 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final BackyardBarrageGame game;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     game =
         widget.game ??
         BackyardBarrageGame(
@@ -174,24 +175,49 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.inactive ||
+          AppLifecycleState.hidden ||
+          AppLifecycleState.paused ||
+          AppLifecycleState.detached:
+        game.onAppBackgrounded();
+      case AppLifecycleState.resumed:
+        break;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: GameWidget<BackyardBarrageGame>(
-        game: game,
-        overlayBuilderMap: {
-          'hud': (context, game) => MatchHud(game: game),
-          'pause': (context, game) => PauseOverlay(game: game),
-          'settings': (context, game) => SettingsOverlay(
-            settings: game.feel.settings,
-            feel: game.feel,
-            onChanged: game.commitSettings,
-            onClose: game.closeSettings,
-            onAdPrivacy: widget.onAdPrivacy,
-            removeAds: widget.removeAds,
-          ),
-          'shop': (context, game) => ShopOverlay(game: game),
-          'defeat': (context, game) => DefeatOverlay(game: game),
-        },
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) game.onBackPressed();
+      },
+      child: Scaffold(
+        body: GameWidget<BackyardBarrageGame>(
+          game: game,
+          overlayBuilderMap: {
+            'hud': (context, game) => MatchHud(game: game),
+            'pause': (context, game) => PauseOverlay(game: game),
+            'settings': (context, game) => SettingsOverlay(
+              settings: game.feel.settings,
+              feel: game.feel,
+              onChanged: game.commitSettings,
+              onClose: game.closeSettings,
+              onAdPrivacy: widget.onAdPrivacy,
+              removeAds: widget.removeAds,
+            ),
+            'shop': (context, game) => ShopOverlay(game: game),
+            'defeat': (context, game) => DefeatOverlay(game: game),
+          },
+        ),
       ),
     );
   }

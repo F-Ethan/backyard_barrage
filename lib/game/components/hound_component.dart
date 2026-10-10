@@ -138,66 +138,77 @@ class HoundComponent extends SpriteComponent {
   /// ten waves after (wave 20 has two, wave 30 three).
   static const int packWave = 10;
 
-  /// Chance of a hound on waves [likelyWave] to [packWave] - 1, at an
-  /// average pace.
+  /// Chance of a hound on waves [likelyWave] to [packWave] - 1.
   static double bracketChance(Difficulty difficulty) => switch (difficulty) {
     Difficulty.easy => 0.5,
     Difficulty.normal => 0.6,
     Difficulty.hard => 0.7,
   };
 
-  /// Chance of one more hound on top of the sure ones from [packWave], at
-  /// an average pace. Taking twice as long makes it certain.
+  /// From [packWave]: chance of one more hound on top of the sure ones.
   static double extraChance(Difficulty difficulty) => switch (difficulty) {
     Difficulty.easy => 0.2,
     Difficulty.normal => 0.25,
     Difficulty.hard => 0.3,
   };
 
-  /// Earliest a hound comes, in seconds into the fight.
-  static const double earliest = 4;
+  /// The rolled hounds come early, so even a quick wave meets them: the
+  /// first [firstEarliest]–[firstLatest]s in, the next ones 4–8s apart.
+  static const double firstEarliest = 4;
+  static const double firstLatest = 10;
 
-  /// How long a wave with [rivals] rivals usually lasts. The hound odds are
-  /// tuned against this pace.
-  static double averageWaveSeconds(int rivals) => 20 + 8.0 * rivals;
+  /// A wave that drags on gets more: one extra hound somewhere in each
+  /// [lingerWindow] after the first [lingerStart]s (so by 5 minutes a
+  /// second, by 15 minutes up to [maxPerWave]).
+  static const double lingerStart = 60;
+  static const double lingerWindow = 300;
 
-  /// When this wave's hounds come, in seconds into the fight, sorted. A
-  /// hound whose time the fight never reaches does not come, so a longer
-  /// fight sees more of them:
+  /// Most hounds in one wave.
+  static const int maxPerWave = 4;
+
+  /// Earliest any hound comes, in seconds into the fight.
+  static const double earliest = firstEarliest;
+
+  /// Hounds rolled for [wave] at the start, ignoring how long it lasts.
+  static int rolledFor(int wave, Difficulty difficulty, math.Random rng) {
+    if (wave < firstWave) return 0;
+    if (wave < likelyWave) {
+      return rng.nextDouble() < chanceFor(difficulty) ? 1 : 0;
+    }
+    if (wave < packWave) {
+      return rng.nextDouble() < bracketChance(difficulty) ? 1 : 0;
+    }
+    final sure = wave ~/ packWave;
+    final extra = rng.nextDouble() < extraChance(difficulty) ? 1 : 0;
+    return math.min(maxPerWave, sure + extra);
+  }
+
+  /// When this wave's hounds come, in seconds into the fight, sorted.
   ///
-  /// * Waves [firstWave]..[packWave] - 1: one hound with chance P at an
-  ///   average pace ([chanceFor], then [bracketChance]). Its time is
-  ///   uniform from [earliest] to D / P, so a fight of length D sees it
-  ///   with chance P, and longer fights more often.
-  /// * From [packWave]: one sure hound per ten waves, spread through the
-  ///   first D seconds, then one extra whose time is uniform from a to 2D,
-  ///   with a set so it lands inside D with [extraChance].
+  /// Two programs:
+  /// * The roll ([rolledFor]): a fixed chance per wave (wave 6 on Easy is
+  ///   50%), arriving early so the wave's length does not matter.
+  /// * Lingering: from wave [firstWave], one more hound in each
+  ///   [lingerWindow] after [lingerStart], so a long fight keeps meeting
+  ///   them, up to [maxPerWave] in all. A hound whose time the fight never
+  ///   reaches does not come.
   static List<double> scheduleFor({
     required int wave,
     required Difficulty difficulty,
-    required double averageSeconds,
     required math.Random rng,
   }) {
     if (wave < firstWave) return const [];
-    final d = math.max(averageSeconds, earliest + 1);
     double between(double a, double b) => a + rng.nextDouble() * (b - a);
-    if (wave < packWave) {
-      final p = wave < likelyWave
-          ? chanceFor(difficulty)
-          : bracketChance(difficulty);
-      return [between(earliest, d / p)];
+    final times = <double>[];
+    var at = between(firstEarliest, firstLatest);
+    for (var i = rolledFor(wave, difficulty, rng); i > 0; i--) {
+      times.add(at);
+      at += between(4, 8);
     }
-    final sure = wave ~/ packWave;
-    final times = <double>[
-      for (var i = 0; i < sure; i++)
-        between(
-          earliest + (d - earliest) * i / sure,
-          earliest + (d - earliest) * (i + 1) / sure,
-        ),
-    ];
-    final e = extraChance(difficulty);
-    final from = math.max(earliest, d * (1 - 2 * e) / (1 - e));
-    times.add(between(from, 2 * d));
+    for (var k = 0; times.length < maxPerWave; k++) {
+      final from = lingerStart + k * lingerWindow;
+      times.add(between(from, from + lingerWindow - lingerStart));
+    }
     times.sort();
     return times;
   }

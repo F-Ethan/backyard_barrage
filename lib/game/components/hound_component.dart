@@ -16,6 +16,8 @@ class HoundSprites {
     required this.crouch,
     required this.leap,
     required this.bite,
+    required this.land,
+    required this.hit,
   });
 
   final Sprite idle;
@@ -27,6 +29,12 @@ class HoundSprites {
 
   /// Snarl, then a puff of frost breath.
   final List<Sprite> bite;
+
+  /// Touching down after the river leap.
+  final Sprite land;
+
+  /// Flinching from a snowball, before it runs off.
+  final Sprite hit;
 }
 
 enum HoundState { warn, approach, jump, hunt, pounce, bite, leave, flee, gone }
@@ -87,6 +95,8 @@ class HoundComponent extends SpriteComponent {
     'jump_01',
     'bite_00',
     'bite_01',
+    'land',
+    'hit',
   ];
 
   static String framePath(String frame) =>
@@ -107,6 +117,9 @@ class HoundComponent extends SpriteComponent {
 
   /// Peak height of the leap, in pixels above the lane.
   static const double leapHeight = 90;
+
+  /// How long it flinches from a snowball before running off.
+  static const double flinchSeconds = 0.25;
 
   /// Waves before this one never get a hound.
   static const int firstWave = 3;
@@ -288,6 +301,10 @@ class HoundComponent extends SpriteComponent {
         if (position.x < -150) _go(HoundState.gone);
       case HoundState.flee:
         _lift = 0;
+        if (_clock < flinchSeconds) {
+          sprite = sprites.hit;
+          break;
+        }
         position.x += runSpeed * dt;
         _cycleRun();
         if (position.x > entryX + 40) _go(HoundState.gone);
@@ -311,7 +328,7 @@ class HoundComponent extends SpriteComponent {
     }
     _lift = 0;
     position.x = landingX;
-    sprite = sprites.idle; // landing pose
+    sprite = sprites.land;
     if (air >= airSeconds + landSeconds) _go(HoundState.hunt);
   }
 
@@ -352,7 +369,7 @@ class HoundComponent extends SpriteComponent {
     final sy = scale.y == 0 ? 1.0 : scale.y;
     canvas.save();
     if (_lift > 0) canvas.translate(0, -_lift / sy);
-    if (_state == HoundState.flee) {
+    if (_state == HoundState.flee && _clock >= flinchSeconds) {
       // Running back the way it came: flip about the body.
       canvas.translate(size.x, 0);
       canvas.scale(-1, 1);

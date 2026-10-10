@@ -40,15 +40,28 @@ flutter:
     - assets/images/characters/player/ethan3d/aim_03_34front_512.png
     - assets/images/characters/player/ethan3d/run_00_flipped_512.png
     - assets/images/characters/player/ethan3d/run_01_flipped_512.png
+    - assets/images/characters/player/ethan3d/kid_idle_512.png
+    - assets/images/characters/player/ethan3d/kid_throw_follow_512.png
+    - assets/images/characters/player/ethan3d/kid_hit_512.png
+    - assets/images/characters/player/ethan3d/kid_ko_512.png
+    - assets/images/characters/player/ethan3d/kid_aim_away_00_512.png
+    - assets/images/characters/player/ethan3d/kid_aim_away_01_512.png
+    - assets/images/characters/player/ethan3d/kid_run_00_512.png
+    - assets/images/characters/player/ethan3d/kid_run_01_512.png
+    - assets/images/characters/player/ethan3d/kid_run_02_512.png
+    - assets/images/characters/player/ethan3d/kid_run_03_512.png
     - assets/images/characters/rivals/ghost/
     - assets/images/characters/rivals/frostkid/
     - assets/images/characters/rivals/hellhound/
+    - assets/images/characters/rivals/rusher/
     - assets/images/forts/
+    - assets/images/forts/rival/
     - assets/images/projectiles/
     - assets/images/props/
     - assets/images/props/summer/
     - assets/images/props/winter/
     - assets/images/ui/
+    - assets/images/ui/powerups/
     - assets/images/ui_modern/
     - assets/images/vfx/
     - assets/images/world/

@@ -53,7 +53,7 @@ class SeasonAssets {
   };
 
   static String projectile(Season season) => switch (season) {
-    Season.winter => 'projectiles/snowball_draft.png',
+    Season.winter => 'projectiles/snowball.png',
     Season.summer => 'projectiles/water_balloon_draft.png',
   };
 
@@ -73,17 +73,17 @@ class SeasonAssets {
   static const _ethanAcross = '${ethan3dDir}aim_01_512.png';
 
   static const _playerWinterAim = {
-    'turn_30l': '${ethan3dDir}aim_00_profile_512.png',
-    'turn_15l': '${ethan3dDir}aim_00_profile_512.png',
+    'turn_30l': '${ethan3dDir}kid_aim_away_01_512.png',
+    'turn_15l': '${ethan3dDir}kid_aim_away_00_512.png',
     'charge': _ethanAcross,
     'turn_15r': '${ethan3dDir}aim_02_512.png',
     'turn_30r': '${ethan3dDir}aim_03_34front_512.png',
-    'idle': _ethanAcross,
-    'walk': '${ethan3dDir}run_00_flipped_512.png',
-    'throw': _ethanAcross,
-    'hit': _ethanAcross,
-    'ko': _ethanAcross,
-    'pickup': _ethanAcross,
+    'idle': '${ethan3dDir}kid_idle_512.png',
+    'walk': '${ethan3dDir}kid_run_00_512.png',
+    'throw': '${ethan3dDir}kid_throw_follow_512.png',
+    'hit': '${ethan3dDir}kid_hit_512.png',
+    'ko': '${ethan3dDir}kid_ko_512.png',
+    'pickup': '${ethan3dDir}kid_idle_512.png',
   };
 
   /// Frames that loop while the kid walks, or null for a single frame.
@@ -93,8 +93,10 @@ class SeasonAssets {
   }) {
     if (!player || season != Season.winter) return null;
     return const [
-      '${ethan3dDir}run_00_flipped_512.png',
-      '${ethan3dDir}run_01_flipped_512.png',
+      '${ethan3dDir}kid_run_00_512.png',
+      '${ethan3dDir}kid_run_01_512.png',
+      '${ethan3dDir}kid_run_02_512.png',
+      '${ethan3dDir}kid_run_03_512.png',
     ];
   }
 
@@ -103,10 +105,10 @@ class SeasonAssets {
   static double playerDrawScale(Season season) =>
       season == Season.winter ? 1.15 : 1;
 
-  /// True when every pose for this side and season comes from the 3D pack.
-  /// That pack has no lying-down KO frame.
+  /// True when the KO pose is an upright frame that has to be tipped over
+  /// in code. Every current pack has a lying-down KO frame.
   static bool uprightKo({required bool player, required Season season}) =>
-      player && season == Season.winter;
+      false;
 
   /// Source square for a render, in pixels: left, top, side. Null for the
   /// 2D drafts, which fill their frame and stand on the bottom edge.
@@ -131,8 +133,20 @@ class SeasonAssets {
   /// rescaled to the v2 framing.
   static String? rivalPose(RivalType type, String pose) {
     final (folder, frame) = switch (type) {
-      // Rushers share the snowman art; [RivalProfile.aura] tells them apart.
-      RivalType.snowGhost || RivalType.rusher => (
+      RivalType.rusher => (
+        'rusher',
+        switch (pose) {
+          'charge' ||
+          'turn_30l' ||
+          'turn_15l' ||
+          'turn_15r' ||
+          'turn_30r' => 'windup',
+          'walk' => 'walk_00',
+          'pickup' => 'idle',
+          _ => pose,
+        },
+      ),
+      RivalType.snowGhost => (
         'ghost',
         switch (pose) {
           'charge' ||
@@ -140,7 +154,8 @@ class SeasonAssets {
           'turn_15l' ||
           'turn_15r' ||
           'turn_30r' => 'windup',
-          'walk' || 'pickup' => 'idle',
+          'walk' => 'walk_00',
+          'pickup' => 'idle',
           _ => pose,
         },
       ),
@@ -167,6 +182,21 @@ class SeasonAssets {
     RivalType.snowGhost || RivalType.rusher => 1.12,
     RivalType.frostKid => 1.18,
   };
+
+  /// Frames a rival loops while it walks on or steps, or null to slide on
+  /// its idle. The frost kid waits on livelier walk art.
+  static List<String>? rivalWalkCycle(RivalType type) {
+    final folder = switch (type) {
+      RivalType.snowGhost => 'ghost',
+      RivalType.rusher => 'rusher',
+      RivalType.frostKid => null,
+    };
+    if (folder == null) return null;
+    return [
+      for (final i in ['00', '01', '02', '03'])
+        '$rivalDir$folder/${folder}_walk_${i}_draft.png',
+    ];
+  }
 
   static String pose({
     required bool player,

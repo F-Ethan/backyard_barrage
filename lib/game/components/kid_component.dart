@@ -582,9 +582,24 @@ class KidComponent extends SpriteComponent {
     if (armored && !isKo) _drawArmor(canvas);
   }
 
+  /// Frost armor art (an ice bubble). Shared by every kid; set once the
+  /// image loads. Null draws the plain ring.
+  static Sprite? armorSprite;
+
   void _drawArmor(Canvas canvas) {
     final center = Offset(size.x / 2, size.y * 0.55);
     final r = size.x * 0.5;
+    final bubble = armorSprite;
+    if (bubble != null) {
+      final side = r * 2.3;
+      bubble.render(
+        canvas,
+        position: Vector2(center.dx - side / 2, center.dy - side / 2),
+        size: Vector2.all(side),
+        overridePaint: Paint()..color = const Color(0xD9FFFFFF),
+      );
+      return;
+    }
     canvas.drawCircle(
       center,
       r,

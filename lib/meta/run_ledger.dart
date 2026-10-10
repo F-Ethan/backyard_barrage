@@ -99,7 +99,7 @@ class RunLedger {
               ?PowerUp.tryParse(e.key is String ? e.key as String : null): _int(
                 e.value,
                 0,
-                PowerUp.maxStack,
+                PowerUp.maxHeld,
               ),
         }
         ..checkpointKidLosses = _int(cp['kidLosses'], 0, 999)

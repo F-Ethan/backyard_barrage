@@ -262,7 +262,8 @@ class CombatRules {
     return ThrowPhysics.circleHitsRect(center, radius, fortRect);
   }
 
-  /// Opaque fort art inside the 640² draft, as fractions of the sprite.
+  /// The wall in the 640² fort art (not the flag), as fractions of the
+  /// sprite. Measured on the final renders.
   static Rect fortHitRect({
     required int stage,
     required Vector2 anchorBottomCenter,
@@ -274,9 +275,9 @@ class CombatRules {
       double right,
       double bottom,
     ) = switch (_clampInt(stage, 1, 3)) {
-      1 => (0.10, 0.56, 0.86, 0.95),
-      2 => (0.08, 0.45, 0.86, 0.95),
-      _ => (0.06, 0.20, 0.88, 0.95),
+      1 => (0.12, 0.60, 0.87, 0.95),
+      2 => (0.13, 0.47, 0.87, 0.95),
+      _ => (0.06, 0.22, 0.87, 0.95),
     };
     final originX = anchorBottomCenter.x - spriteSize.x / 2;
     final originY = anchorBottomCenter.y - spriteSize.y;

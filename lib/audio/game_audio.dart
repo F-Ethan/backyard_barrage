@@ -72,12 +72,10 @@ abstract final class AudioCues {
 
   static const loops = <String>[menuLoop, battleWinter, battleSummer];
 
-  /// Mix level for one-shots (0–1). Throws and hits sit at 0.75 so they do
-  /// not drown out the rest; everything else plays at full.
-  static double volumeOf(String cue) => switch (cue) {
-    throwWhoosh || throwFullPower || impactSnow || impactWet || hitOuch => 0.75,
-    _ => 1,
-  };
+  /// Mix level for one-shots (0–1). Every cue plays at full: the v2 throw
+  /// and hit sounds are already about 5dB under the old placeholders that
+  /// needed turning down.
+  static double volumeOf(String cue) => 1;
 
   /// The charge hum loop: 1.25× its old 0.6 so it can be heard.
   static const double chargeHumVolume = 0.75;
@@ -206,7 +204,9 @@ class GameAudio {
     : _lookup = lookup ?? const BundleAudioLookup(),
       _playback = playback ?? FlameAudioPlayback();
 
-  static const _extensions = ['.ogg', '.wav', '.mp3'];
+  /// First match wins. AAC (`.m4a`) for the long music loops: it plays on
+  /// iOS (Ogg does not) at a tenth of a WAV's size.
+  static const _extensions = ['.m4a', '.wav', '.mp3', '.ogg'];
 
   final AudioAssetLookup _lookup;
   final AudioPlayback _playback;

@@ -117,7 +117,7 @@ void main() {
     expect(playback.sfx, isNot(contains('sfx/throw_whoosh.wav')));
   });
 
-  testWidgets('throws and hits play at 0.75; the rest at full', (tester) async {
+  testWidgets('every one-shot plays at full volume', (tester) async {
     final playback = RecordingPlayback();
     final audio = GameAudio(playback: playback);
     for (final cue in [
@@ -129,9 +129,9 @@ void main() {
     ]) {
       await audio.playSfx(cue);
     }
-    expect(playback.volumes['sfx/throw_whoosh.wav'], 0.75);
-    expect(playback.volumes['sfx/hit_ouch.wav'], 0.75);
-    expect(playback.volumes['sfx/impact_snow.wav'], 0.75);
+    expect(playback.volumes['sfx/throw_whoosh.wav'], 1);
+    expect(playback.volumes['sfx/hit_ouch.wav'], 1);
+    expect(playback.volumes['sfx/impact_snow.wav'], 1);
     expect(playback.volumes['sfx/hound_growl.wav'], 1);
     expect(playback.volumes['sfx/coin_pop.wav'], 1);
     expect(AudioCues.chargeHumVolume, closeTo(0.6 * 1.25, 1e-9));
@@ -203,10 +203,10 @@ void main() {
       await audio.resolvedFile(AudioCues.purchaseCoin),
       'sfx/purchase_coin.wav',
     );
-    expect(await audio.resolvedFile(AudioCues.menuLoop), 'music/menu_loop.wav');
+    expect(await audio.resolvedFile(AudioCues.menuLoop), 'music/menu_loop.m4a');
     expect(
       await audio.resolvedFile(AudioCues.battleWinter),
-      'music/battle_loop_winter.wav',
+      'music/battle_loop_winter.m4a',
     );
     expect(
       await audio.resolvedFile(AudioCues.battleSummer),
@@ -239,7 +239,7 @@ void main() {
       ]),
     );
     expect(playback.loops, [
-      'music/menu_loop.wav',
+      'music/menu_loop.m4a',
       'music/battle_loop_summer.wav',
     ]);
 

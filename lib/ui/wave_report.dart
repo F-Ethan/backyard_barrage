@@ -42,8 +42,8 @@ class _WaveReportState extends State<WaveReport> {
         const ReportSection('Rewards'),
         PillRow(
           children: [
-            for (final reward in game.waveRewards)
-              RewardPill(key: Key('report-reward-$reward'), reward: reward),
+            for (final (i, reward) in game.waveRewards.indexed)
+              RewardPill(key: Key('report-reward-$i'), reward: reward),
           ],
         ),
         const ReportSection('Your crew'),

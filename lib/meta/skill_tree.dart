@@ -567,6 +567,14 @@ class SkillTree {
 
   static bool isPersonal(SkillBranch branch) => personal.contains(branch);
 
+  /// A kid's own branches that keep them standing (the rest of their own
+  /// branches make them hit harder or faster).
+  static const Set<SkillBranch> personalDefense = {
+    SkillBranch.health,
+    SkillBranch.shield,
+    SkillBranch.poise,
+  };
+
   /// Saved key for kid [kid] owning node [id] (for example `k1:shield-2`).
   static String kidKey(int kid, String id) => 'k$kid:$id';
 

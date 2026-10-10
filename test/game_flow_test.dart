@@ -1462,7 +1462,7 @@ void main() {
     await tester.pump();
     expect(find.text('Aim'), findsOneWidget);
     expect(find.text('Throw'), findsNothing);
-    // Kid 1's own skills: the team's shared ones sit behind Team.
+    // Mike's own skills: the team's shared ones sit behind Team.
     expect(find.byKey(const Key('skill-branch-team')), findsNothing);
     expect(find.byKey(const Key('shop-filter-kid-1')), findsNothing);
 
@@ -1485,7 +1485,7 @@ void main() {
     await tester.pump();
     expect(game.meta.crewSize, 2);
 
-    // Kid 2's button shows once they join; their skills sit behind it.
+    // Beth's tab shows once she joins; her skills sit behind it.
     await tester.tap(find.byKey(const Key('shop-filter-kid-1')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('skill-branch-aim')));
@@ -2614,9 +2614,7 @@ void main() {
     expect(await caughtOn(Difficulty.hard), isTrue);
   });
 
-  testWidgets('a snowball scares the hound off only before it jumps', (
-    tester,
-  ) async {
+  testWidgets('a snowball scares the hound off until it lands', (tester) async {
     final game = (await boot(tester, MetaState())).game;
     final kid = game.players.first;
     var hound = game.releaseHound(kid);
@@ -2626,6 +2624,15 @@ void main() {
     runHound(hound, () => hound.state == HoundState.gone);
     expect(hound.state, HoundState.gone);
     expect(kid.isKo, isFalse);
+
+    // Mid-leap over the river still counts.
+    hound = game.releaseHound(kid);
+    runHound(hound, () => hound.state == HoundState.jump);
+    expect(hound.scareable, isTrue);
+    expect(hound.groundHitCenter.y, greaterThan(hound.hitCenter.y - 1));
+    hound.scare();
+    expect(hound.state, HoundState.flee);
+    runHound(hound, () => hound.state == HoundState.gone);
 
     hound = game.releaseHound(kid);
     runHound(hound, () => hound.state == HoundState.hunt);
@@ -3187,6 +3194,9 @@ void main() {
     expect(find.text('0 KOs'), findsOneWidget);
     expect(find.byKey(const Key('report-next-1')), findsOneWidget);
     expect(find.text('Wave 1 clear'), findsOneWidget);
+    // Named, with their own upgrades counted.
+    expect(find.text('Beth'), findsOneWidget);
+    expect(find.byKey(const Key('report-upgrades-0')), findsOneWidget);
     // The next button sits in the fixed footer, on screen without a scroll.
     final button = tester.getRect(find.byKey(const Key('report-continue')));
     expect(button.bottom, lessThanOrEqualTo(tester.view.physicalSize.height));

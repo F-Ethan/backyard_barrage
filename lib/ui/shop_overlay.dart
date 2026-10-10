@@ -257,8 +257,7 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                                 hiddenOwned > 0
                                                     ? 'Ranks 1–$hiddenOwned owned. Each rank unlocks the next.'
                                                     : personal
-                                                    ? 'Kid ${owner + 1}'
-                                                          "'s own skill."
+                                                    ? "${KidColors.nameOf(owner)}'s own skill."
                                                     : 'Shared by the whole crew.',
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
@@ -324,7 +323,7 @@ class _ShopOverlayState extends State<ShopOverlay> {
                               for (var i = 0; i < meta.crewSize; i++)
                                 (
                                   key: Key('shop-filter-kid-$i'),
-                                  label: 'Kid ${i + 1}',
+                                  label: KidColors.nameOf(i),
                                   color: KidColors.of(i),
                                   ink: KidColors.deepOf(i),
                                 ),

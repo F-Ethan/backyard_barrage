@@ -1058,4 +1058,17 @@ void main() {
       meta.itemCount(PowerUp.revive),
     );
   });
+
+  test('each kid counts their own attack and defense upgrades', () {
+    final meta = MetaState(coins: 5000, skills: {'team-2'});
+    expect(meta.kidUpgrades(0), (attack: 0, defense: 0));
+    expect(meta.buy('hp-1', kid: 0), isTrue);
+    expect(meta.buy('shield-1', kid: 0), isTrue);
+    expect(meta.buy('shield-2', kid: 0), isTrue);
+    expect(meta.buy('throw-1', kid: 0), isTrue);
+    expect(meta.buy('throw-1', kid: 1), isTrue);
+    expect(meta.buy('team-3'), isTrue, reason: 'team skills do not count');
+    expect(meta.kidUpgrades(0), (attack: 1, defense: 3));
+    expect(meta.kidUpgrades(1), (attack: 1, defense: 0));
+  });
 }

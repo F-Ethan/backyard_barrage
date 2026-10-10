@@ -230,6 +230,24 @@ class MetaState {
   int kidMaxHp(int kid) =>
       baseKidHp + _ownedPrefix(SkillBranch.health, kid: kid);
 
+  /// Ranks [kid] owns in their own branches, split into attack (Throw,
+  /// Hit, aim and pals) and defense (Health, Shield, Shake it off).
+  ({int attack, int defense}) kidUpgrades(int kid) {
+    var attack = 0;
+    var defense = 0;
+    for (final branch in SkillTree.personal) {
+      final owned = SkillTree.chain(
+        branch,
+      ).where((node) => ownsFor(kid, node.id)).length;
+      if (SkillTree.personalDefense.contains(branch)) {
+        defense += owned;
+      } else {
+        attack += owned;
+      }
+    }
+    return (attack: attack, defense: defense);
+  }
+
   int kidShield(int kid) =>
       SkillEffects.shield(_ownedPrefix(SkillBranch.shield, kid: kid));
 

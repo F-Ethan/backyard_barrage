@@ -1714,7 +1714,8 @@ class BackyardBarrageGame extends FlameGame {
       final pool = open.isEmpty ? living : open;
       releaseHound(pool[_rng.nextInt(pool.length)]);
     }
-    // A player snowball that meets a hound before it crosses scares it.
+    // A player snowball that meets a hound before it lands on the crew's
+    // side (mid-leap too) scares it.
     for (final hound in _hounds) {
       if (!hound.scareable) continue;
       for (final shot in world.children.whereType<LobProjectile>()) {
@@ -1722,7 +1723,7 @@ class BackyardBarrageGame extends FlameGame {
         if (!ThrowPhysics.snowballContacts(
           ground: shot.hitPosition,
           shotRadius: shot.radius,
-          kidCenter: hound.hitCenter,
+          kidCenter: hound.groundHitCenter,
           kidRadius: HoundComponent.hitRadius,
         )) {
           continue;

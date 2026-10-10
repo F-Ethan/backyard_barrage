@@ -199,8 +199,8 @@ void main() {
       expect(normal.playerChargeTimeScale, closeTo(2 / 3, 0.0001));
       expect(normal.allyStunScale, 0.75);
       expect(normal.enemyHitsToKo, 2);
-      expect(hard.playerChargeTimeScale, 1);
-      expect(hard.allyStunScale, 1);
+      expect(hard.playerChargeTimeScale, 0.7);
+      expect(hard.allyStunScale, 0.4);
       expect(hard.enemyHitsToKo, 3);
       expect(easy.scaled().enemyHitsToKo, easy.enemyHitsToKo);
       expect(normal.friendlyFortDamage, isFalse);

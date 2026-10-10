@@ -11,7 +11,8 @@ import '../throw_physics.dart';
 /// and down to where it lands at the current power. A landing mark sits on
 /// the floor under the end; when [target] is set the arc stops at that rival
 /// and their feet get a lock ring. Difficulty decides how much of this
-/// shows ([showPath], [target]). The power bar lives in the HUD.
+/// shows ([showPath], [target]). A power meter beside the thrower shows
+/// how full the charge is on every difficulty.
 class ChargeIndicator extends PositionComponent {
   ChargeIndicator({Sprite? glowSprite})
     : _glowSprite = glowSprite,
@@ -65,6 +66,8 @@ class ChargeIndicator extends PositionComponent {
       _renderFlightPath(canvas, start, end, target);
     }
 
+    _renderPowerMeter(canvas);
+
     final dir = aimDir.clone();
     if (dir.length2 < 1e-6) {
       dir.setValues(1, -0.5);
@@ -80,6 +83,58 @@ class ChargeIndicator extends PositionComponent {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(Offset(anchorWorld.x, anchorWorld.y), tip, arrow);
+  }
+
+  /// Meter size and offset from the hand: a short upright bar behind the
+  /// thrower, clear of the throw arrow.
+  static const double meterWidth = 14;
+  static const double meterHeight = 84;
+  static const Offset meterOffset = Offset(-62, -70);
+
+  /// Where the power meter sits in the world, for tests.
+  Rect get meterRect => Rect.fromLTWH(
+    anchorWorld.x + meterOffset.dx,
+    anchorWorld.y + meterOffset.dy,
+    meterWidth,
+    meterHeight,
+  );
+
+  void _renderPowerMeter(Canvas canvas) {
+    final box = meterRect;
+    final shell = RRect.fromRectAndRadius(
+      box.inflate(3),
+      const Radius.circular(10),
+    );
+    canvas.drawRRect(shell, Paint()..color = _ink.withValues(alpha: 0.55));
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(box, const Radius.circular(7)),
+      Paint()..color = _cream.withValues(alpha: 0.35),
+    );
+    final t = charge.clamp(0.0, 1.0);
+    if (t > 0) {
+      final fill = Rect.fromLTRB(
+        box.left,
+        box.bottom - box.height * t,
+        box.right,
+        box.bottom,
+      );
+      // Cream to gold as it fills; full power turns warm orange.
+      final color = t >= 0.999
+          ? const Color(0xFFFF9F43)
+          : Color.lerp(_cream, _charge, t)!;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(fill, const Radius.circular(7)),
+        Paint()..color = color,
+      );
+    }
+    // Quarter ticks so a half charge is easy to judge.
+    final tick = Paint()
+      ..color = _ink.withValues(alpha: 0.45)
+      ..strokeWidth = 2;
+    for (final q in const [0.25, 0.5, 0.75]) {
+      final y = box.bottom - box.height * q;
+      canvas.drawLine(Offset(box.left, y), Offset(box.left + 5, y), tick);
+    }
   }
 
   void _renderFlightPath(

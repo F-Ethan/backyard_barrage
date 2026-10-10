@@ -428,16 +428,19 @@ void main() {
     expect(over.radius, 22);
     expect(
       over.scale.x,
-      closeTo(
-        ArenaGrid.depthScale(over.hitPosition.y, groundTrack: true),
-        0.001,
-      ),
+      closeTo(ArenaGrid.ballScale(over.hitPosition.y), 0.001),
     );
 
+    // The ball shrinks up the yard and grows toward the camera, more than
+    // the kids do, so depth reads in flight.
     final farShot = shotAt(ArenaGrid.laneY(0));
-    expect(farShot.scale.x, closeTo(ArenaGrid.depthScaleFar, 0.001));
+    expect(farShot.scale.x, closeTo(ArenaGrid.ballScaleFar, 0.001));
     final nearShot = shotAt(ArenaGrid.laneY(ArenaGrid.rows - 1));
-    expect(nearShot.scale.x, closeTo(ArenaGrid.depthScaleNear, 0.001));
+    expect(nearShot.scale.x, closeTo(ArenaGrid.ballScaleNear, 0.001));
+    expect(
+      ArenaGrid.ballScaleNear / ArenaGrid.ballScaleFar,
+      greaterThan(ArenaGrid.depthScaleNear / ArenaGrid.depthScaleFar),
+    );
 
     final under = shotAt(kid.hitCenter.y + 36);
     under.update(1 / 60);

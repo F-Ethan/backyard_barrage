@@ -235,6 +235,20 @@ class BackyardBarrageGame extends FlameGame {
   /// a scared hound or a boss, knockout coins, and the clear bonus.
   final List<WaveReward> waveRewards = [];
 
+  /// Adds [reward] to the wave report, folding it into an earlier one of
+  /// the same item from the same source ("+2 Revive" for a boss that
+  /// paid two).
+  void _addReward(WaveReward reward) {
+    final index = waveRewards.indexWhere(
+      (r) => r.item == reward.item && r.source == reward.source,
+    );
+    if (index < 0) {
+      waveRewards.add(reward);
+      return;
+    }
+    waveRewards[index] = waveRewards[index].plus(reward.amount);
+  }
+
   /// Rivals each kid knocked out this wave (by index).
   final List<int> kidKos = [0, 0, 0];
 
@@ -1448,7 +1462,7 @@ class BackyardBarrageGame extends FlameGame {
       held.uses = 0;
       if (_rng.nextDouble() >= EnemyPerkRules.dropChance) continue;
       meta.replaceItems({...meta.items, item: meta.itemCount(item) + 1});
-      waveRewards.add(WaveReward.item(item, 'Dropped by a rival'));
+      _addReward(WaveReward.item(item, 'Dropped by a rival'));
       world.add(
         CoinPop(
           amount: 0,
@@ -1731,7 +1745,7 @@ class BackyardBarrageGame extends FlameGame {
   }) {
     final given = [for (var i = 0; i < count; i++) meta.grantRandomItem(_rng)];
     for (final item in given) {
-      waveRewards.add(WaveReward.item(item, reason));
+      _addReward(WaveReward.item(item, reason));
     }
     final label = given.length == 1
         ? '+1 ${given.single.label}'

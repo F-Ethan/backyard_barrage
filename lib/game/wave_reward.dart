@@ -17,6 +17,11 @@ class WaveReward {
 
   bool get isCoins => item == null;
 
+  /// The same reward with [more] added.
+  WaveReward plus(int more) => isCoins
+      ? WaveReward.coins(amount + more, source)
+      : WaveReward.item(item!, source, amount: amount + more);
+
   /// "+1 Freeze all" or "+45".
   String get label => isCoins ? '+$amount' : '+$amount ${item!.label}';
 

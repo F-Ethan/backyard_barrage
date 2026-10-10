@@ -3113,6 +3113,36 @@ void main() {
     expect(game.players[0].hp, 2);
   });
 
+  testWidgets('repeat rewards fold into one pill on the report', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    // Twenty items from seven kinds: some must repeat.
+    final given = game.rewardRandomItems(
+      20,
+      at: game.players.first.position,
+      reason: 'Magmo beaten',
+    );
+    expect(given, hasLength(20));
+    final items = [
+      for (final r in game.waveRewards)
+        if (r.source == 'Magmo beaten') r,
+    ];
+    expect(items.length, lessThanOrEqualTo(PowerUp.values.length));
+    expect(items.map((r) => r.item).toSet(), hasLength(items.length));
+    expect(items.fold<int>(0, (n, r) => n + r.amount), 20);
+    for (final r in items) {
+      expect(r.amount, given.where((g) => g == r.item).length);
+    }
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('wave-report')), findsOneWidget);
+  });
+
   testWidgets('the report credits knockouts to the kid who threw', (
     tester,
   ) async {

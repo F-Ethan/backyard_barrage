@@ -252,16 +252,15 @@ class MetaState {
   double kidChargeScale(int kid) =>
       SkillEffects.charge(_ownedPrefix(SkillBranch.charge, kid: kid));
 
-  /// The hardest-hitting kid in the crew (bosses scale to this).
-  int get bestKidHits =>
-      [for (var i = 0; i < crewSize; i++) kidHits(i)].reduce(math.max);
-
   /// Coins to revive kid [kid] after the wave: 100, then double for each
   /// time that same kid has been revived.
   int reviveCost(int kid) => 100 * math.pow(2, ledger.revivesOf(kid)).toInt();
 
-  /// Coins for one heart back between waves.
-  static const int healCost = 20;
+  /// Coins for one heart back after clearing [wave]: a third of that
+  /// wave's clear bonus, never under 20, so it keeps pace with what waves
+  /// pay (about 40 at wave 10, 175 at wave 20, 665 at wave 30).
+  static int healCostFor(int wave) =>
+      math.max(20, _round5(coinsForWave(wave) / 3));
 
   bool buyRevive(int kid) {
     final cost = reviveCost(kid);
@@ -271,9 +270,10 @@ class MetaState {
     return true;
   }
 
-  bool buyHeal() {
-    if (coins < healCost) return false;
-    coins -= healCost;
+  bool buyHeal({required int wave}) {
+    final cost = healCostFor(wave);
+    if (coins < cost) return false;
+    coins -= cost;
     return true;
   }
 

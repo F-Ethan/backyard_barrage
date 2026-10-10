@@ -38,18 +38,18 @@ abstract final class BossRules {
   /// after brings one more.
   static int supportFor(int wave) => appearance(wave) - 1;
 
-  /// Health: 8 / 12 / 16 snowballs (Easy / Normal / Hard) the first time,
-  /// 25% more each time a boss comes back. It is counted in snowballs, not
-  /// hits, so damage skills do not melt it: [playerHits] is how many hits
-  /// the player's own throw lands right now (Harder hit ranks).
-  static int hits(Difficulty difficulty, int appearance, {int playerHits = 1}) {
+  /// Hits to put a boss down: 12 / 18 / 24 (Easy / Normal / Hard) the
+  /// first time, 25% more each time a boss comes back. Fixed, not scaled
+  /// to the crew's skills: it is tuned for a crew that has bought Harder
+  /// hit (at 3 hits a throw, an Easy boss falls in 4 throws), so those
+  /// skills keep paying off.
+  static int hits(Difficulty difficulty, int appearance) {
     final base = switch (difficulty) {
-      Difficulty.easy => 8,
-      Difficulty.normal => 12,
-      Difficulty.hard => 16,
+      Difficulty.easy => 12,
+      Difficulty.normal => 18,
+      Difficulty.hard => 24,
     };
-    final throws = (base * math.pow(1.25, math.max(appearance, 1) - 1)).round();
-    return throws * math.max(playerHits, 1);
+    return (base * math.pow(1.25, math.max(appearance, 1) - 1)).round();
   }
 
   /// A random boss, never the same as [last] twice in a row.

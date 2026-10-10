@@ -73,6 +73,7 @@ class _WaveReportState extends State<WaveReport> {
                     next: next[i],
                     max: meta.kidMaxHp(i),
                     reviveCost: meta.reviveCost(i),
+                    healCost: MetaState.healCostFor(game.wave),
                     coins: meta.coins,
                     feel: game.feel,
                     onRevive: () => _do(() => game.reviveKid(i)),
@@ -134,6 +135,7 @@ class _KidRow extends StatelessWidget {
     required this.next,
     required this.max,
     required this.reviveCost,
+    required this.healCost,
     required this.coins,
     required this.feel,
     required this.onRevive,
@@ -145,6 +147,7 @@ class _KidRow extends StatelessWidget {
   final int next;
   final int max;
   final int reviveCost;
+  final int healCost;
   final int coins;
   final FeelBus feel;
   final VoidCallback onRevive;
@@ -174,9 +177,9 @@ class _KidRow extends StatelessWidget {
     } else if (next < max) {
       action = DraftImageButton(
         key: Key('report-heal-$index'),
-        label: '+1 ♥ · ${MetaState.healCost}',
+        label: '+1 ♥ · $healCost',
         secondary: true,
-        enabled: coins >= MetaState.healCost,
+        enabled: coins >= healCost,
         onPressed: onHeal,
         width: 150,
         height: 44,

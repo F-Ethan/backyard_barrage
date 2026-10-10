@@ -22,26 +22,22 @@ void main() {
     expect(BossRules.supportFor(20), 2);
   });
 
-  test('8 / 12 / 16 snowballs the first time, 25% more each return', () {
+  test('12 / 18 / 24 hits the first time, 25% more each return', () {
     expect(
       [for (final d in Difficulty.values) BossRules.hits(d, 1)],
-      [8, 12, 16],
+      [12, 18, 24],
     );
     expect(
       [for (final d in Difficulty.values) BossRules.hits(d, 2)],
-      [10, 15, 20],
+      [15, 23, 30],
     );
     expect(
       [for (final d in Difficulty.values) BossRules.hits(d, 3)],
-      [13, 19, 25],
+      [19, 28, 38],
     );
-  });
-
-  test('damage skills do not melt a boss: health is counted in throws', () {
-    expect(
-      BossRules.hits(Difficulty.normal, 1, playerHits: 3),
-      3 * BossRules.hits(Difficulty.normal, 1),
-    );
+    // Tuned for a crew with Harder hit: 3 hits a throw downs an Easy boss
+    // in 4 throws.
+    expect((BossRules.hits(Difficulty.easy, 1) / 3).ceil(), 4);
   });
 
   test('a random boss, never the same one twice running', () {

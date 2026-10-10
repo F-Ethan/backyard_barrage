@@ -818,7 +818,6 @@ void main() {
       expect(meta.buy('damage-1', kid: 0), isTrue);
       expect(meta.kidHits(0), 2);
       expect(meta.kidHits(1), 1);
-      expect(meta.bestKidHits, 2);
     });
 
     test('a kid not on the crew yet cannot buy personal skills', () {
@@ -851,8 +850,12 @@ void main() {
       expect(meta.buyRevive(1), isTrue);
       expect(meta.reviveCost(1), 400);
       expect(meta.coins, 700);
-      expect(meta.buyHeal(), isTrue);
-      expect(meta.coins, 700 - MetaState.healCost);
+      expect(meta.buyHeal(wave: 1), isTrue);
+      expect(meta.coins, 700 - MetaState.healCostFor(1));
+      // A heart costs more the further the run gets.
+      expect(MetaState.healCostFor(1), 20);
+      expect(MetaState.healCostFor(10), greaterThan(30));
+      expect(MetaState.healCostFor(20), greaterThan(MetaState.healCostFor(10)));
       final back = MetaState.fromJson(meta.toJson());
       expect(back.reviveCost(1), 400);
     });

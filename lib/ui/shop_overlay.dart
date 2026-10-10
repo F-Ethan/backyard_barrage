@@ -315,7 +315,7 @@ class _ShopOverlayState extends State<ShopOverlay> {
                           _FilterButton(
                             key: const Key('shop-filter-team'),
                             label: 'Team',
-                            color: tokens.primary,
+                            color: tokens.ink,
                             selected: !_items && _filter == null,
                             compact: compact,
                             onTap: () => _selectFilter(null),
@@ -1093,7 +1093,7 @@ class _FilterButton extends StatelessWidget {
             maxLines: 1,
             style: BarrageType.button.copyWith(
               fontSize: 14,
-              color: selected ? BarrageColors.ink : tokens.ink,
+              color: selected ? tokens.onPrimary : tokens.ink,
             ),
           ),
         ),

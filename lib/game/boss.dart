@@ -121,6 +121,9 @@ abstract final class BossArt {
 
   static const magmaBall = 'vfx/boss/magma_ball.png';
   static const magmaImpact = 'vfx/boss/magma_impact.png';
+
+  /// The ogre's giant snowball in flight.
+  static const ogreBall = 'vfx/boss/ogre_snowball.png';
   static const fireWave = 'vfx/boss/fire_wave.png';
   static const shockwave = 'vfx/boss/shockwave_ring.png';
   static const iceSpikes = [
@@ -140,6 +143,7 @@ abstract final class BossArt {
     ],
     magmaBall,
     magmaImpact,
+    ogreBall,
     fireWave,
     shockwave,
     ...iceSpikes,

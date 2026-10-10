@@ -16,7 +16,7 @@ Playful, cozy backyard, kid-safe. Big readable silhouettes for phone **landscape
 | Snow | `#F4F8FC` | Ground / snowbanks |
 | Grass | `#6BBF59` | Summer ground |
 | Dirt / fence | `#C4A484` | Fence wood |
-| Player primary | `#3D7CFF` | Player kid / coat accents (blue — unique vs classic red) |
+| Player primary | `#3D7CFF` | Player kid / coat accents (blue — unique vs classic red). Kid 1 is blue; Kid 2 (green `#2ECC71`) and Kid 3 (red `#E74C3C`) wear their own coat colours, owner-approved Oct 2026. UI still uses blue as the team colour. |
 | Player secondary | `#FFC857` | Hair / warm accents |
 | Enemy primary | `#9B59B6` | Enemy kids (violet — not green army) |
 | Enemy secondary | `#F39C12` | Enemy accents |

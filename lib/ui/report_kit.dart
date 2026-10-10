@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../game/kid_colors.dart';
 import '../game/wave_reward.dart';
+import '../seasons/season.dart';
 import 'barrage_colors.dart';
 import 'barrage_theme.dart';
 import 'draft_button.dart';
@@ -274,9 +275,8 @@ class KidPortrait extends StatelessWidget {
             scale: down ? 1.4 : 1.9,
             alignment: down ? Alignment.center : const Alignment(0, -0.55),
             child: Image.asset(
-              down
-                  ? 'assets/images/characters/player/ethan3d/kid_ko_512.png'
-                  : 'assets/images/characters/player/ethan3d/kid_idle_512.png',
+              'assets/images/${SeasonAssets.crewDir(kid)}'
+              '${down ? 'kid_ko_512.png' : 'kid_idle_512.png'}',
               fit: BoxFit.contain,
               filterQuality: FilterQuality.medium,
             ),

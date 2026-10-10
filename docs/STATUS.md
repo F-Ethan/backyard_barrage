@@ -138,6 +138,10 @@ Both rivals charge on `windup` (snowball raised); the `aim_*` frames are a smoot
 | `props/winter/*.png` | Eight props, 512², standing on y=496 |
 | `ui/powerups/pu_*.png` | Seven round power-up icons, 256² |
 | `characters/player/ethan3d/kid_*_512.png` | Kid idle, throw follow-through, hit, KO, two aim-away frames, four-frame run |
+| `characters/player/team_green/`, `team_red/` | Kid 2 (green girl) and Kid 3 (red boy): the same 13 frames as the blue kid, 512², same foot line (2026-10-10) |
+| `props/shield/iron_shield.png` | Iron shield held while Shield hits remain, 256² (2026-10-10) |
+| `projectiles/bunker_buster.png` | Fort cracker ball, 256² (2026-10-10) |
+| `vfx/boss/ogre_snowball.png` | The ogre's thrown snowball, 256² (2026-10-10) |
 
 `hellhound/` (Ice hound event, 2026-10-08): `idle`, `run_00`–`run_03`, `jump_00` (crouch), `jump_01` (air), `bite_00`, `bite_01`, the 512 versions with the same square crop. `jump_02` (same as `idle`) and `look` are not copied; the landing uses `idle`.
 

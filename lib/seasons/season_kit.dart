@@ -12,7 +12,7 @@ class SeasonKit {
     required this.background,
     required this.projectile,
     required this.impact,
-    required this.playerPoses,
+    required this.crewPoses,
     required this.enemyPoses,
     required this.rivalPoses,
   });
@@ -21,8 +21,15 @@ class SeasonKit {
   final Sprite background;
   final Sprite projectile;
   final Sprite impact;
-  final KidPoseSprites playerPoses;
+
+  /// One pose set per crew kid (blue, green, red in winter).
+  final List<KidPoseSprites> crewPoses;
   final KidPoseSprites enemyPoses;
+
+  KidPoseSprites get playerPoses => crewPoses.first;
+
+  KidPoseSprites posesForKid(int kid) =>
+      crewPoses[kid.clamp(0, crewPoses.length - 1)];
 
   /// One pose set per rival type. Types without their own art share
   /// [enemyPoses].
@@ -32,16 +39,24 @@ class SeasonKit {
 }
 
 Future<SeasonKit> loadSeasonKit(FlameGame game, Season season) async {
-  Future<List<Sprite>?> walkCycle(bool player) async {
-    final frames = SeasonAssets.walkCycle(player: player, season: season);
+  Future<List<Sprite>?> walkCycle(bool player, int kid) async {
+    final frames = SeasonAssets.walkCycle(
+      player: player,
+      season: season,
+      kid: kid,
+    );
     if (frames == null) return null;
     return Future.wait([for (final path in frames) _loadPose(game, path)]);
   }
 
-  Future<KidPoseSprites> poses(bool player, {RivalType? rival}) async {
+  Future<KidPoseSprites> poses(
+    bool player, {
+    RivalType? rival,
+    int kid = 0,
+  }) async {
     String path(String pose) =>
         (rival == null ? null : SeasonAssets.rivalPose(rival, pose)) ??
-        SeasonAssets.pose(player: player, season: season, pose: pose);
+        SeasonAssets.pose(player: player, season: season, pose: pose, kid: kid);
     final entries = await Future.wait([
       for (final pose in SeasonAssets.poseNames) _loadPose(game, path(pose)),
     ]);
@@ -72,14 +87,17 @@ Future<SeasonKit> loadSeasonKit(FlameGame game, Season season) async {
           : (player ? SeasonAssets.playerDrawScale(season) : 1),
       walkCycle: rival != null
           ? await _rivalWalk(game, rival)
-          : await walkCycle(player),
+          : await walkCycle(player, kid),
     );
   }
 
   final background = game.loadSprite(SeasonAssets.background(season));
   final projectile = game.loadSprite(SeasonAssets.projectile(season));
   final impact = game.loadSprite(SeasonAssets.impact(season));
-  final playerPoses = poses(true);
+  final crewPoses = [
+    for (var kid = 0; kid < SeasonAssets.crewDirs.length; kid++)
+      poses(true, kid: kid),
+  ];
   final enemyPoses = poses(false);
   final rivalPoses = {
     for (final type in RivalType.values)
@@ -91,7 +109,7 @@ Future<SeasonKit> loadSeasonKit(FlameGame game, Season season) async {
     background: await background,
     projectile: await projectile,
     impact: await impact,
-    playerPoses: await playerPoses,
+    crewPoses: await Future.wait(crewPoses),
     enemyPoses: await enemyPoses,
     rivalPoses: {
       for (final entry in rivalPoses.entries) entry.key: await entry.value,

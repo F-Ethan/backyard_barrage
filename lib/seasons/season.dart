@@ -70,33 +70,41 @@ class SeasonAssets {
   /// camera, so it holds the profile; aiming down-screen turns toward the
   /// camera through `aim_02` to the 3/4 front. Walking runs [walkCycle].
   static const ethan3dDir = 'characters/player/ethan3d/';
-  static const _ethanAcross = '${ethan3dDir}aim_01_512.png';
+
+  /// Each crew kid's art: Kid 1 the blue kid, Kid 2 the green girl, Kid 3
+  /// the red boy. Same frames, size, and foot line in every folder.
+  static const crewDirs = [
+    ethan3dDir,
+    'characters/player/team_green/',
+    'characters/player/team_red/',
+  ];
+
+  static String crewDir(int kid) => crewDirs[kid.clamp(0, crewDirs.length - 1)];
 
   static const _playerWinterAim = {
-    'turn_30l': '${ethan3dDir}kid_aim_away_01_512.png',
-    'turn_15l': '${ethan3dDir}kid_aim_away_00_512.png',
-    'charge': _ethanAcross,
-    'turn_15r': '${ethan3dDir}aim_02_512.png',
-    'turn_30r': '${ethan3dDir}aim_03_34front_512.png',
-    'idle': '${ethan3dDir}kid_idle_512.png',
-    'walk': '${ethan3dDir}kid_run_00_512.png',
-    'throw': '${ethan3dDir}kid_throw_follow_512.png',
-    'hit': '${ethan3dDir}kid_hit_512.png',
-    'ko': '${ethan3dDir}kid_ko_512.png',
-    'pickup': '${ethan3dDir}kid_idle_512.png',
+    'turn_30l': 'kid_aim_away_01_512.png',
+    'turn_15l': 'kid_aim_away_00_512.png',
+    'charge': 'aim_01_512.png',
+    'turn_15r': 'aim_02_512.png',
+    'turn_30r': 'aim_03_34front_512.png',
+    'idle': 'kid_idle_512.png',
+    'walk': 'kid_run_00_512.png',
+    'throw': 'kid_throw_follow_512.png',
+    'hit': 'kid_hit_512.png',
+    'ko': 'kid_ko_512.png',
+    'pickup': 'kid_idle_512.png',
   };
 
   /// Frames that loop while the kid walks, or null for a single frame.
   static List<String>? walkCycle({
     required bool player,
     required Season season,
+    int kid = 0,
   }) {
     if (!player || season != Season.winter) return null;
-    return const [
-      '${ethan3dDir}kid_run_00_512.png',
-      '${ethan3dDir}kid_run_01_512.png',
-      '${ethan3dDir}kid_run_02_512.png',
-      '${ethan3dDir}kid_run_03_512.png',
+    return [
+      for (final i in ['00', '01', '02', '03'])
+        '${crewDir(kid)}kid_run_${i}_512.png',
     ];
   }
 
@@ -117,7 +125,7 @@ class SeasonAssets {
   /// A square as tall as the feet line sits them on the bottom-center
   /// anchor. The widest frames lose a few pixels at the edges.
   static (double, double, double)? crop(String path) {
-    if (path.startsWith(rivalDir) || path.startsWith(ethan3dDir)) {
+    if (path.startsWith(rivalDir) || crewDirs.any(path.startsWith)) {
       return (20.5, 0, 471);
     }
     return null;
@@ -204,10 +212,11 @@ class SeasonAssets {
     required bool player,
     required Season season,
     required String pose,
+    int kid = 0,
   }) {
     if (player && season == Season.winter) {
       final aimed = _playerWinterAim[pose];
-      if (aimed != null) return aimed;
+      if (aimed != null) return '${crewDir(kid)}$aimed';
     }
     final who = player ? 'player' : 'enemy';
     return 'characters/$who/${who}_${pose}_${season.name}_draft.png';

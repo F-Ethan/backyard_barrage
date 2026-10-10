@@ -17,6 +17,13 @@ abstract final class GameArt {
   /// Frost armor: a faceted ice bubble drawn around each kid.
   static const iceBubble = 'vfx/ice_bubble.png';
 
+  /// The iron shield a kid holds while their Shield skill (or a rival's
+  /// Shield perk) still has hits to block.
+  static const ironShield = 'props/shield/iron_shield.png';
+
+  /// The spiked ball a throw flies as while Fort cracker is armed.
+  static const bunkerBuster = 'projectiles/bunker_buster.png';
+
   /// Freeze all: frost that creeps in from the screen edges (1280x720).
   static const frostCrust = 'vfx/frost_crust_overlay.png';
 
@@ -56,6 +63,8 @@ abstract final class GameArt {
       fortCollapsed(rival: rival),
     ],
     iceBubble,
+    ironShield,
+    bunkerBuster,
     ...props,
     // Also drawn as the ball on a throw that carries that power-up.
     for (final item in PowerUp.values) powerUp(item),

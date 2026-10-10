@@ -6,37 +6,31 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('ads follow bosses and losses, else every five minutes', () {
-    expect(AdConfig.interstitialEvery, const Duration(minutes: 5));
-    expect(AdConfig.interstitialMinGap, const Duration(minutes: 1));
-    bool allows(AdMoment moment, int seconds, {bool fight = false}) =>
-        AdPolicy.allows(
-          inFight: fight,
-          moment: moment,
-          playSinceAd: Duration(seconds: seconds),
-          anyShown: true,
-        );
-    // Boss and loss: after a minute of fighting since the last ad.
+  test('ads follow bosses and losses after a win, else every five wins', () {
+    expect(AdConfig.interstitialWaves, 5);
+    expect(AdConfig.interstitialMinGap, const Duration(minutes: 3));
+    bool allows(
+      AdMoment moment, {
+      int seconds = 600,
+      int waves = 1,
+      bool fight = false,
+    }) => AdPolicy.allows(
+      inFight: fight,
+      moment: moment,
+      playSinceAd: Duration(seconds: seconds),
+      wavesSinceAd: waves,
+    );
     for (final moment in [AdMoment.bossBeaten, AdMoment.defeat]) {
-      expect(allows(moment, 59), isFalse);
-      expect(allows(moment, 60), isTrue);
-      expect(
-        AdPolicy.allows(
-          inFight: false,
-          moment: moment,
-          playSinceAd: Duration.zero,
-          anyShown: false,
-        ),
-        isTrue,
-        reason: 'the first one of the session shows',
-      );
+      expect(allows(moment), isTrue);
+      expect(allows(moment, waves: 0), isFalse, reason: 'needs a win');
+      expect(allows(moment, seconds: 179), isFalse, reason: 'three minutes');
+      expect(allows(moment, seconds: 180), isTrue);
     }
-    // Any other break: five minutes.
-    expect(allows(AdMoment.breakTime, 299), isFalse);
-    expect(allows(AdMoment.breakTime, 300), isTrue);
-    // Never in a fight.
+    expect(allows(AdMoment.breakTime, waves: 4), isFalse);
+    expect(allows(AdMoment.breakTime, waves: 5), isTrue);
+    expect(allows(AdMoment.breakTime, waves: 5, seconds: 100), isFalse);
     for (final moment in AdMoment.values) {
-      expect(allows(moment, 3600, fight: true), isFalse);
+      expect(allows(moment, waves: 9, fight: true), isFalse);
     }
   });
 

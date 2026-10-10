@@ -119,8 +119,9 @@ class MetaState {
   bool get reviveOne => owns('revive-1');
   final Map<PowerUp, int> _items = {};
 
-  /// One-use power-ups in this wallet. They stay until used; a defeat
-  /// keeps them, like unspent coins.
+  /// One-use power-ups in this wallet. They stay until used. A Campaign
+  /// defeat clears them with the skills; Arcade goes back to the
+  /// checkpoint's items.
   Map<PowerUp, int> get items => Map.unmodifiable(_items);
 
   int itemCount(PowerUp item) => _items[item] ?? 0;
@@ -150,6 +151,20 @@ class MetaState {
     _items[item] = itemCount(item) + 1;
     if (item == PowerUp.revive) ledger.reviveBought += 1;
     return true;
+  }
+
+  /// Adds one random item the wallet has room for, for free (a hound or
+  /// boss reward), and returns it. Null when every item is full. A free
+  /// Revive does not raise the Revive price.
+  PowerUp? grantRandomItem(math.Random rng) {
+    final open = [
+      for (final item in PowerUp.values)
+        if (itemCount(item) < PowerUp.maxStack) item,
+    ];
+    if (open.isEmpty) return null;
+    final item = open[rng.nextInt(open.length)];
+    _items[item] = itemCount(item) + 1;
+    return item;
   }
 
   /// Spend one. False when there is none.
@@ -226,6 +241,9 @@ class MetaState {
       SkillEffects.shield(_ownedPrefix(SkillBranch.shield));
 
   bool get passesOwnFort => owns('lanes');
+
+  /// Extra forts bought (More forts), on top of the main fort.
+  int get extraForts => _ownedPrefix(SkillBranch.moreForts);
 
   double get blastScale => SkillEffects.blast(_ownedPrefix(SkillBranch.blast));
 
@@ -447,7 +465,7 @@ class MetaState {
   }
 
   /// A defeat. [PlayMode.arcade] (shown as Campaign) drops every skill and
-  /// starts over at wave 1; unspent coins stay. [PlayMode.campaign] (shown
+  /// item and starts over at wave 1; unspent coins stay. [PlayMode.campaign] (shown
   /// as Arcade) goes back to its stage checkpoint.
   ///
   /// Season and best wave stay either way. The caller restarts the match
@@ -455,8 +473,10 @@ class MetaState {
   CheckpointResult resetRun({int lostOn = 1}) {
     if (mode == PlayMode.campaign) return restoreCheckpoint(lostOn: lostOn);
     _skills.clear();
+    _items.clear();
     ledger
       ..kidLosses = 0
+      ..reviveBought = 0
       ..clearCheckpoint();
     return const CheckpointResult(wave: 1, coinsLost: 0, refunded: 0);
   }

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flame/components.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../meta/difficulty.dart';
 import '../arena_grid.dart';
@@ -93,6 +94,9 @@ class EnemyController extends Component {
   KidComponent? _lockedTarget;
   Vector2? _lockedAim;
 
+  /// True once this windup's one re-aim ([RivalProfile.reaimAt]) is spent.
+  bool _reaimed = false;
+
   double get _telegraph {
     final player =
         playerChargeSeconds?.call() ?? CombatRules.playerChargeSeconds(0);
@@ -142,6 +146,14 @@ class EnemyController extends Component {
       host.showChargePose();
       onWindup?.call();
       _lockAim();
+    }
+    final reaim = profile.reaimAt;
+    if (_phase == _AiPhase.telegraph &&
+        reaim != null &&
+        !_reaimed &&
+        _elapsed >= telegraphAt + _telegraph * reaim) {
+      _reaimed = true;
+      _reaim();
     }
     if (_phase == _AiPhase.telegraph) _lookDuringWindup();
     if (_phase == _AiPhase.telegraph && _elapsed >= _cycle) {
@@ -232,12 +244,28 @@ class EnemyController extends Component {
   /// the target stands now, off by the difficulty's depth error, so a kid
   /// who moves during the windup can step out of the throw.
   void _lockAim() {
+    _reaimed = false;
     final target = _pickTarget();
     _lockedTarget = target;
     if (target == null) {
       _lockedAim = null;
       return;
     }
+    _lockedAim = _aimAt(target);
+  }
+
+  /// The one mid-windup look: same target, new aim point where it stands
+  /// now. Moving early no longer dodges; only a late step does.
+  void _reaim() {
+    final target = _lockedTarget;
+    if (target == null || target.isKo) return;
+    _lockedAim = _aimAt(target);
+  }
+
+  @visibleForTesting
+  Vector2? get lockedAim => _lockedAim;
+
+  Vector2 _aimAt(KidComponent target) {
     final spread =
         tuning().aimDepthRows *
         profile.jitterScale *
@@ -245,7 +273,7 @@ class EnemyController extends Component {
         ArenaGrid.rowStep;
     // Center-weighted: the sum of two uniforms.
     final error = (rng.nextDouble() + rng.nextDouble() - 1) * spread;
-    _lockedAim = target.hitCenter + Vector2(0, error);
+    return target.hitCenter + Vector2(0, error);
   }
 
   void _fire() {
@@ -307,7 +335,7 @@ class EnemyController extends Component {
     final cell = ArenaGrid.nearestCell(side, host.position);
     final home = _towardHome(cell, retreat: retreat);
     if (home != null) return home;
-    return EnemyAi.planBotStep(
+    final step = EnemyAi.planBotStep(
       column: cell.column,
       row: cell.row,
       playerRows: [
@@ -323,6 +351,21 @@ class EnemyController extends Component {
       occupied: _occupied(),
       approach: approachColumn,
     );
+    // A rival with a home column keeps it and only changes rows; it never
+    // walks forward off the back line (or back off the front).
+    final hold = this.profile.holdColumn;
+    if (step == null || hold == null || retreat || cell.column != hold) {
+      return step;
+    }
+    if (step.column == hold) return step;
+    if (step.row == cell.row) return null;
+    final sideways = (column: hold, row: step.row);
+    for (final spot in _occupied()) {
+      if (spot.column == sideways.column && spot.row == sideways.row) {
+        return null;
+      }
+    }
+    return sideways;
   }
 
   /// One column toward [RivalProfile.holdColumn] when this rival has one

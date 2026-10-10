@@ -8,11 +8,12 @@ enum RivalType {
   /// The standard rival. Lobs on the difficulty timer and steps to lanes.
   snowGhost,
 
-  /// Long range. Hangs back behind the fort, winds up longer with a glint
-  /// at the hand, and rarely misses the distance. One hit less to put down.
+  /// The sniper. Stays on the back line, winds up longer with a glint at
+  /// the hand, aims true, and re-aims once partway through the windup.
+  /// Goes down to a single snowball on every difficulty.
   frostKid,
 
-  /// Up close. Holds the front line and throws quick, loose lobs.
+  /// Up close and fast. Holds the front line and throws quick, loose lobs.
   /// Drawn as a snowman with a red tint and glow until it gets its own art.
   rusher,
 }
@@ -29,7 +30,18 @@ class RivalProfile {
     this.glint = false,
     this.glintAt,
     this.aura,
+    this.fixedHits,
+    this.reaimAt,
   });
+
+  /// Hits to put this rival down whatever the difficulty and wave. Null
+  /// uses the difficulty's count plus [hpDelta].
+  final int? fixedHits;
+
+  /// Fraction of the windup at which this rival looks again and moves its
+  /// aim to where the target stands then, once per throw. Null never
+  /// re-aims, so stepping away during the windup dodges.
+  final double? reaimAt;
 
   /// A colored tint and pulsing glow that marks this rival out from the
   /// snowmen it shares art with. Null draws the art as is.
@@ -50,9 +62,10 @@ class RivalProfile {
   /// Added to the difficulty's hits-to-KO. Never below 1.
   final int hpDelta;
 
-  /// Column this rival works back to between throws. Column 0 is the front
-  /// line nearest the players; the last column is behind the fort. Null
-  /// keeps the standard lane stepping.
+  /// Column this rival works back to and then stays on: it only changes
+  /// rows (and steps back after a hit). Column 0 is the front line nearest
+  /// the players; the last column is behind the fort. Null keeps the
+  /// standard lane stepping.
   final int? holdColumn;
 
   /// Show a glint at the hand while winding up, so a long-range throw is
@@ -68,24 +81,27 @@ class RivalProfile {
     RivalType.frostKid => const RivalProfile(
       gapScale: 1.3,
       windupScale: 1.25,
-      jitterScale: 0.3,
-      hpDelta: -1,
+      jitterScale: 0.15,
+      fixedHits: 1,
+      reaimAt: 0.6,
       holdColumn: ArenaGrid.columnsPerSide - 1,
       glint: true,
       // The snowball held up behind the head in frostkid_windup.
       glintAt: (0.209, -0.706),
     ),
     RivalType.rusher => const RivalProfile(
-      gapScale: 0.7,
-      windupScale: 0.7,
-      jitterScale: 1.5,
-      stepScale: 1.3,
+      gapScale: 0.55,
+      windupScale: 0.55,
+      jitterScale: 2.2,
+      stepScale: 1.6,
       holdColumn: 0,
       aura: Color(0xFFFF4D4D),
     ),
   };
 
   int hitsToKo(int base) {
+    final fixed = fixedHits;
+    if (fixed != null) return fixed;
     final hits = base + hpDelta;
     return hits < 1 ? 1 : hits;
   }

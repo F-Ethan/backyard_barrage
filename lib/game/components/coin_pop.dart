@@ -3,10 +3,13 @@ import 'package:flutter/painting.dart';
 
 /// "+8" that floats up from a knocked-out rival and fades.
 class CoinPop extends PositionComponent {
-  CoinPop({required this.amount, required Vector2 position})
+  CoinPop({required this.amount, required Vector2 position, this.label})
     : super(position: position, anchor: Anchor.center, priority: 3500);
 
   final int amount;
+
+  /// Text shown instead of "+[amount]" (a power-up reward).
+  final String? label;
   static const double lifetime = 0.9;
   double _age = 0;
 
@@ -25,7 +28,7 @@ class CoinPop extends PositionComponent {
     final pop = t < 0.15 ? 0.7 + 2 * t : 1.0;
     final text = TextPainter(
       text: TextSpan(
-        text: '+$amount',
+        text: label ?? '+$amount',
         style: TextStyle(
           fontSize: 30 * pop,
           fontWeight: FontWeight.w900,

@@ -40,8 +40,26 @@ class FortComponent extends SpriteComponent {
 
   bool get isCollapsed => hp <= 0;
 
+  /// First column of the pair this fort stands on. The main forts use
+  /// [ArenaGrid.coverColumnA]; bought extra forts can stand on any pair.
+  int coverColumn = ArenaGrid.coverColumnA;
+
   /// The two cover cells this fort occupies. Shots meet the fort here.
-  Rect get footprint => ArenaGrid.fortFootprint(side, coverRow);
+  Rect get footprint => ArenaGrid.fortFootprint(side, coverRow, coverColumn);
+
+  /// Where a rival's snowball meets this fort: taller than [footprint], as
+  /// tall as a kid's hit reach, so a lob aimed a little off a kid standing
+  /// behind the wall cannot slip past its edge and still hit them.
+  Rect get shieldFootprint =>
+      ArenaGrid.fortFootprint(side, coverRow, coverColumn, shieldHalfRows);
+
+  /// Half-height of [shieldFootprint], in rows.
+  static const double shieldHalfRows = 0.8;
+
+  /// True when [column] on this fort's side is behind it (away from the
+  /// river).
+  bool isBehind(int column) =>
+      side == KidSide.player ? column < coverColumn : column > coverColumn + 1;
 
   /// Puts the fort on a usable row. Columns stay on the cover pair, off
   /// the back line, so a kid can still shelter and peak a short lob over it.
@@ -49,8 +67,14 @@ class FortComponent extends SpriteComponent {
     var next = row;
     if (next < ArenaGrid.fortRowMin) next = ArenaGrid.fortRowMin;
     if (next > ArenaGrid.fortRowMax) next = ArenaGrid.fortRowMax;
-    coverRow = next;
-    position = ArenaGrid.fortAnchor(side, next);
+    placeAt(row: next, column: ArenaGrid.coverColumnA);
+  }
+
+  /// Puts the fort on any [row] and column pair starting at [column].
+  void placeAt({required int row, required int column}) {
+    coverRow = row.clamp(0, ArenaGrid.rows - 1);
+    coverColumn = column.clamp(0, ArenaGrid.columnsPerSide - 2);
+    position = ArenaGrid.fortAnchor(side, coverRow, coverColumn);
     _syncDepth();
   }
 
@@ -95,8 +119,7 @@ class FortComponent extends SpriteComponent {
     if (hp <= 0 || kid.isKo || kid.side != side) return false;
     final cell = ArenaGrid.nearestCell(kid.side, kid.position);
     return cell.row == coverRow &&
-        (cell.column == ArenaGrid.coverColumnA ||
-            cell.column == ArenaGrid.coverColumnB);
+        (cell.column == coverColumn || cell.column == coverColumn + 1);
   }
 
   void _syncSprite() {

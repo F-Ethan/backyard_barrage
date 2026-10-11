@@ -1910,7 +1910,6 @@ class BackyardBarrageGame extends FlameGame {
     maxHp: MetaState.baseKidHp,
     maxHps: [for (var i = 0; i < now.length; i++) meta.kidMaxHp(i)],
     difficulty: feel.settings.difficulty,
-    carries: true,
     healBonus: meta.healPerWave,
     reviveOne: meta.reviveOne,
   );

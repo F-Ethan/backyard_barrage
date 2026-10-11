@@ -3,7 +3,7 @@ import '../meta/difficulty.dart';
 /// How the crew's health carries from one wave into the next.
 ///
 /// Applies in both Campaign and Arcade. Easy and the first wave of a run
-/// start everyone at full health. [carries] false skips it (tests).
+/// start everyone at full health.
 ///
 /// | Difficulty | Standing kids | Knocked-out kids |
 /// | --- | --- | --- |
@@ -31,12 +31,11 @@ class CrewCarry {
     required int maxHp,
     List<int>? maxHps,
     required Difficulty difficulty,
-    required bool carries,
     int healBonus = 0,
     bool reviveOne = false,
   }) {
     int cap(int i) => maxHps != null && i < maxHps.length ? maxHps[i] : maxHp;
-    if (!carries || difficulty == Difficulty.easy) {
+    if (difficulty == Difficulty.easy) {
       return [for (var i = 0; i < hp.length; i++) cap(i)];
     }
     final heal = baseHeal(difficulty) + healBonus;

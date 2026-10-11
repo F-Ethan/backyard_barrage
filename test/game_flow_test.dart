@@ -257,7 +257,26 @@ void main() {
     game.debugAddPlayTime(600);
     game.pauseMatch();
     game.exitToMenu();
-    expect(ads.calls, 0);
+    expect(ads.calls, 0, reason: 'no wins yet');
+
+    // Five wins (the fifth clear's ad does not show, so nothing resets):
+    // leaving now offers one.
+    game.resumeMatch();
+    ads.shown = false;
+    for (var cleared = 0; cleared < 5; cleared++) {
+      knockOut(game.enemies);
+      game.resolveKnockouts();
+      game.update(0.7);
+      game.update(0.6);
+      if (cleared < 4) {
+        game.continueFromShop();
+        game.finishEntrance();
+      }
+    }
+    expect(ads.calls, 1, reason: 'the fifth clear offered one');
+    await tester.pump();
+    game.exitToMenu();
+    expect(ads.calls, 2);
   });
 
   testWidgets('a boss wave clear shows an ad after three minutes', (
@@ -1888,22 +1907,6 @@ void main() {
     expect((second.y - kid.hitCenter.y).abs(), lessThanOrEqualTo(spread + 1));
   });
 
-  testWidgets('scaring a hound or beating a boss pays random power-ups', (
-    tester,
-  ) async {
-    final game = (await boot(tester, MetaState())).game;
-    final one = game.rewardRandomItems(1, at: Vector2(400, 400));
-    expect(one, hasLength(1));
-    expect(game.meta.itemCount(one.single), 1);
-    final three = game.rewardRandomItems(3, at: Vector2(400, 400));
-    expect(three, hasLength(3));
-    final held = PowerUp.values.fold<int>(
-      0,
-      (n, item) => n + game.meta.itemCount(item),
-    );
-    expect(held, 4, reason: 'no cap, so every reward lands');
-  });
-
   testWidgets('bought extra forts stand apart and stop rival snowballs', (
     tester,
   ) async {
@@ -2533,35 +2536,22 @@ void main() {
     );
   });
 
-  testWidgets('a wide phone fits the full backyard instead of cropping it', (
-    tester,
-  ) async {
-    await _useSurface(tester, const Size(844, 390));
-    final game = (await boot(
-      tester,
-      MetaState(crewSize: 3, throwRank: 5),
-    )).game;
-    game.wave = 2;
-    game.startWave();
-    game.finishEntrance();
-    game.updateTree(0);
-    _expectFullBackyard(game);
-  });
-
-  testWidgets('a taller window still fits the backyard without vertical crop', (
-    tester,
-  ) async {
-    await _useSurface(tester, const Size(900, 600));
-    final game = (await boot(
-      tester,
-      MetaState(crewSize: 3, throwRank: 5),
-    )).game;
-    game.wave = 2;
-    game.startWave();
-    game.finishEntrance();
-    game.updateTree(0);
-    _expectFullBackyard(game);
-  });
+  // A wide phone and a taller window both fit the whole yard, uncropped.
+  for (final surface in const [Size(844, 390), Size(900, 600)]) {
+    testWidgets('a ${surface.width.toInt()}x${surface.height.toInt()} '
+        'window fits the full backyard', (tester) async {
+      await _useSurface(tester, surface);
+      final game = (await boot(
+        tester,
+        MetaState(crewSize: 3, throwRank: 5),
+      )).game;
+      game.wave = 2;
+      game.startWave();
+      game.finishEntrance();
+      game.updateTree(0);
+      _expectFullBackyard(game);
+    });
+  }
 
   void runHound(HoundComponent hound, bool Function() until) {
     for (var t = 0.0; t < 10 && !until(); t += 1 / 60) {

@@ -6,14 +6,12 @@ void main() {
   List<int> carry(
     List<int> hp,
     Difficulty d, {
-    bool carries = true,
     int heal = 0,
     bool revive = false,
   }) => CrewCarry.next(
     hp: hp,
     maxHp: 3,
     difficulty: d,
-    carries: carries,
     healBonus: heal,
     reviveOne: revive,
   );

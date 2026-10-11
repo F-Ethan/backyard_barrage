@@ -48,12 +48,6 @@ void main() {
     expect(ArenaGrid.rows, greaterThan(ArenaGrid.columnsPerSide));
     expect(ArenaGrid.verticalSpan, greaterThan(ArenaGrid.horizontalSpan));
     expect(ArenaGrid.playerRight, lessThan(ArenaGrid.enemyLeft));
-    expect(
-      ArenaGrid.inNeutral((ArenaGrid.playerRight + ArenaGrid.enemyLeft) / 2),
-      isTrue,
-    );
-    expect(ArenaGrid.inNeutral(ArenaGrid.playerLeft), isFalse);
-    expect(ArenaGrid.inNeutral(ArenaGrid.enemyRight), isFalse);
   });
 
   test('player cells stay out of the enemy half', () {
@@ -63,8 +57,6 @@ void main() {
         final enemy = ArenaGrid.cellCenter(KidSide.enemy, column, row);
         expect(player.x, lessThanOrEqualTo(ArenaGrid.playerRight));
         expect(enemy.x, greaterThanOrEqualTo(ArenaGrid.enemyLeft));
-        expect(ArenaGrid.inNeutral(player.x), isFalse);
-        expect(ArenaGrid.inNeutral(enemy.x), isFalse);
       }
     }
   });

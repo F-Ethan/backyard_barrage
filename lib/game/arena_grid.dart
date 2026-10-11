@@ -194,23 +194,6 @@ class ArenaGrid {
     return fortRowMin + rng.nextInt(span);
   }
 
-  static bool isCoverCell(int column, int row) {
-    return row == coverRow &&
-        (column == coverColumnA || column == coverColumnB);
-  }
-
-  static int get coverCellCount {
-    var count = 0;
-    for (var column = 0; column < columnsPerSide; column++) {
-      for (var row = 0; row < rows; row++) {
-        if (isCoverCell(column, row)) count++;
-      }
-    }
-    return count;
-  }
-
-  static bool inNeutral(double x) => x > playerRight && x < enemyLeft;
-
   static Rect field(KidSide side) {
     if (side == KidSide.player) {
       return const Rect.fromLTRB(playerLeft, rowBack, playerRight, rowFront);

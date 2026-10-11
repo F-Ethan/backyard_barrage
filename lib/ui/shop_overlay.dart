@@ -45,19 +45,39 @@ class _ShopOverlayState extends State<ShopOverlay> {
 
   /// The Items tab (one-use power-ups) is showing instead of a skill group.
   bool _items = false;
-  SkillBranch _branch = SkillBranch.throwSpeed;
+
+  /// Opens on the team's shared skills in Fight (Pressure first).
+  SkillBranch _branch = SkillBranch.pressure;
 
   /// Which skills show: a kid's own (Health, Shield, …) by index, or the
   /// team's shared ones when null. Picked with the buttons by Next wave.
-  int? _filter = 0;
+  int? _filter;
   _Purchase? _lastPurchase;
   int _purchaseSerial = 0;
 
   /// The kid a purchase in the open branch goes to: the picked kid for a
-  /// personal branch, 0 (unused) for a team one.
-  int get _owner => SkillTree.isPersonal(_branch)
-      ? (_filter ?? 0).clamp(0, widget.game.meta.crewSize - 1)
-      : 0;
+  /// personal branch (the starter if the pick is not in the crew), 0
+  /// (unused) for a team one.
+  int get _owner {
+    if (!SkillTree.isPersonal(_branch)) return 0;
+    final crew = widget.game.meta.crew;
+    final pick = _filter;
+    return pick != null && crew.contains(pick) ? pick : crew.first;
+  }
+
+  /// Team → Crew: [kid] joins as the next crew place.
+  Future<void> _recruit(int kid) async {
+    final meta = widget.game.meta;
+    final node = meta.nextKidNode;
+    if (node == null) return;
+    final cost = meta.costOf(node.id);
+    if (!meta.recruit(kid)) return;
+    widget.game.feel.purchased();
+    setState(() {
+      _lastPurchase = _Purchase('join-$kid', cost, ++_purchaseSerial);
+    });
+    await widget.game.persist();
+  }
 
   Future<void> _buy(SkillNode node) async {
     final kid = _owner;
@@ -189,6 +209,9 @@ class _ShopOverlayState extends State<ShopOverlay> {
                   child: Column(
                     children: [
                       _Header(
+                        onBack: game.backFromSkills,
+                        onSettings: fromDefeat ? null : game.openSettings,
+                        feel: game.feel,
                         title: fromDefeat
                             ? 'Skills'
                             : 'Wave ${game.wave} clear',
@@ -285,40 +308,71 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                                 style: BarrageType.muted,
                                               ),
                                               SizedBox(height: tokens.space.sm),
-                                              for (
-                                                var i = 0;
-                                                i < chain.length;
-                                                i++
-                                              )
-                                                _NodeRow(
-                                                  node: chain[i],
-                                                  cost: meta.costOf(
-                                                    chain[i].id,
-                                                    kid: owner,
+                                              // Crew: every kid by name,
+                                              // unlocked in any order.
+                                              if (_branch == SkillBranch.team)
+                                                for (final kid in const [
+                                                  0,
+                                                  1,
+                                                  2,
+                                                ])
+                                                  _JoinRow(
+                                                    kid: kid,
+                                                    inCrew: meta.inCrew(kid),
+                                                    cost: meta.nextKidCost,
+                                                    affordable: meta.canBuyKid,
+                                                    feel: game.feel,
+                                                    celebrate:
+                                                        _lastPurchase?.id ==
+                                                            'join-$kid'
+                                                        ? _lastPurchase!.serial
+                                                        : null,
+                                                    onUnlock: () =>
+                                                        _recruit(kid),
+                                                  )
+                                              else
+                                                for (
+                                                  var i = 0;
+                                                  i < chain.length;
+                                                  i++
+                                                )
+                                                  _NodeRow(
+                                                    detail: personal
+                                                        ? SkillTree.personalDetail(
+                                                            chain[i],
+                                                            KidColors.nameOf(
+                                                              owner,
+                                                            ),
+                                                          )
+                                                        : chain[i].detail,
+                                                    node: chain[i],
+                                                    cost: meta.costOf(
+                                                      chain[i].id,
+                                                      kid: owner,
+                                                    ),
+                                                    owned: meta.ownsFor(
+                                                      owner,
+                                                      chain[i].id,
+                                                    ),
+                                                    lockReason: meta.lockReason(
+                                                      chain[i].id,
+                                                      kid: owner,
+                                                    ),
+                                                    affordable: meta.canBuy(
+                                                      chain[i].id,
+                                                      kid: owner,
+                                                    ),
+                                                    continues:
+                                                        from + i <
+                                                        full.length - 1,
+                                                    feel: game.feel,
+                                                    celebrate:
+                                                        _lastPurchase?.id ==
+                                                            chain[i].id
+                                                        ? _lastPurchase!.serial
+                                                        : null,
+                                                    onBuy: () => _buy(chain[i]),
                                                   ),
-                                                  owned: meta.ownsFor(
-                                                    owner,
-                                                    chain[i].id,
-                                                  ),
-                                                  lockReason: meta.lockReason(
-                                                    chain[i].id,
-                                                    kid: owner,
-                                                  ),
-                                                  affordable: meta.canBuy(
-                                                    chain[i].id,
-                                                    kid: owner,
-                                                  ),
-                                                  continues:
-                                                      from + i <
-                                                      full.length - 1,
-                                                  feel: game.feel,
-                                                  celebrate:
-                                                      _lastPurchase?.id ==
-                                                          chain[i].id
-                                                      ? _lastPurchase!.serial
-                                                      : null,
-                                                  onBuy: () => _buy(chain[i]),
-                                                ),
                                             ],
                                           ),
                                         ),
@@ -342,21 +396,24 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                 ink: tokens.ink,
                                 count: meta.teamRanks,
                               ),
-                              for (var i = 0; i < meta.crewSize; i++)
+                              for (final kid in meta.crew)
                                 (
-                                  key: Key('shop-filter-kid-$i'),
-                                  label: KidColors.nameOf(i),
-                                  color: KidColors.of(i),
-                                  ink: KidColors.deepOf(i),
-                                  count: _kidTotal(i),
+                                  key: Key('shop-filter-kid-$kid'),
+                                  label: KidColors.nameOf(kid),
+                                  color: KidColors.of(kid),
+                                  ink: KidColors.deepOf(kid),
+                                  count: _kidTotal(kid),
                                 ),
                             ],
                             selected: _items
                                 ? null
-                                : (_filter == null ? 0 : _filter! + 1),
+                                : (_filter == null
+                                      ? 0
+                                      : meta.crew.indexOf(_filter!) + 1),
                             compact: compact,
-                            onSelect: (index) =>
-                                _selectFilter(index == 0 ? null : index - 1),
+                            onSelect: (index) => _selectFilter(
+                              index == 0 ? null : meta.crew[index - 1],
+                            ),
                           ),
                           const Spacer(),
                           DraftImageButton(
@@ -391,6 +448,9 @@ class _ShopOverlayState extends State<ShopOverlay> {
 
 class _Header extends StatelessWidget {
   const _Header({
+    required this.onBack,
+    required this.onSettings,
+    required this.feel,
     required this.title,
     required this.reward,
     required this.coins,
@@ -400,6 +460,12 @@ class _Header extends StatelessWidget {
     required this.compact,
   });
 
+  /// Back to the wave report (or the defeat summary).
+  final VoidCallback onBack;
+
+  /// Opens Settings between waves; null hides the gear.
+  final VoidCallback? onSettings;
+  final FeelBus feel;
   final String title;
   final int? reward;
   final int coins;
@@ -415,6 +481,28 @@ class _Header extends StatelessWidget {
     final purchase = this.purchase;
     return Row(
       children: [
+        Semantics(
+          button: true,
+          label: 'Back',
+          child: PressScale(
+            key: const Key('shop-back'),
+            pressedScale: 0.92,
+            onTap: () {
+              feel.uiTap();
+              onBack();
+            },
+            child: Container(
+              width: compact ? 40 : 44,
+              height: compact ? 40 : 44,
+              decoration: BoxDecoration(
+                color: tokens.lockedFill,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.arrow_back_rounded, color: tokens.ink),
+            ),
+          ),
+        ),
+        SizedBox(width: tokens.space.sm),
         Expanded(
           child: Text(
             title,
@@ -472,6 +560,17 @@ class _Header extends StatelessWidget {
               ),
           ],
         ),
+        if (onSettings != null) ...[
+          SizedBox(width: tokens.space.sm),
+          KitIconButton(
+            key: const Key('shop-settings'),
+            kind: UiIconKind.settings,
+            semanticLabel: 'Settings',
+            size: compact ? 40 : 44,
+            feel: feel,
+            onPressed: onSettings!,
+          ),
+        ],
       ],
     );
   }
@@ -731,10 +830,143 @@ class _BranchTile extends StatelessWidget {
   }
 }
 
+/// One kid in Team → Crew: their picture and name, then "In the crew" or
+/// an Unlock button at the next crew place's price.
+class _JoinRow extends StatelessWidget {
+  const _JoinRow({
+    required this.kid,
+    required this.inCrew,
+    required this.cost,
+    required this.affordable,
+    required this.feel,
+    required this.onUnlock,
+    this.celebrate,
+  });
+
+  final int kid;
+  final bool inCrew;
+
+  /// Price of the next crew place, or null when the crew is full.
+  final int? cost;
+  final bool affordable;
+  final FeelBus feel;
+  final VoidCallback onUnlock;
+  final int? celebrate;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final color = KidColors.of(kid);
+    final name = KidColors.nameOf(kid);
+    final price = cost;
+    Widget row = Container(
+      key: Key('join-row-$kid'),
+      margin: EdgeInsets.only(bottom: tokens.space.sm),
+      padding: EdgeInsets.symmetric(
+        horizontal: tokens.space.md,
+        vertical: tokens.space.sm,
+      ),
+      decoration: BoxDecoration(
+        color: inCrew ? tokens.ownedTint : tokens.surface,
+        borderRadius: tokens.radii.cardAll,
+        border: Border.all(color: color.withValues(alpha: 0.6), width: 1.5),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color.withValues(alpha: 0.18),
+              border: Border.all(color: color, width: 2),
+            ),
+            child: ClipOval(
+              child: Transform.scale(
+                scale: 1.9,
+                alignment: const Alignment(0, -0.55),
+                child: Image.asset(
+                  'assets/images/${SeasonAssets.crewDir(kid)}kid_idle_512.png',
+                  filterQuality: FilterQuality.medium,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: tokens.space.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  name,
+                  style: BarrageType.heading.copyWith(
+                    color: KidColors.deepOf(kid),
+                  ),
+                ),
+                Text(
+                  inCrew
+                      ? '$name is on your crew.'
+                      : '$name joins your crew next wave.',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: BarrageType.muted,
+                ),
+              ],
+            ),
+          ),
+          if (inCrew)
+            TagPill(
+              key: Key('joined-$kid'),
+              color: tokens.ownedTint,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_rounded, size: 18, color: tokens.primary),
+                  const SizedBox(width: 4),
+                  Text(
+                    'In the crew',
+                    style: BarrageType.button.copyWith(
+                      fontSize: 14,
+                      color: tokens.primaryDeep,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (price != null)
+            DraftImageButton(
+              key: Key('unlock-$kid'),
+              label: 'Unlock $name · $price',
+              enabled: affordable,
+              onPressed: onUnlock,
+              width: 190,
+              height: 44,
+              fontSize: 14,
+              feel: feel,
+            ),
+        ],
+      ),
+    );
+    if (celebrate != null && !context.motion.reduced) {
+      row = row
+          .animate(key: ValueKey(celebrate))
+          .scale(
+            begin: const Offset(0.96, 0.96),
+            end: const Offset(1, 1),
+            duration: context.motion.slow,
+            curve: context.motion.spring,
+          );
+    }
+    return row;
+  }
+}
+
 enum _NodeState { owned, affordable, short, locked }
 
 class _NodeRow extends StatelessWidget {
   const _NodeRow({
+    required this.detail,
     required this.node,
     required this.cost,
     required this.owned,
@@ -747,6 +979,9 @@ class _NodeRow extends StatelessWidget {
   });
 
   final SkillNode node;
+
+  /// What it does (with the kid's name for their own skills).
+  final String detail;
 
   /// Price now (crew nodes rise after a lost teammate).
   final int cost;
@@ -831,7 +1066,7 @@ class _NodeRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  lockReason ?? node.detail,
+                  lockReason ?? detail,
                   maxLines: 2,
                   softWrap: true,
                   overflow: TextOverflow.ellipsis,

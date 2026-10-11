@@ -18,6 +18,7 @@ import 'coin_amount.dart';
 import 'difficulty_picker.dart';
 import 'draft_button.dart';
 import 'motion.dart';
+import 'new_game.dart';
 import 'season_home_backdrop.dart';
 import 'settings_panel.dart';
 
@@ -100,6 +101,17 @@ class _MainMenuState extends State<MainMenu> {
     widget.onPlay(slot);
   }
 
+  /// Arcade's New Game from the home card: ask, wipe that wallet, play.
+  Future<void> _newGame(PlayMode mode) async {
+    final profile = _profile;
+    if (profile == null) return;
+    widget.feel.uiTap();
+    if (!await confirmNewGame(context, feel: widget.feel)) return;
+    if (!mounted) return;
+    profile.wallet(mode, widget.feel.settings.difficulty).startOver();
+    await _play(mode);
+  }
+
   Future<void> _commitSettings(GameSettings next) async {
     widget.feel.apply(next);
     if (mounted) setState(() {});
@@ -134,6 +146,7 @@ class _MainMenuState extends State<MainMenu> {
                       difficulty: widget.feel.settings.difficulty,
                       onDifficulty: _setDifficulty,
                       onPlay: _play,
+                      onNewGame: _newGame,
                       onSettings: () => setState(() => _settingsOpen = true),
                     ),
                   ),
@@ -168,8 +181,18 @@ class _HomeLayout extends StatelessWidget {
     required this.difficulty,
     required this.onDifficulty,
     required this.onPlay,
+    required this.onNewGame,
     required this.onSettings,
   });
+
+  /// Something to wipe: a run to resume, coins, skills, items, or score.
+  static bool _hasRun(MetaState wallet) =>
+      wallet.canResume ||
+      wallet.coins > 0 ||
+      wallet.score > 0 ||
+      wallet.items.isNotEmpty ||
+      wallet.teamRanks > 0 ||
+      wallet.crewSize > 1;
 
   final _MenuSize size;
   final PlayerSave profile;
@@ -177,6 +200,7 @@ class _HomeLayout extends StatelessWidget {
   final Difficulty difficulty;
   final ValueChanged<Difficulty> onDifficulty;
   final ValueChanged<PlayMode> onPlay;
+  final ValueChanged<PlayMode> onNewGame;
   final VoidCallback onSettings;
 
   @override
@@ -276,6 +300,11 @@ class _HomeLayout extends StatelessWidget {
                 compact: compact,
                 wide: wide,
                 onTap: () => onPlay(mode),
+                onNewGame:
+                    mode == PlayMode.campaign &&
+                        _hasRun(profile.wallet(mode, difficulty))
+                    ? () => onNewGame(mode)
+                    : null,
               ),
             ),
           ),
@@ -599,6 +628,7 @@ class _ModeCard extends StatelessWidget {
     required this.compact,
     required this.wide,
     required this.onTap,
+    this.onNewGame,
   });
 
   final PlayMode mode;
@@ -607,6 +637,9 @@ class _ModeCard extends StatelessWidget {
   final bool compact;
   final bool wide;
   final VoidCallback onTap;
+
+  /// Arcade with a run under way: wipe it and play from wave 1.
+  final VoidCallback? onNewGame;
 
   @override
   Widget build(BuildContext context) {
@@ -775,7 +808,23 @@ class _ModeCard extends StatelessWidget {
                 ),
               ),
               SizedBox(width: tokens.space.sm),
-              playPill,
+              if (onNewGame == null)
+                playPill
+              else
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    playPill,
+                    SizedBox(height: compact ? 4 : tokens.space.sm),
+                    NewGameButton(
+                      key: Key('new-game-${mode.name}'),
+                      compact: compact,
+                      onDark: primary,
+                      onPressed: onNewGame!,
+                    ),
+                  ],
+                ),
             ],
           ),
         ),

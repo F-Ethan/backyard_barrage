@@ -15,7 +15,7 @@ enum PlayMode {
 
   /// One line on the home card. Matches the defeat rules.
   String get blurb => switch (this) {
-    PlayMode.arcade => 'Skills wipe on defeat. Coins stay.',
+    PlayMode.arcade => 'A loss wipes skills and half the coins you earned.',
     PlayMode.campaign => 'Skills stay. A loss sends you back to your stage.',
   };
 

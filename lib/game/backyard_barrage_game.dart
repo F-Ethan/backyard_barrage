@@ -447,7 +447,7 @@ class BackyardBarrageGame extends FlameGame {
         final down = players.firstWhere((kid) => kid.isKo);
         down
           ..revive()
-          ..shieldHits = meta.kidShield(players.indexOf(down))
+          ..shieldHits = meta.kidShield(down.kidId)
           ..armored = _armorTime > 0
           ..syncDepth();
         _burst(down.hitCenter, depthY: down.hitCenter.y, power: 0.8);
@@ -795,8 +795,7 @@ class BackyardBarrageGame extends FlameGame {
     }
     final selected = identical(kid, _selected);
     final scale =
-        meta.kidPoise(math.max(0, players.indexOf(kid))) *
-        _tuning().allyStunScale;
+        meta.kidPoise(math.max(0, kid.kidId)) * _tuning().allyStunScale;
     for (var i = 1; i < hits; i++) {
       if (kid.blockWithShield()) {
         continue;
@@ -1006,8 +1005,9 @@ class BackyardBarrageGame extends FlameGame {
     if (paused) resumeEngine();
   }
 
+  /// Settings over Pause, or over the wave report and skills between waves.
   void openSettings() {
-    if (phase != MatchPhase.paused) return;
+    if (phase != MatchPhase.paused && phase != MatchPhase.shop) return;
     if (!overlays.isActive('settings')) overlays.add('settings');
   }
 
@@ -1028,7 +1028,7 @@ class BackyardBarrageGame extends FlameGame {
     _kit = kit;
     _bg.sprite = _backdrop(kit);
     for (var i = 0; i < players.length; i++) {
-      players[i].applyPoses(kit.posesForKid(i));
+      players[i].applyPoses(kit.posesForKid(players[i].kidId));
     }
     for (final kid in enemies) {
       if (kid.isBoss) continue;
@@ -1075,6 +1075,11 @@ class BackyardBarrageGame extends FlameGame {
       }
     }
 
+    // A run that is only its first kid starts with the kid picked in
+    // Settings (a new game, a fresh wallet, or after a Campaign loss).
+    if (wave <= 1 && meta.crewSize == 1) {
+      meta.setStarter(feel.settings.leadKid);
+    }
     final crewHp = _nextCrewHp();
     while (players.length > meta.crewSize) {
       players.removeLast().removeFromParent();
@@ -1087,7 +1092,15 @@ class BackyardBarrageGame extends FlameGame {
     _waveStartHp = List<int>.of(crewHp);
     for (var i = 0; i < players.length; i++) {
       final kid = players[i];
-      kid.maxHp = meta.kidMaxHp(i);
+      // Crew places can change hands (a new starter, or a different kid
+      // bought back after a checkpoint): match the kid to the place.
+      final id = meta.kidAt(i);
+      if (kid.kidId != id) {
+        kid
+          ..kidId = id
+          ..applyPoses(_kit.posesForKid(id));
+      }
+      kid.maxHp = meta.kidMaxHp(id);
       final goal = ArenaGrid.slot(KidSide.player, i);
       if (crewHp[i] <= 0) {
         // Knocked out in an earlier wave and not brought back.
@@ -1097,14 +1110,19 @@ class BackyardBarrageGame extends FlameGame {
       }
       kid.revive();
       kid.hp = crewHp[i];
-      kid.shieldHits = meta.kidShield(i);
+      kid.shieldHits = meta.kidShield(id);
       kid.syncHealthSeen();
       kid.position = Vector2(-_offstage - i * 36, goal.y);
       kid.setWalking(true);
       kid.syncDepth();
       _entrance.add((kid: kid, goal: goal));
     }
-    _setSelected(_firstLiving(players));
+    // The kid picked in Settings leads, if they are in the crew and up.
+    final lead = feel.settings.leadKid;
+    _setSelected(
+      players.where((kid) => kid.kidId == lead && !kid.isKo).firstOrNull ??
+          _firstLiving(players),
+    );
     _ensureAllyBrains();
 
     // A boss wave is the boss plus a growing escort; the first comes alone.
@@ -1260,13 +1278,15 @@ class BackyardBarrageGame extends FlameGame {
 
   KidComponent _makeKid(KidSide side, int slot) {
     final player = side == KidSide.player;
+    final id = player ? meta.kidAt(slot) : -1;
     return KidComponent(
         side: side,
-        poses: player ? _kit.posesForKid(slot) : _kit.enemyPoses,
+        poses: player ? _kit.posesForKid(id) : _kit.enemyPoses,
         position: ArenaGrid.slot(side, slot),
         size: Vector2.all(ArenaGrid.kidSize),
-        maxHp: player ? meta.kidMaxHp(slot) : _tuning().enemyHitsToKo,
+        maxHp: player ? meta.kidMaxHp(id) : _tuning().enemyHitsToKo,
       )
+      ..kidId = id
       ..shieldSpot = player ? _crewShield : null
       ..onShieldBroken = _dropShield;
   }
@@ -1852,6 +1872,18 @@ class BackyardBarrageGame extends FlameGame {
     if (!overlays.isActive('shop')) overlays.add('shop');
   }
 
+  /// The skills page's back button: back to the wave report between waves,
+  /// or to the defeat summary after a loss.
+  void backFromSkills() {
+    if (shoppingFromDefeat) {
+      closeSkillTree();
+      return;
+    }
+    if (phase != MatchPhase.shop) return;
+    if (overlays.isActive('shop')) overlays.remove('shop');
+    if (!overlays.isActive('report')) overlays.add('report');
+  }
+
   /// Back to the defeat summary. Between waves this starts the next wave.
   void closeSkillTree() {
     if (!shoppingFromDefeat) {
@@ -1869,9 +1901,29 @@ class BackyardBarrageGame extends FlameGame {
   /// new build and a new score.
   void startOverFromDefeat() {
     if (phase != MatchPhase.defeat) return;
+    startNewGame();
+  }
+
+  /// Arcade's New Game: wipe this wallet (coins, skills, items, score; the
+  /// best score stays) and play again from wave 1. Works from the defeat
+  /// summary, Pause → Settings, and between waves.
+  void startNewGame() {
     meta.startOver();
     lastDefeat = null;
+    defeatBefore = null;
+    defeatAfter = null;
     carriedCoins = 0;
+    shoppingFromDefeat = false;
+    _clearHound();
+    for (final name in const [
+      'settings',
+      'pause',
+      'report',
+      'shop',
+      'defeat',
+    ]) {
+      if (overlays.isActive(name)) overlays.remove(name);
+    }
     unawaited(persist());
     retryFromDefeat();
   }
@@ -1900,15 +1952,15 @@ class BackyardBarrageGame extends FlameGame {
     return [
       for (var i = 0; i < meta.crewSize; i++)
         from != null && i < from.length
-            ? from[i].clamp(0, meta.kidMaxHp(i))
-            : meta.kidMaxHp(i),
+            ? from[i].clamp(0, meta.kidMaxHp(meta.kidAt(i)))
+            : meta.kidMaxHp(meta.kidAt(i)),
     ];
   }
 
   List<int> _carriedHp(List<int> now) => CrewCarry.next(
     hp: now,
     maxHp: MetaState.baseKidHp,
-    maxHps: [for (var i = 0; i < now.length; i++) meta.kidMaxHp(i)],
+    maxHps: [for (var i = 0; i < now.length; i++) meta.kidMaxHp(meta.kidAt(i))],
     difficulty: feel.settings.difficulty,
     healBonus: meta.healPerWave,
     reviveOne: meta.reviveOne,
@@ -2093,8 +2145,9 @@ class BackyardBarrageGame extends FlameGame {
     if (pending == null || index >= pending.length || pending[index] > 0) {
       return false;
     }
-    if (!meta.buyRevive(index)) return false;
-    pending[index] = meta.kidMaxHp(index);
+    final kid = meta.kidAt(index);
+    if (!meta.buyRevive(kid)) return false;
+    pending[index] = meta.kidMaxHp(kid);
     _afterReportPurchase();
     return true;
   }
@@ -2105,7 +2158,7 @@ class BackyardBarrageGame extends FlameGame {
     final pending = _pendingCrewHp;
     if (pending == null || index >= pending.length) return false;
     final hp = pending[index];
-    if (hp <= 0 || hp >= meta.kidMaxHp(index)) return false;
+    if (hp <= 0 || hp >= meta.kidMaxHp(meta.kidAt(index))) return false;
     if (!meta.buyHeal(wave: wave)) return false;
     pending[index] = hp + 1;
     _afterReportPurchase();
@@ -2133,17 +2186,18 @@ class BackyardBarrageGame extends FlameGame {
     feel.defeated();
     lastScorePenalty = meta.scoreDefeat(wave);
     defeatBefore = CrewSnapshot.of(meta, [
-      for (var i = 0; i < players.length; i++)
+      for (final kid in players)
         KidState(
-          hp: players[i].hp,
-          maxHp: meta.kidMaxHp(i),
-          shield: players[i].shieldHits,
-          upgrades: meta.kidUpgrades(i),
+          kid: kid.kidId,
+          hp: kid.hp,
+          maxHp: meta.kidMaxHp(kid.kidId),
+          shield: kid.shieldHits,
+          upgrades: meta.kidUpgrades(kid.kidId),
         ),
     ]);
     final result = meta.resetRun(lostOn: wave);
     defeatAfter = CrewSnapshot.of(meta, [
-      for (var i = 0; i < players.length; i++) KidState.fresh(meta, i),
+      for (final kid in players) KidState.fresh(meta, kid.kidId),
     ]);
     lastDefeat = result;
     carriedCoins = meta.coins;
@@ -2334,11 +2388,12 @@ class BackyardBarrageGame extends FlameGame {
     rivalCurve: true,
   );
 
-  /// Bot tuning for kid [index] (its own Quicker pals and Faster pals).
-  DifficultyTuning _allyTuning(int index) {
+  /// Bot tuning for crew kid [kid] (their own Quicker pals and Faster
+  /// pals).
+  DifficultyTuning _allyTuning(int kid) {
     return DifficultyTuning.of(Difficulty.easy, wave: wave).scaled(
-      gapScale: meta.kidGapScale(index),
-      chargeScale: meta.kidChargeScale(index),
+      gapScale: meta.kidGapScale(kid),
+      chargeScale: meta.kidChargeScale(kid),
     );
   }
 
@@ -2406,13 +2461,10 @@ class BackyardBarrageGame extends FlameGame {
   /// Bots scale from this, so their windup stays put when the bar speeds up.
   /// The selected kid's full-charge hold (its own Quicker throw ranks).
   double _baseChargeSeconds() =>
-      CombatRules.playerChargeSeconds(meta.kidThrowRank(_selectedIndex));
+      CombatRules.playerChargeSeconds(meta.kidThrowRank(_selectedKidId));
 
-  int get _selectedIndex {
-    final kid = _selected;
-    if (kid == null) return 0;
-    return math.max(0, players.indexOf(kid));
-  }
+  /// The selected kid's crew id (Mike when nobody is selected).
+  int get _selectedKidId => math.max(0, _selected?.kidId ?? 0);
 
   double _playerChargeSeconds() =>
       _baseChargeSeconds() * _tuning().playerChargeTimeScale;
@@ -2504,7 +2556,7 @@ class BackyardBarrageGame extends FlameGame {
           rivals: players,
           wave: wave,
           rng: _rng,
-          tuning: () => _allyTuning(i),
+          tuning: () => _allyTuning(kid.kidId),
           initialDelay: profile.throwGap((0.35 + i * 0.2).clamp(0.0, 1.0)),
           onFire: _onAllyFire,
           isFighting: () => phase == MatchPhase.fight && !_settling,
@@ -2513,8 +2565,8 @@ class BackyardBarrageGame extends FlameGame {
           isManual: () => identical(_selected, kid),
           currentWave: () => wave,
           playerChargeSeconds: () =>
-              CombatRules.playerChargeSeconds(meta.kidThrowRank(i)),
-          aimJitterScale: () => meta.kidAimScale(i),
+              CombatRules.playerChargeSeconds(meta.kidThrowRank(kid.kidId)),
+          aimJitterScale: () => meta.kidAimScale(kid.kidId),
         ),
       );
     }
@@ -2652,7 +2704,7 @@ class BackyardBarrageGame extends FlameGame {
       charge: charge,
       facingRight: true,
       speedScale: CombatRules.projectileSpeedScale(
-        meta.kidThrowRank(_selectedIndex),
+        meta.kidThrowRank(_selectedKidId),
       ),
       originY: kid.throwOrigin.y,
       trackY: kid.hitCenter.y,
@@ -2680,7 +2732,7 @@ class BackyardBarrageGame extends FlameGame {
       owner: owner,
       blockedByFort: true,
       forts: _allForts,
-      friendlyFortDamage: _tuning().friendlyFortDamage,
+      ownFortBlocks: _tuning().ownFortBlocks,
       passOwnFort: fromPlayer && meta.passesOwnFort,
       manualThrow: manualThrow,
       radius: fromPlayer
@@ -2786,11 +2838,9 @@ class BackyardBarrageGame extends FlameGame {
     final ally = target.side == KidSide.player;
     if (ally && _armorTime > 0) return false; // Frost armor
     if (!ally && _rivalArmorTime > 0) return false; // a rival's team armor
-    final hits = fromPlayer
-        ? meta.kidHits(math.max(0, players.indexOf(owner)))
-        : 1;
+    final hits = fromPlayer ? meta.kidHits(math.max(0, owner.kidId)) : 1;
     var scale = ally
-        ? meta.kidPoise(math.max(0, players.indexOf(target)))
+        ? meta.kidPoise(math.max(0, target.kidId))
         : meta.stunScaleFor(ally: false);
     // Difficulty shortens ally stun only. Rival brush-off and knockdown
     // stay the same length on Easy, Normal, and Hard.

@@ -12,6 +12,7 @@ import 'barrage_theme.dart';
 import 'coin_amount.dart';
 import 'draft_button.dart';
 import 'power_up_ui.dart';
+import 'new_game.dart';
 import 'report_kit.dart';
 import 'season_toggle.dart';
 import 'ui_assets.dart';
@@ -71,7 +72,8 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                     'Your build from then is back, everything bought '
                     'since is refunded, and half the coins earned '
                     'since are lost.'
-              : 'Skills reset. Unspent coins carry over.',
+              : 'Back to wave 1. Skills and potions reset, and half the '
+                    'coins earned this run are lost.',
           key: const Key('defeat-rule'),
           style: BarrageType.body,
         ),
@@ -100,10 +102,10 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
           for (var i = 0; i < before.kids.length; i++)
             KidCard(
               key: Key('defeat-kid-$i'),
-              kid: i,
+              kid: before.kids[i].kid,
               knockouts: i < game.kidKos.length ? game.kidKos[i] : 0,
               now: before.kids[i],
-              next: KidState.fresh(meta, i),
+              next: KidState.fresh(meta, before.kids[i].kid),
               nowCaption: 'Went down',
               nextCaption: 'At the retry',
             ),
@@ -208,7 +210,7 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                   SizedBox(width: tokens.space.sm),
                   DraftImageButton(
                     key: const Key('start-over'),
-                    label: 'Start over',
+                    label: 'New Game',
                     secondary: true,
                     leadingIcon: Icons.restart_alt_rounded,
                     onPressed: () => setState(() => _confirmStartOver = true),
@@ -260,8 +262,7 @@ class _StartOverConfirm extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          'Start over at wave 1 with 0 coins, no skills, and no items? '
-          'Your score goes back to 0. Your best score stays.',
+          newGameWarning,
           key: const Key('start-over-warning'),
           style: BarrageType.body,
           textAlign: TextAlign.center,
@@ -274,7 +275,7 @@ class _StartOverConfirm extends StatelessWidget {
           children: [
             DraftImageButton(
               key: const Key('start-over-yes'),
-              label: 'Yes, start over',
+              label: 'Yes, new game',
               leadingIcon: Icons.restart_alt_rounded,
               onPressed: game.startOverFromDefeat,
               width: 220,
@@ -323,7 +324,7 @@ class _Change {
   static List<_Change> between(CrewSnapshot before, CrewSnapshot after) {
     final changes = <_Change>[];
     for (var i = 0; i < before.kids.length && i < after.kids.length; i++) {
-      final name = KidColors.nameOf(i);
+      final name = KidColors.nameOf(before.kids[i].kid);
       if (!after.kids[i].inCrew) {
         changes.add(
           _Change(

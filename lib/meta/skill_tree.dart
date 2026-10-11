@@ -150,6 +150,48 @@ class SkillTree {
   ].length;
 
   /// 1-based rank of [id] within its chain, or 0 when unknown.
+  /// What a kid's own skill does, said with their [name] ("Mike gets a
+  /// quicker, stronger throw."). Team skills keep their own text.
+  static String personalDetail(SkillNode node, String name) {
+    if (!isPersonal(node.branch)) return node.detail;
+    final r = rankOf(node.id);
+    final first = r <= 1;
+    return switch (node.branch) {
+      SkillBranch.health => switch (r) {
+        1 => '$name gets 1 more heart.',
+        2 => '$name gets another heart.',
+        _ => '$name gets one more heart. Six in all.',
+      },
+      SkillBranch.shield =>
+        "$name's shield blocks ${SkillEffects.shield(r)} "
+            "hit${SkillEffects.shield(r) == 1 ? '' : 's'} every wave.",
+      SkillBranch.poise =>
+        first
+            ? '$name gets back up faster after a hit.'
+            : '$name gets back up even faster.',
+      SkillBranch.throwSpeed => switch (r) {
+        1 => '$name gets a quicker, stronger throw.',
+        5 => "$name's fastest throw yet.",
+        _ => "$name's throw is ready even faster.",
+      },
+      SkillBranch.damage =>
+        "$name's snowballs hit ${r == 1 ? 'twice' : '${SkillEffects.kidHits(r)} times'} as hard.",
+      SkillBranch.aim =>
+        first
+            ? '$name aims better when playing on their own.'
+            : '$name aims even better on their own.',
+      SkillBranch.reaction =>
+        first
+            ? '$name throws more often when playing on their own.'
+            : '$name throws even more often on their own.',
+      SkillBranch.charge =>
+        first
+            ? '$name gets a throw ready faster on their own.'
+            : '$name gets a throw ready even faster on their own.',
+      _ => node.detail,
+    };
+  }
+
   static int rankOf(String id) {
     final node = byId[id];
     if (node == null) return 0;

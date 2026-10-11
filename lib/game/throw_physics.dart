@@ -880,20 +880,19 @@ class ThrowPhysics {
 
   /// Fort vs snowball. Peak shots clear. A collapsed fort does not block
   /// either direction. Shots from behind your own standing fort are blocked
-  /// without damage unless [friendlyDamage] is on. Opponent shots that are
-  /// not at the peak damage a standing fort.
+  /// and never damage it. Opponent shots that are not at the peak damage a
+  /// standing fort.
   static FortShotResult resolveFortShot({
     required bool overlaps,
     required bool atPeak,
     required bool sameSide,
     required bool throwerBehind,
-    required bool friendlyDamage,
     bool collapsed = false,
   }) {
     if (!overlaps || atPeak || collapsed) return FortShotResult.none;
     if (sameSide && !throwerBehind) return FortShotResult.none;
     if (sameSide) {
-      return friendlyDamage ? FortShotResult.damaged : FortShotResult.blocked;
+      return FortShotResult.blocked;
     }
     return FortShotResult.damaged;
   }

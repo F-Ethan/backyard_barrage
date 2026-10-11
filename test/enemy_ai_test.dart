@@ -203,9 +203,9 @@ void main() {
       expect(hard.allyStunScale, 0.4);
       expect(hard.enemyHitsToKo, 3);
       expect(easy.scaled().enemyHitsToKo, easy.enemyHitsToKo);
-      expect(normal.friendlyFortDamage, isFalse);
-      expect(easy.friendlyFortDamage, isFalse);
-      expect(hard.friendlyFortDamage, isTrue);
+      expect(normal.ownFortBlocks, isFalse);
+      expect(easy.ownFortBlocks, isFalse);
+      expect(hard.ownFortBlocks, isTrue);
       final playerPace = ThrowPhysics.kidMoveSpeed();
       expect(hard.enemyStepSpeed, greaterThan(playerPace));
       expect(hard.enemyStepSpeed, lessThan(playerPace * 4));

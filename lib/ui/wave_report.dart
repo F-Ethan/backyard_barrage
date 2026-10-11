@@ -38,7 +38,17 @@ class _WaveReportState extends State<WaveReport> {
     return ReportSheet(
       key: const Key('wave-report'),
       title: 'Wave ${game.wave} report',
-      trailing: [TagPill(child: CoinAmount(amount: meta.coins))],
+      trailing: [
+        TagPill(child: CoinAmount(amount: meta.coins)),
+        KitIconButton(
+          key: const Key('report-settings'),
+          kind: UiIconKind.settings,
+          semanticLabel: 'Settings',
+          size: 44,
+          feel: game.feel,
+          onPressed: game.openSettings,
+        ),
+      ],
       body: [
         const ReportSection('Rewards'),
         PillRow(
@@ -51,19 +61,21 @@ class _WaveReportState extends State<WaveReport> {
         for (var i = 0; i < next.length; i++)
           KidCard(
             key: Key('report-kid-$i'),
-            kid: i,
+            kid: meta.kidAt(i),
             knockouts: game.kidKos[i],
             now: KidState(
+              kid: meta.kidAt(i),
               hp: i < game.players.length ? game.players[i].hp : 0,
-              maxHp: meta.kidMaxHp(i),
+              maxHp: meta.kidMaxHp(meta.kidAt(i)),
               shield: i < game.players.length ? game.players[i].shieldHits : 0,
-              upgrades: meta.kidUpgrades(i),
+              upgrades: meta.kidUpgrades(meta.kidAt(i)),
             ),
             next: KidState(
+              kid: meta.kidAt(i),
               hp: next[i],
-              maxHp: meta.kidMaxHp(i),
-              shield: meta.kidShield(i),
-              upgrades: meta.kidUpgrades(i),
+              maxHp: meta.kidMaxHp(meta.kidAt(i)),
+              shield: meta.kidShield(meta.kidAt(i)),
+              upgrades: meta.kidUpgrades(meta.kidAt(i)),
             ),
             action: _action(i, next[i], meta, healCost),
           ),
@@ -106,7 +118,7 @@ class _WaveReportState extends State<WaveReport> {
   Widget? _action(int i, int next, MetaState meta, int healCost) {
     final game = widget.game;
     if (next <= 0) {
-      final cost = meta.reviveCost(i);
+      final cost = meta.reviveCost(meta.kidAt(i));
       return DraftImageButton(
         key: Key('report-revive-$i'),
         label: 'Revive · $cost',
@@ -119,7 +131,7 @@ class _WaveReportState extends State<WaveReport> {
         feel: game.feel,
       );
     }
-    if (next < meta.kidMaxHp(i)) {
+    if (next < meta.kidMaxHp(meta.kidAt(i))) {
       return DraftImageButton(
         key: Key('report-heal-$i'),
         label: 'Heal · $healCost',

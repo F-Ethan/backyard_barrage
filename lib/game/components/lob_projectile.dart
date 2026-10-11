@@ -36,7 +36,7 @@ class LobProjectile extends SpriteComponent {
     this.landingRow = 0,
     this.apexRise = 0,
     this.landingDrop = 0,
-    this.friendlyFortDamage = false,
+    this.ownFortBlocks = false,
     this.passOwnFort = false,
     this.manualThrow = false,
     this.scripted = false,
@@ -96,7 +96,7 @@ class LobProjectile extends SpriteComponent {
 
   /// +1 toward the enemy half, -1 toward the player half.
   final double facing;
-  final bool friendlyFortDamage;
+  final bool ownFortBlocks;
 
   /// Bought lane node. Your own shots pass your fort. The base rule stays
   /// when this is false.
@@ -524,10 +524,10 @@ class LobProjectile extends SpriteComponent {
     if (sameSide && !behind) return false;
 
     // Easy and Normal: a shot that peaks past your own fort has already
-    // lofted over it. Hard skips this so a full lob from behind can still
-    // chip that fort. The other side's fort still stops a ball that flies
-    // through it.
-    if (groundTrack && sameSide && flightRange > 1 && !friendlyFortDamage) {
+    // lofted over it. Hard skips this, so your own fort stops a lob from
+    // behind it (a block, never damage). The other side's fort still
+    // stops a ball that flies through it.
+    if (groundTrack && sameSide && flightRange > 1 && !ownFortBlocks) {
       final apexX = originX + facing * flightRange * apexFraction;
       if (ThrowPhysics.peaksPastFort(
         apexX: apexX,
@@ -544,14 +544,11 @@ class LobProjectile extends SpriteComponent {
     }
     if (velocity.y < 0 && _apexWillClear(cover)) return false;
 
-    final friendly =
-        friendlyFortDamage && sameSide && cover.side == KidSide.player;
     final result = ThrowPhysics.resolveFortShot(
       overlaps: true,
       atPeak: false,
       sameSide: sameSide,
       throwerBehind: behind,
-      friendlyDamage: friendly,
       collapsed: cover.isCollapsed,
     );
     if (result == FortShotResult.none) return false;

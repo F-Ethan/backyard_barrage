@@ -184,6 +184,10 @@ class KidComponent extends SpriteComponent {
   }
 
   int _shieldHits = 0;
+
+  /// Which crew kid this is (0 Mike, 1 Beth, 2 Ruben), for their own
+  /// skills, hearts, and art. -1 for rivals and bosses.
+  int kidId = -1;
   int _shieldTop = 0;
 
   /// The shield has blocked a hit and still has some left.

@@ -39,6 +39,7 @@ Playable MVP loop on the gameplay branch:
 
 ## Known gaps
 
+- **Names and New Game are first-pass (Oct 2026).** Code, tests, and older docs still say `normal` / `hard` for what players now see as Hard / Insane. New Game from Settings mid-wave drops that wave without a defeat beat. The Campaign coin loss (half of this run's earnings) needs playtesting against the skill wipe.
 Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you notice something you are not fixing in the current PR. Remove or rewrite a row when it is actually fixed.
 
 - **Music loops are AAC.** `menu_loop.m4a` and `battle_loop_winter.m4a` (160 kbps) replace the WAVs: iOS cannot play the delivered Ogg, and the WAVs were 15MB each. AAC adds a few milliseconds of encoder padding, so the loop point may have a tiny gap; listen on device.

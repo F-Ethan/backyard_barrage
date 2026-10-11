@@ -1443,6 +1443,46 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('skill tabs count what the picked kid or team owns', (
+    tester,
+  ) async {
+    await _useSurface(tester, const Size(844, 390));
+    final meta = MetaState(coins: 3000, skills: {'team-2'});
+    for (final id in ['throw-1', 'throw-2', 'shield-1']) {
+      expect(meta.buy(id, kid: 0), isTrue);
+    }
+    expect(meta.buy('hp-1', kid: 1), isTrue);
+    final game = (await boot(tester, meta)).game;
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+    game.openShopFromReport();
+    await tester.pump();
+    String count(String key) => tester
+        .widgetList<Text>(
+          find.descendant(
+            of: find.byKey(Key(key)),
+            matching: find.byType(Text),
+          ),
+        )
+        .last
+        .data!;
+    // Name tabs total each kid's own ranks; Team totals the shared ones.
+    expect(count('shop-filter-kid-0-count'), '3');
+    expect(count('shop-filter-kid-1-count'), '1');
+    expect(count('shop-filter-team-count'), '${game.meta.teamRanks}');
+    // Group tabs split Mike's three: Fight 2 (Throw), Defense 1 (Shield).
+    expect(count('skill-group-count-fight'), '2');
+    expect(count('skill-group-count-defense'), '1');
+    expect(count('skill-group-count-crew'), '0');
+    await tester.tap(find.byKey(const Key('shop-filter-kid-1')));
+    await tester.pump();
+    expect(count('skill-group-count-crew'), '1', reason: "Beth's Health");
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('aim stays grey until a second kid is bought', (tester) async {
     await _useSurface(tester, const Size(844, 390));
     final game = (await boot(tester, MetaState(coins: 400))).game;
@@ -2636,6 +2676,28 @@ void main() {
 
     expect(await caughtOn(Difficulty.normal), isFalse);
     expect(await caughtOn(Difficulty.hard), isTrue);
+  });
+
+  testWidgets('the wave does not clear while a hound is still in play', (
+    tester,
+  ) async {
+    final game = (await boot(tester, MetaState())).game;
+    final kid = game.players.first;
+    final hound = game.releaseHound(kid);
+    runHound(hound, () => hound.state == HoundState.jump);
+    expect(game.houndInPlay, isTrue);
+
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.05);
+    expect(game.phase, MatchPhase.fight, reason: 'the hound is mid-leap');
+    expect(game.world.children.whereType<HoundComponent>(), isNotEmpty);
+
+    // Scared off: the clear goes ahead.
+    hound.scare();
+    game.update(0.05);
+    expect(game.houndInPlay, isFalse);
+    expect(game.phase, isNot(MatchPhase.fight));
   });
 
   testWidgets('a snowball scares the hound off until it lands', (tester) async {

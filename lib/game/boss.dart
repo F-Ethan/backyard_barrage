@@ -80,20 +80,31 @@ abstract final class BossRules {
   static const double waveWindupSeconds = 1.3;
 
   /// Seconds the ogre crouches, then hangs in the air, before it crashes.
-  static const double hopCrouchSeconds = 0.6;
-  static const double hopAirSeconds = 0.5;
+  static const double hopCrouchSeconds = 0.6 / attackPace;
+  static const double hopAirSeconds = 0.5 / attackPace;
+
+  /// Bosses attack this much faster than they first did (Oct 2026): every
+  /// gap, windup, and recovery is divided by it. The two dodge warnings
+  /// (the heat wave's lean-back and the spikes' cracks) keep their length.
+  static const double attackPace = 1.25;
 
   /// Peak of the ogre's hop, in pixels.
   static const double hopHeight = 70;
 
   /// Seconds between a boss's normal throws, and between its specials.
-  static double throwGap(Difficulty difficulty) => switch (difficulty) {
+  static double throwGap(Difficulty difficulty) =>
+      _baseThrowGap(difficulty) / attackPace;
+
+  static double specialGap(Difficulty difficulty) =>
+      _baseSpecialGap(difficulty) / attackPace;
+
+  static double _baseThrowGap(Difficulty difficulty) => switch (difficulty) {
     Difficulty.easy => 2.6,
     Difficulty.normal => 2.1,
     Difficulty.hard => 1.6,
   };
 
-  static double specialGap(Difficulty difficulty) => switch (difficulty) {
+  static double _baseSpecialGap(Difficulty difficulty) => switch (difficulty) {
     Difficulty.easy => 10,
     Difficulty.normal => 8.5,
     Difficulty.hard => 7,

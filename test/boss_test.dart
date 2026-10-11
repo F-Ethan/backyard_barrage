@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:backyard_barrage/game/boss.dart';
 import 'package:backyard_barrage/meta/difficulty.dart';
+import 'package:backyard_barrage/game/components/boss_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -72,5 +73,16 @@ void main() {
       BossArt.all,
       contains('characters/bosses/magma/magma_wave_push.png'),
     );
+  });
+
+  test('bosses attack 25% faster, but dodge warnings keep their length', () {
+    expect(BossRules.attackPace, 1.25);
+    expect(BossRules.throwGap(Difficulty.easy), closeTo(2.6 / 1.25, 1e-9));
+    expect(BossRules.throwGap(Difficulty.hard), closeTo(1.6 / 1.25, 1e-9));
+    expect(BossRules.specialGap(Difficulty.normal), closeTo(8.5 / 1.25, 1e-9));
+    expect(BossRules.hopCrouchSeconds, closeTo(0.48, 1e-9));
+    expect(BossController.throwWindupSeconds, closeTo(0.56, 1e-9));
+    expect(BossRules.waveWindupSeconds, 1.3);
+    expect(BossRules.spikeWarnSeconds(Difficulty.easy), 1.0);
   });
 }

@@ -1054,6 +1054,7 @@ class BackyardBarrageGame extends FlameGame {
     _paidKills.clear();
     killCoinsThisWave = 0;
     waveRewards.clear();
+    _clearWaitsOnHound = false;
     // A float still up when the report paused the yard goes with it.
     for (final float in world.children.whereType<RewardFloat>().toList()) {
       float.removeFromParent();
@@ -1596,6 +1597,16 @@ class BackyardBarrageGame extends FlameGame {
   HoundSprites? _houndSprites;
   final List<HoundComponent> _hounds = [];
 
+  /// A hound still in play: not yet scared off and not gone. While one is,
+  /// the wave does not clear, even with every rival down.
+  bool get houndInPlay => _hounds.any(
+    (hound) =>
+        hound.state != HoundState.flee && hound.state != HoundState.gone,
+  );
+
+  /// Every rival is down, and the clear is waiting for a hound.
+  bool _clearWaitsOnHound = false;
+
   /// Seconds into the fight when each hound still to come is released.
   final List<double> _houndTimes = [];
 
@@ -1702,8 +1713,10 @@ class BackyardBarrageGame extends FlameGame {
       feel.houndHowl();
     }
     _hounds.removeWhere((hound) => hound.state == HoundState.gone);
+    // No new hounds once the last rival is down.
     while (_houndTimes.isNotEmpty &&
         !_settling &&
+        !_clearWaitsOnHound &&
         _waveFight >= _houndTimes.first) {
       _houndTimes.removeAt(0);
       final living = [
@@ -2021,10 +2034,16 @@ class BackyardBarrageGame extends FlameGame {
     }
     _settling = false;
     _settleTime = 0;
+    _clearWaitsOnHound = false;
     switch (outcome) {
       case RoundOutcome.defeat:
         _beginDefeat();
       case RoundOutcome.waveClear:
+        if (houndInPlay) {
+          // Not over until the hound is scared off or gone.
+          _clearWaitsOnHound = true;
+          return;
+        }
         _beginWaveClear();
       case RoundOutcome.ongoing:
         break;
@@ -3201,6 +3220,7 @@ class BackyardBarrageGame extends FlameGame {
       }
     }
     _tickHound(dt);
+    if (_clearWaitsOnHound && !houndInPlay) resolveKnockouts();
     _tickWalkOns(dt);
     _tickPerks(dt);
     if (_armorTime > 0) {

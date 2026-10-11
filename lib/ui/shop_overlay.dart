@@ -135,6 +135,12 @@ class _ShopOverlayState extends State<ShopOverlay> {
         branch,
   ];
 
+  /// All of [kid]'s own ranks (attack, defense, and crew).
+  int _kidTotal(int kid) {
+    final up = widget.game.meta.kidUpgrades(kid);
+    return up.attack + up.defense + up.crew;
+  }
+
   /// Ranks [kid] (or the team) owns in [branch].
   int _ranksOwned(SkillBranch branch, int kid) => SkillTree.chain(
     branch,
@@ -198,6 +204,21 @@ class _ShopOverlayState extends State<ShopOverlay> {
                         selected: _items ? null : _group,
                         onSelect: _selectGroup,
                         onItems: _selectItems,
+                        // Ranks owned in each group for the picked kid
+                        // (or the team), and power-ups held.
+                        counts: {
+                          for (final group in SkillGroup.values)
+                            group: _shownBranches(group).fold<int>(
+                              0,
+                              (n, branch) =>
+                                  n + _ranksOwned(branch, _filter ?? 0),
+                            ),
+                        },
+                        itemCount: meta.items.values.fold<int>(
+                          0,
+                          (n, count) => n + count,
+                        ),
+                        tint: _filter == null ? null : KidColors.of(_filter!),
                       ),
                       SizedBox(height: tokens.space.sm),
                       Expanded(
@@ -319,6 +340,7 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                 label: 'Team',
                                 color: tokens.ink,
                                 ink: tokens.ink,
+                                count: meta.teamRanks,
                               ),
                               for (var i = 0; i < meta.crewSize; i++)
                                 (
@@ -326,6 +348,7 @@ class _ShopOverlayState extends State<ShopOverlay> {
                                   label: KidColors.nameOf(i),
                                   color: KidColors.of(i),
                                   ink: KidColors.deepOf(i),
+                                  count: _kidTotal(i),
                                 ),
                             ],
                             selected: _items
@@ -460,10 +483,22 @@ class _GroupTabs extends StatelessWidget {
     required this.selected,
     required this.onSelect,
     required this.onItems,
+    required this.counts,
+    required this.itemCount,
+    required this.tint,
   });
 
   /// Null while the Items tab is showing.
   final SkillGroup? selected;
+
+  /// Ranks owned per group, for the picked kid or the team.
+  final Map<SkillGroup, int> counts;
+
+  /// Power-ups held, on the Items tab.
+  final int itemCount;
+
+  /// The picked kid's color for the count badges, or null for the team.
+  final Color? tint;
   final ValueChanged<SkillGroup> onSelect;
   final VoidCallback onItems;
 
@@ -522,10 +557,12 @@ class _GroupTabs extends StatelessWidget {
                                     ? tokens.onPrimary
                                     : tokens.inkMuted,
                               ),
-                              child: Text(
-                                group.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              child: _TabLabel(
+                                key: Key('skill-group-count-${group.name}'),
+                                label: group.label,
+                                count: counts[group] ?? 0,
+                                selected: group == selected,
+                                tint: tint,
                               ),
                             ),
                           ),
@@ -549,7 +586,13 @@ class _GroupTabs extends StatelessWidget {
                                   ? tokens.onPrimary
                                   : tokens.inkMuted,
                             ),
-                            child: const Text('Items', maxLines: 1),
+                            child: _TabLabel(
+                              key: const Key('shop-tab-items-count'),
+                              label: 'Items',
+                              count: itemCount,
+                              selected: current == null,
+                              tint: null,
+                            ),
                           ),
                         ),
                       ),
@@ -1054,6 +1097,55 @@ class _ItemRow extends StatelessWidget {
   }
 }
 
+/// A tab's name with a small count badge after it, like the branch
+/// tiles' rank badges: tinted in the picked kid's color, light on the
+/// selected tab.
+class _TabLabel extends StatelessWidget {
+  const _TabLabel({
+    super.key,
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.tint,
+  });
+
+  final String label;
+  final int count;
+  final bool selected;
+  final Color? tint;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+        const SizedBox(width: 5),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+          decoration: BoxDecoration(
+            color: selected
+                ? tokens.onPrimary.withValues(alpha: 0.28)
+                : (tint ?? tokens.primary).withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            '$count',
+            style: BarrageType.muted.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: selected ? tokens.onPrimary : tokens.ink,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Team / Kid 1 / Kid 2 / Kid 3 in one pill track, like the group tabs
 /// up top: each label in its kid's color, the picked one filled in it.
 class _FilterTabs extends StatelessWidget {
@@ -1064,14 +1156,16 @@ class _FilterTabs extends StatelessWidget {
     required this.onSelect,
   });
 
-  final List<({Key key, String label, Color color, Color ink})> options;
+  /// Each tab, with the total skill ranks behind it.
+  final List<({Key key, String label, Color color, Color ink, int count})>
+  options;
 
   /// Index into [options], or null while the Items tab is open.
   final int? selected;
   final bool compact;
   final ValueChanged<int> onSelect;
 
-  static const double tabWidth = 76;
+  static const double tabWidth = 98;
 
   @override
   Widget build(BuildContext context) {
@@ -1132,7 +1226,15 @@ class _FilterTabs extends StatelessWidget {
                                 ? tokens.onPrimary
                                 : options[i].ink,
                           ),
-                          child: Text(options[i].label, maxLines: 1),
+                          child: _TabLabel(
+                            key: Key(
+                              '${(options[i].key as ValueKey).value}-count',
+                            ),
+                            label: options[i].label,
+                            count: options[i].count,
+                            selected: i == current,
+                            tint: options[i].color,
+                          ),
                         ),
                       ),
                     ),

@@ -91,10 +91,10 @@ class BossController extends Component {
   };
 
   /// Seconds in the throw pose before a lob.
-  static const double throwWindupSeconds = 0.7;
+  static const double throwWindupSeconds = 0.7 / BossRules.attackPace;
 
-  static const double pushSeconds = 0.45;
-  static const double crashSeconds = 0.45;
+  static const double pushSeconds = 0.45 / BossRules.attackPace;
+  static const double crashSeconds = 0.45 / BossRules.attackPace;
 
   BossPhase _phase = BossPhase.roam;
   double _clock = 0;

@@ -1,5 +1,6 @@
 import 'package:flame/components.dart';
 import 'package:flame/extensions.dart';
+import 'package:flutter/painting.dart' show Color, Paint, RRect, Radius;
 
 import '../arena_grid.dart';
 import '../combat_rules.dart';
@@ -120,6 +121,50 @@ class FortComponent extends SpriteComponent {
     final cell = ArenaGrid.nearestCell(kid.side, kid.position);
     return cell.row == coverRow &&
         (cell.column == coverColumn || cell.column == coverColumn + 1);
+  }
+
+  @override
+  void render(Canvas canvas) {
+    super.render(canvas);
+    if (showingDamage) _drawHealthBar(canvas);
+  }
+
+  /// Where the bar sits, as a fraction of the fort art's height (just over
+  /// the top of the wall in the 640² renders).
+  static const double barTop = 0.30;
+
+  /// A small bar over a damaged fort, one pip per hit it can still take,
+  /// like the kids' bars: green, yellow under half, red on its last hit.
+  /// Hidden at full health and once it is flat.
+  void _drawHealthBar(Canvas canvas) {
+    final width = size.x * 0.42;
+    const height = 10.0;
+    final left = size.x / 2 - width / 2;
+    final top = size.y * barTop;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(left - 2, top - 2, width + 4, height + 4),
+        const Radius.circular(7),
+      ),
+      Paint()..color = const Color(0xCC1A2332),
+    );
+    final fraction = hp / maxHp;
+    final fill = hp == 1
+        ? const Color(0xFFFF4D4D)
+        : (fraction > 0.5 ? const Color(0xFF2ECC71) : const Color(0xFFF1C40F));
+    final pips = maxHp.clamp(1, 12);
+    const gap = 2.0;
+    final pip = (width - gap * (pips - 1)) / pips;
+    final filled = maxHp <= 12 ? hp : (fraction * pips).ceil();
+    for (var i = 0; i < pips; i++) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(left + i * (pip + gap), top, pip, height),
+          const Radius.circular(3),
+        ),
+        Paint()..color = i < filled ? fill : const Color(0x33FFFFFF),
+      );
+    }
   }
 
   void _syncSprite() {

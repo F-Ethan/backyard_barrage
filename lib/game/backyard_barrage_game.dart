@@ -1600,8 +1600,7 @@ class BackyardBarrageGame extends FlameGame {
   /// A hound still in play: not yet scared off and not gone. While one is,
   /// the wave does not clear, even with every rival down.
   bool get houndInPlay => _hounds.any(
-    (hound) =>
-        hound.state != HoundState.flee && hound.state != HoundState.gone,
+    (hound) => hound.state != HoundState.flee && hound.state != HoundState.gone,
   );
 
   /// Every rival is down, and the clear is waiting for a hound.

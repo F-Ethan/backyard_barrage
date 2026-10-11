@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../game/backyard_barrage_game.dart';
+import '../meta/power_up.dart';
+import '../game/kid_colors.dart';
+import '../game/crew_snapshot.dart';
 import '../meta/meta_state.dart';
 import '../meta/play_mode.dart';
 import '../seasons/season.dart';
@@ -8,6 +11,7 @@ import 'barrage_colors.dart';
 import 'barrage_theme.dart';
 import 'coin_amount.dart';
 import 'draft_button.dart';
+import 'power_up_ui.dart';
 import 'report_kit.dart';
 import 'season_toggle.dart';
 import 'ui_assets.dart';
@@ -43,6 +47,11 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
     final retryWave = result?.wave ?? 1;
     final stage = MetaState.stageOf(retryWave);
     final lostOn = game.wave;
+    final before = game.defeatBefore;
+    final after = game.defeatAfter;
+    final changes = before == null || after == null
+        ? const <_Change>[]
+        : _Change.between(before, after);
     return ReportSheet(
       key: const Key('defeat-sheet'),
       title: 'Crew down',
@@ -86,31 +95,29 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
             ),
           ],
         ),
+        if (before != null) ...[
+          const ReportSection('Your crew'),
+          for (var i = 0; i < before.kids.length; i++)
+            KidCard(
+              key: Key('defeat-kid-$i'),
+              kid: i,
+              knockouts: i < game.kidKos.length ? game.kidKos[i] : 0,
+              now: before.kids[i],
+              next: KidState.fresh(meta, i),
+              nowCaption: 'Went down',
+              nextCaption: 'At the retry',
+            ),
+        ],
         const ReportSection('Losses'),
         PillRow(
           children: [
-            if (!checkpoint)
-              ReportPill(
-                key: const Key('defeat-skills-reset'),
-                icon: Icon(Icons.auto_awesome_rounded, color: lossTint),
-                value: 'Skills reset',
-                caption: 'Skills and items',
-                tint: lossTint,
-              ),
-            if (checkpoint || (result?.coinsLost ?? 0) > 0)
+            if ((result?.coinsLost ?? 0) > 0)
               ReportPill(
                 key: const Key('defeat-lost'),
                 icon: Image.asset(UiAssets.coin, width: 28, height: 28),
                 value: '-${compactCoins(result?.coinsLost ?? 0)}',
                 caption: 'Coins lost',
                 tint: lossTint,
-              ),
-            if (result != null && result.refunded > 0)
-              ReportPill(
-                key: const Key('defeat-refund'),
-                icon: Image.asset(UiAssets.coin, width: 28, height: 28),
-                value: '+${compactCoins(result.refunded)}',
-                caption: 'Refunded',
               ),
             if (game.lastScorePenalty > 0)
               ReportPill(
@@ -120,8 +127,27 @@ class _DefeatOverlayState extends State<DefeatOverlay> {
                 caption: 'Score',
                 tint: lossTint,
               ),
+            for (final change in changes.where((c) => c.amount < 0))
+              _ChangePill(change: change),
           ],
         ),
+        if ((result?.refunded ?? 0) > 0 ||
+            changes.any((c) => c.amount > 0)) ...[
+          const ReportSection('Back to you'),
+          PillRow(
+            children: [
+              if (result != null && result.refunded > 0)
+                ReportPill(
+                  key: const Key('defeat-refund'),
+                  icon: Image.asset(UiAssets.coin, width: 28, height: 28),
+                  value: '+${compactCoins(result.refunded)}',
+                  caption: 'Refunded',
+                ),
+              for (final change in changes.where((c) => c.amount > 0))
+                _ChangePill(change: change),
+            ],
+          ),
+        ],
         const ReportSection('Your run'),
         PillRow(
           children: [
@@ -268,6 +294,122 @@ class _StartOverConfirm extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// One thing a loss changed: a kid's upgrades of one kind, the team's
+/// shared skills, a kid leaving the crew, or a power-up. Negative is lost,
+/// positive came back.
+class _Change {
+  const _Change({
+    required this.key,
+    required this.amount,
+    required this.label,
+    required this.caption,
+    this.kind,
+    this.item,
+    this.icon,
+  });
+
+  final String key;
+  final int amount;
+  final String label;
+  final String caption;
+  final UpgradeKind? kind;
+  final PowerUp? item;
+  final IconData? icon;
+
+  static List<_Change> between(CrewSnapshot before, CrewSnapshot after) {
+    final changes = <_Change>[];
+    for (var i = 0; i < before.kids.length && i < after.kids.length; i++) {
+      final name = KidColors.nameOf(i);
+      if (!after.kids[i].inCrew) {
+        changes.add(
+          _Change(
+            key: 'defeat-left-$i',
+            amount: -1,
+            label: '$name left',
+            caption: 'Not in the crew yet',
+            icon: Icons.person_remove_rounded,
+          ),
+        );
+        continue;
+      }
+      final was = before.kids[i].upgrades;
+      final now = after.kids[i].upgrades;
+      for (final (kind, a, b) in [
+        (UpgradeKind.attack, was.attack, now.attack),
+        (UpgradeKind.defense, was.defense, now.defense),
+        (UpgradeKind.crew, was.crew, now.crew),
+      ]) {
+        if (a == b) continue;
+        changes.add(
+          _Change(
+            key: 'defeat-skill-$i-${kind.name}',
+            amount: b - a,
+            label: '${kind.label} skills',
+            caption: name,
+            kind: kind,
+          ),
+        );
+      }
+    }
+    if (after.teamRanks != before.teamRanks) {
+      changes.add(
+        _Change(
+          key: 'defeat-skill-team',
+          amount: after.teamRanks - before.teamRanks,
+          label: 'Team skills',
+          caption: 'Whole crew',
+          icon: Icons.auto_awesome_rounded,
+        ),
+      );
+    }
+    for (final item in PowerUp.values) {
+      final delta = (after.items[item] ?? 0) - (before.items[item] ?? 0);
+      if (delta == 0) continue;
+      changes.add(
+        _Change(
+          key: 'defeat-item-${item.name}',
+          amount: delta,
+          label: item.label,
+          caption: delta > 0 ? 'Back' : 'Lost',
+          item: item,
+        ),
+      );
+    }
+    return changes;
+  }
+}
+
+/// A [_Change] as a pill: red for lost, blue for back.
+class _ChangePill extends StatelessWidget {
+  const _ChangePill({required this.change});
+
+  final _Change change;
+
+  @override
+  Widget build(BuildContext context) {
+    final lost = change.amount < 0;
+    final item = change.item;
+    final kind = change.kind;
+    final Widget icon = item != null
+        ? PowerUpBadge(item: item, size: 30)
+        : Icon(
+            kind?.icon ?? change.icon,
+            color: kind?.color ?? (lost ? lossTint : null),
+          );
+    final sign = lost ? '-' : '+';
+    final count = change.amount.abs();
+    return ReportPill(
+      key: Key(change.key),
+      icon: icon,
+      value: change.key.startsWith('defeat-left')
+          ? change.label
+          : '$sign$count ${change.label}',
+      caption: change.caption,
+      tint: lost ? lossTint : null,
     );
   }
 }

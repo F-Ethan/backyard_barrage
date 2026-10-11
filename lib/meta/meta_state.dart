@@ -231,21 +231,35 @@ class MetaState {
       baseKidHp + _ownedPrefix(SkillBranch.health, kid: kid);
 
   /// Ranks [kid] owns in their own branches, split into attack (Throw,
-  /// Hit, aim and pals) and defense (Health, Shield, Shake it off).
-  ({int attack, int defense}) kidUpgrades(int kid) {
+  /// Harder hit), defense (Health, Shield, Shake it off), and crew (aim,
+  /// Quicker pals, Faster pals).
+  KidUpgrades kidUpgrades(int kid) {
     var attack = 0;
     var defense = 0;
+    var crew = 0;
     for (final branch in SkillTree.personal) {
       final owned = SkillTree.chain(
         branch,
       ).where((node) => ownsFor(kid, node.id)).length;
       if (SkillTree.personalDefense.contains(branch)) {
         defense += owned;
+      } else if (SkillTree.personalCrew.contains(branch)) {
+        crew += owned;
       } else {
         attack += owned;
       }
     }
-    return (attack: attack, defense: defense);
+    return (attack: attack, defense: defense, crew: crew);
+  }
+
+  /// Ranks owned in the shared team branches (Crew, Fort, Recovery, …).
+  int get teamRanks {
+    var owned = 0;
+    for (final branch in SkillBranch.values) {
+      if (SkillTree.isPersonal(branch)) continue;
+      owned += SkillTree.chain(branch).where((node) => owns(node.id)).length;
+    }
+    return owned;
   }
 
   int kidShield(int kid) =>
@@ -724,6 +738,9 @@ class MetaState {
     return value;
   }
 }
+
+/// A kid's own upgrade ranks by kind (see [MetaState.kidUpgrades]).
+typedef KidUpgrades = ({int attack, int defense, int crew});
 
 /// What a defeat did to the wallet.
 class CheckpointResult {

@@ -2836,6 +2836,12 @@ void main() {
     await tester.pump();
     expect(find.byKey(const Key('defeat-lost')), findsOneWidget);
     expect(find.byKey(const Key('defeat-refund')), findsOneWidget);
+    // The crew cards: down → the retry, and what the loss took.
+    expect(find.byKey(const Key('defeat-kid-0')), findsOneWidget);
+    expect(find.byKey(const Key('defeat-kid-1')), findsOneWidget);
+    expect(find.text('Not in crew'), findsOneWidget);
+    expect(find.byKey(const Key('defeat-left-1')), findsOneWidget);
+    expect(find.byKey(const Key('defeat-skill-team')), findsOneWidget);
     await tester.tap(find.byKey(const Key('retry')));
     await tester.pump();
     game.finishEntrance();
@@ -3069,6 +3075,39 @@ void main() {
     }
   });
 
+  testWidgets('a loss shows skills and potions lost, and potions back', (
+    tester,
+  ) async {
+    final game = (await boot(
+      tester,
+      MetaState(mode: PlayMode.campaign, coins: 400),
+    )).game;
+    expect(game.meta.buyItem(PowerUp.freezeAll), isTrue);
+    game.wave = 6;
+    game.startWave();
+    game.finishEntrance();
+    // After the checkpoint: a skill bought, a potion bought, one used.
+    expect(game.meta.buy('throw-1', kid: 0), isTrue);
+    expect(game.meta.buyItem(PowerUp.hotCocoa), isTrue);
+    expect(game.meta.useItem(PowerUp.freezeAll), isTrue);
+    knockOut(game.players);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(1.5);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    final before = game.defeatBefore!.kids.first;
+    expect(before.hp, 0);
+    expect(before.upgrades.attack, 1);
+    expect(game.defeatAfter!.kids.first.upgrades.attack, 0);
+    expect(find.byKey(const Key('defeat-skill-0-attack')), findsOneWidget);
+    expect(find.byKey(const Key('defeat-item-hotCocoa')), findsOneWidget);
+    expect(find.text('Back to you'), findsOneWidget);
+    expect(find.byKey(const Key('defeat-item-freezeAll')), findsOneWidget);
+    expect(find.text('+1 Freeze all'), findsOneWidget);
+    expect(find.text('-1 Hot cocoa'), findsOneWidget);
+  });
+
   testWidgets('Arcade: losing to a boss retries just the boss', (tester) async {
     final game = (await boot(
       tester,
@@ -3196,7 +3235,7 @@ void main() {
     expect(find.text('Wave 1 clear'), findsOneWidget);
     // Named, with their own upgrades counted.
     expect(find.text('Beth'), findsOneWidget);
-    expect(find.byKey(const Key('report-upgrades-0')), findsOneWidget);
+    expect(find.byKey(const Key('report-now-0')), findsOneWidget);
     // The next button sits in the fixed footer, on screen without a scroll.
     final button = tester.getRect(find.byKey(const Key('report-continue')));
     expect(button.bottom, lessThanOrEqualTo(tester.view.physicalSize.height));

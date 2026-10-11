@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../game/backyard_barrage_game.dart';
+import '../game/crew_snapshot.dart';
 import '../meta/meta_state.dart';
 import 'barrage_colors.dart';
 import 'barrage_theme.dart';
@@ -52,13 +53,18 @@ class _WaveReportState extends State<WaveReport> {
             key: Key('report-kid-$i'),
             kid: i,
             knockouts: game.kidKos[i],
-            hpNow: i < game.players.length ? game.players[i].hp : 0,
-            shieldNow: i < game.players.length ? game.players[i].shieldHits : 0,
-            hpNext: next[i],
-            shieldNext: meta.kidShield(i),
-            maxHp: meta.kidMaxHp(i),
-            attack: meta.kidUpgrades(i).attack,
-            defense: meta.kidUpgrades(i).defense,
+            now: KidState(
+              hp: i < game.players.length ? game.players[i].hp : 0,
+              maxHp: meta.kidMaxHp(i),
+              shield: i < game.players.length ? game.players[i].shieldHits : 0,
+              upgrades: meta.kidUpgrades(i),
+            ),
+            next: KidState(
+              hp: next[i],
+              maxHp: meta.kidMaxHp(i),
+              shield: meta.kidShield(i),
+              upgrades: meta.kidUpgrades(i),
+            ),
             action: _action(i, next[i], meta, healCost),
           ),
         const ReportSection('Your power-ups'),

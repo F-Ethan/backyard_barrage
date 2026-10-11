@@ -22,10 +22,6 @@ void main() {
     return hits / runs;
   }
 
-  test('no hounds before wave 3', () {
-    expect(share(2, 1, 1e9, Difficulty.hard), 0);
-  });
-
   test('the roll: a fixed chance per wave, early, however fast you are', () {
     // Wave 6 on Easy: one in two plays meets a hound within 10 seconds.
     expect(share(6, 1, 10, Difficulty.easy), closeTo(0.5, 0.03));

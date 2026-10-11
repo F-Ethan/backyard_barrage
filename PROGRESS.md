@@ -39,6 +39,7 @@ Playable MVP loop on the gameplay branch:
 
 ## Known gaps
 
+- **Dead code left in `lib/` (Oct 2026 test cleanup).** No game code calls `ThrowPhysics.launchVelocity`, `launchToward`, `defaultAim`, or `speedForCharge` (throws go through `planPlayerLob` / `planEnemyLob`), `ArenaGrid.coverCellCount` / `isCoverCell` / `inNeutral`, or `CrewCarry`'s `carries: false` branch. Their tests were removed; the code can go in a cleanup PR.
 Document out-of-scope bugs, doc drift, and follow-ups here. Add a row when you notice something you are not fixing in the current PR. Remove or rewrite a row when it is actually fixed.
 
 - **Music loops are AAC.** `menu_loop.m4a` and `battle_loop_winter.m4a` (160 kbps) replace the WAVs: iOS cannot play the delivered Ogg, and the WAVs were 15MB each. AAC adds a few milliseconds of encoder padding, so the loop point may have a tiny gap; listen on device.

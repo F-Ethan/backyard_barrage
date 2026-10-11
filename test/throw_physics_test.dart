@@ -9,20 +9,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('ThrowPhysics', () {
-    test('launchVelocity scales with charge and goes upward', () {
-      final slow = ThrowPhysics.launchVelocity(
-        charge: 0.2,
-        aimDirection: Vector2(1, -0.4),
-      );
-      final fast = ThrowPhysics.launchVelocity(
-        charge: 1.0,
-        aimDirection: Vector2(1, -0.4),
-      );
-      expect(fast.length, greaterThan(slow.length));
-      expect(slow.y, lessThan(0));
-      expect(fast.x, greaterThan(0));
-    });
-
     test('circlesOverlap detects hit and miss', () {
       expect(
         ThrowPhysics.circlesOverlap(Vector2(0, 0), 10, Vector2(15, 0), 10),
@@ -32,21 +18,6 @@ void main() {
         ThrowPhysics.circlesOverlap(Vector2(0, 0), 10, Vector2(50, 0), 10),
         isFalse,
       );
-    });
-
-    test('defaultAim biases upward toward target', () {
-      final aim = ThrowPhysics.defaultAim(Vector2(0, 0), Vector2(200, 0));
-      expect(aim.x, greaterThan(0));
-      expect(aim.y, lessThan(0));
-    });
-
-    test('enemy lobs keep a leftward upward arc', () {
-      final velocity = ThrowPhysics.launchVelocity(
-        charge: 1,
-        aimDirection: Vector2(-1, 0.2),
-      );
-      expect(velocity.x, lessThan(0));
-      expect(velocity.y, lessThan(0));
     });
 
     test('charge starts at the tap minimum and climbs steadily to full', () {
@@ -100,29 +71,6 @@ void main() {
       expect(Difficulty.easy.aimPreview, AimPreview.full);
       expect(Difficulty.normal.aimPreview, AimPreview.path);
       expect(Difficulty.hard.aimPreview, AimPreview.none);
-    });
-
-    test('full power reaches the enemy half and a tap does not', () {
-      final size = Vector2(152, 152);
-      final from = ArenaGrid.throwOrigin(
-        KidSide.player,
-        ArenaGrid.cellCenter(KidSide.player, 0, 0),
-        size,
-      );
-      final far = ArenaGrid.hitCenter(
-        ArenaGrid.cellCenter(KidSide.enemy, ArenaGrid.columnsPerSide - 1, 7),
-        size,
-      );
-      final maxSpeed = ThrowPhysics.speedForCharge(1);
-      expect(
-        ThrowPhysics.launchToward(from: from, to: far, speed: maxSpeed),
-        isNotNull,
-      );
-      final tap = ThrowPhysics.speedForCharge(0.15);
-      expect(
-        ThrowPhysics.launchToward(from: from, to: far, speed: tap),
-        isNull,
-      );
     });
 
     test('full power reaches the far side without speeding the ball up', () {
@@ -640,16 +588,6 @@ void main() {
       expect(ArenaGrid.columnIsBehindFort(KidSide.player, 1), isFalse);
     });
 
-    test('a full-power lob is flatter than a steep flick', () {
-      final shot = ThrowPhysics.launchVelocity(
-        charge: 1,
-        aimDirection: Vector2(1, -0.9),
-      );
-      final loft = math.atan2(-shot.y, shot.x);
-      expect(loft, lessThan(32 * math.pi / 180));
-      expect(shot.x, greaterThan(shot.y.abs()));
-    });
-
     test('walk cap is one column per step and stays under throw pace', () {
       final pace = ThrowPhysics.kidMoveSpeed();
       expect(
@@ -867,19 +805,6 @@ void main() {
       expect(ground, greaterThan(ArenaGrid.laneY(4)));
       expect(ground, lessThan(ArenaGrid.rowY(4)));
       expect(ground, lessThan(700));
-    });
-
-    test('speedScale multiplies launch speed', () {
-      final slow = ThrowPhysics.launchVelocity(
-        charge: 0.5,
-        aimDirection: Vector2(1, -0.4),
-      );
-      final fast = ThrowPhysics.launchVelocity(
-        charge: 0.5,
-        aimDirection: Vector2(1, -0.4),
-        speedScale: 2,
-      );
-      expect(fast.length, closeTo(slow.length * 2, 0.001));
     });
   });
 }

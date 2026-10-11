@@ -69,19 +69,6 @@ void main() {
     }
   });
 
-  test('fort cover is two player cells', () {
-    expect(ArenaGrid.coverCellCount, inInclusiveRange(1, 2));
-    expect(
-      ArenaGrid.isCoverCell(ArenaGrid.coverColumnA, ArenaGrid.coverRow),
-      isTrue,
-    );
-    expect(
-      ArenaGrid.isCoverCell(ArenaGrid.coverColumnB, ArenaGrid.coverRow),
-      isTrue,
-    );
-    expect(ArenaGrid.isCoverCell(0, ArenaGrid.coverRow), isFalse);
-  });
-
   test('fort footprint is the two cover cells on each side', () {
     for (final side in [KidSide.player, KidSide.enemy]) {
       final box = ArenaGrid.fortFootprint(side);

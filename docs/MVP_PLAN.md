@@ -343,3 +343,18 @@ General-audience listing, rated 4+, marketed as a family game, not in Apple's Ki
   - A rival knocked out with a potion it never used drops it for the crew half the time (logged in the wave report).
 - Bosses: none the first time, then one more perk each time a boss returns (up to three), from Shield, Hot cocoa (a quarter of its health), and the three team potions.
 - Rival forts: stage 1 early, sometimes 2 from wave 5, 2 or 3 from wave 10, 3 from wave 20. Extra rival forts: maybe one from wave 8, one (sometimes two) from wave 15, two from wave 25, laid out like the crew's extra forts.
+
+## Names, New Game, and fort blocks (Oct 2026)
+
+- **Difficulty names.** The picker reads **Easy / Hard / Insane**. Only the shown names changed: saves and settings still store `easy` / `normal` / `hard`, so every wallet and best keeps its place. A fourth level is parked until playtests show a gap.
+- **New Game** (was Start over) wipes an Arcade wallet: coins, skills, items, and score (the best score stays), then plays from wave 1. It asks first, with the same warning everywhere. Offered on the defeat summary, on the Arcade home card once there is a run to wipe, and in Settings during an Arcade match.
+- **Settings between waves.** The wave report and the skills page have a gear that opens Settings over them.
+- **Skills back button.** Top-left of the skills page: back to the wave report between waves, or to the defeat summary after a loss.
+- **No controls hint.** The "Drag on the left to move · hold the right side to throw" chip under the HUD is gone.
+- **Own fort blocks.** On Insane (stored `hard`) your own standing fort stops a lob thrown from behind it instead of letting it sail over; it is a block and never damages the fort. On Easy and Hard a lob from behind clears your own fort. (`DifficultyTuning.ownFortBlocks`, was `friendlyFortDamage`.)
+- **Campaign coin loss.** A Campaign loss now also takes half the coins earned that run (rounded toward losing), from what is still unspent, along with the skills and potions. The run's count starts over after the loss.
+- **Start as.** Settings has a "Start as" row (Mike / Beth / Ruben, in their colors). That kid starts every new run (a new game, a fresh wallet, a Campaign loss) and leads each wave. It is a device setting saved with sound and haptics (`GameSettings.leadKid`). If that kid is not in the crew, or is still down, the first kid standing leads.
+- **Kids join by name.** Team → Crew lists all three kids: the ones in the crew show "In the crew", the rest an **Unlock Beth · price** button, in any order. Prices follow the crew place (the second kid costs what Crew II did, the third what Crew III did). The wallet saves the join order (`MetaState.crewOrder`), and every kid keeps their own art, color, name, hearts, and skills whatever place they join in. Old saves read as Mike, Beth, Ruben.
+- **Skills in their names.** A kid's own skills read with their name: "Mike gets a quicker, stronger throw.", "Beth's shield blocks 2 hits every wave.".
+- **Skills open on Team.** The skills page opens on the Team tab (the shared skills, Fight → Pressure first); a kid's tab shows their own.
+

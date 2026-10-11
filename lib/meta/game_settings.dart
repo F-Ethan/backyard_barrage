@@ -10,6 +10,7 @@ class GameSettings {
     this.musicEnabled = true,
     this.hapticsEnabled = true,
     this.difficulty = Difficulty.normal,
+    this.leadKid = 0,
   });
 
   final bool sfxEnabled;
@@ -19,17 +20,24 @@ class GameSettings {
   /// Missing saves stay on Normal.
   final Difficulty difficulty;
 
+  /// The kid you control when a wave starts (0 Mike, 1 Beth, 2 Ruben).
+  /// Falls back to the first kid standing when that one is not in the crew
+  /// or is down.
+  final int leadKid;
+
   GameSettings copyWith({
     bool? sfxEnabled,
     bool? musicEnabled,
     bool? hapticsEnabled,
     Difficulty? difficulty,
+    int? leadKid,
   }) {
     return GameSettings(
       sfxEnabled: sfxEnabled ?? this.sfxEnabled,
       musicEnabled: musicEnabled ?? this.musicEnabled,
       hapticsEnabled: hapticsEnabled ?? this.hapticsEnabled,
       difficulty: difficulty ?? this.difficulty,
+      leadKid: leadKid ?? this.leadKid,
     );
   }
 
@@ -38,6 +46,7 @@ class GameSettings {
     'music': musicEnabled,
     'haptics': hapticsEnabled,
     'difficulty': difficulty.name,
+    'leadKid': leadKid,
   };
 
   factory GameSettings.fromJson(Map<String, dynamic> json) {
@@ -46,6 +55,10 @@ class GameSettings {
       musicEnabled: _asBool(json['music']),
       hapticsEnabled: _asBool(json['haptics']),
       difficulty: DifficultyTuning.parse(json['difficulty']),
+      leadKid: switch (json['leadKid']) {
+        final int kid when kid >= 0 && kid <= 2 => kid,
+        _ => 0,
+      },
     );
   }
 

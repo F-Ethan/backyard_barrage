@@ -34,7 +34,9 @@ class MetaState {
     this.mode = PlayMode.arcade,
     this.difficulty = Difficulty.normal,
     RunLedger? ledger,
+    List<int>? crewOrder,
   }) : _season = season.orPlayable,
+       crewOrder = _validOrder(crewOrder),
        bestScore = math.max(bestScore ?? 0, score),
        ledger = ledger ?? RunLedger() {
     if (items != null) replaceItems(items);
@@ -54,6 +56,54 @@ class MetaState {
   }
 
   static const int maxCrew = 3;
+
+  /// Who is in the crew, in the order they joined: kid ids (0 Mike,
+  /// 1 Beth, 2 Ruben). The first [crewSize] are in; the rest wait their
+  /// turn. Always holds all three, each once.
+  List<int> crewOrder;
+
+  static List<int> _validOrder(List<int>? order) {
+    if (order == null ||
+        order.length != maxCrew ||
+        order.toSet().length != maxCrew ||
+        order.any((kid) => kid < 0 || kid >= maxCrew)) {
+      return [0, 1, 2];
+    }
+    return List.of(order);
+  }
+
+  /// The kids in the crew now, in the order they joined.
+  List<int> get crew => crewOrder.take(crewSize).toList();
+
+  /// Kid id in crew place [slot] (0 is the kid who started the run).
+  int kidAt(int slot) => crewOrder[slot.clamp(0, maxCrew - 1)];
+
+  bool inCrew(int kid) => crew.contains(kid);
+
+  /// Kids who have not joined yet, in their waiting order.
+  List<int> get waitingKids => crewOrder.skip(crewSize).toList();
+
+  /// [kid] starts the run: first in the order, the others keep theirs.
+  /// Only before anyone else has joined.
+  void setStarter(int kid) {
+    if (crewSize > 1 || kid < 0 || kid >= maxCrew) return;
+    crewOrder = [kid, ...crewOrder.where((other) => other != kid)];
+  }
+
+  /// Buys the next crew place for [kid] (who must not be in the crew yet).
+  bool recruit(int kid) {
+    if (inCrew(kid) || kid < 0 || kid >= maxCrew) return false;
+    final node = nextKidNode;
+    if (node == null || !canBuy(node.id)) return false;
+    final place = crewSize;
+    final rest = [
+      for (final other in crewOrder.skip(place))
+        if (other != kid) other,
+    ];
+    crewOrder = [...crewOrder.take(place), kid, ...rest];
+    return buy(node.id);
+  }
+
   static const int maxFortStage = 3;
 
   /// Hand-made throw ranks. The chain keeps going past this.
@@ -415,7 +465,7 @@ class MetaState {
   SkillLock skillLock(String id, {int kid = 0}) {
     final node = SkillTree.node(id);
     if (node == null || ownsFor(kid, id)) return SkillLock.open;
-    if (SkillTree.isPersonal(node.branch) && kid >= crewSize) {
+    if (SkillTree.isPersonal(node.branch) && !inCrew(kid)) {
       return SkillLock.recruit;
     }
     final parent = node.parentId;
@@ -557,6 +607,11 @@ class MetaState {
   /// at [CheckpointResult.wave].
   CheckpointResult resetRun({int lostOn = 1}) {
     if (mode == PlayMode.campaign) return restoreCheckpoint(lostOn: lostOn);
+    // Campaign: skills and items go, and so does half of what this run
+    // earned (as much of it as is still unspent).
+    final earned = ledger.earnedSinceCheckpoint;
+    final lost = math.min(coins, earned - earned ~/ 2);
+    coins -= lost;
     _skills.clear();
     _items.clear();
     ledger
@@ -564,7 +619,7 @@ class MetaState {
       ..reviveBought = 0
       ..clearCheckpoint();
     ledger.kidRevives.setAll(0, [0, 0, 0]);
-    return const CheckpointResult(wave: 1, coinsLost: 0, refunded: 0);
+    return CheckpointResult(wave: 1, coinsLost: lost, refunded: 0);
   }
 
   /// Replace the owned set with [owned], closing any gap back to the root.
@@ -606,6 +661,7 @@ class MetaState {
     'difficulty': difficulty.name,
     'mode': mode.name,
     'ledger': ledger.toJson(),
+    'crew': crewOrder,
   };
 
   factory MetaState.fromJson(Map<String, dynamic> json) {
@@ -650,6 +706,9 @@ class MetaState {
       difficulty: _readDifficulty(json['difficulty']),
       mode: PlayMode.tryParse(_asString(json['mode'])) ?? PlayMode.arcade,
       ledger: RunLedger.fromJson(json['ledger']),
+      crewOrder: json['crew'] is List
+          ? [for (final v in json['crew'] as List) _asInt(v)]
+          : null,
     );
   }
 

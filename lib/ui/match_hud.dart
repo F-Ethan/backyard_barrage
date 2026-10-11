@@ -177,19 +177,6 @@ class MatchHud extends StatelessWidget {
                       const SizedBox(height: 6),
                       _BossBar(game: game),
                     ],
-                    if (fighting) ...[
-                      const SizedBox(height: 6),
-                      const FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: _HudChip(
-                          child: Text(
-                            'Drag on the left to move  ·  hold the right side to throw',
-                            key: Key('hud-hint'),
-                            style: BarrageType.muted,
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),

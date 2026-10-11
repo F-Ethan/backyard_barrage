@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:backyard_barrage/meta/difficulty.dart';
+import 'package:backyard_barrage/meta/game_settings.dart';
 import 'package:backyard_barrage/meta/meta_state.dart';
 import 'package:backyard_barrage/meta/power_up.dart';
 import 'package:backyard_barrage/meta/play_mode.dart';
@@ -657,7 +658,10 @@ void main() {
     'the modes are labelled Campaign (skills wipe) and Arcade (skills stay)',
     () {
       expect(PlayMode.arcade.label, 'Campaign');
-      expect(PlayMode.arcade.blurb, 'Skills wipe on defeat. Coins stay.');
+      expect(
+        PlayMode.arcade.blurb,
+        'A loss wipes skills and half the coins you earned.',
+      );
       expect(PlayMode.arcade.showsScore, isFalse);
       expect(PlayMode.campaign.label, 'Arcade');
       expect(
@@ -1071,5 +1075,87 @@ void main() {
     expect(meta.kidUpgrades(0), (attack: 1, defense: 3, crew: 0));
     expect(meta.buy('aim-1', kid: 1), isTrue);
     expect(meta.kidUpgrades(1), (attack: 1, defense: 0, crew: 1));
+  });
+
+  test('a Campaign loss takes half the coins earned this run', () {
+    final meta = MetaState(coins: 30, skills: {'team-2'});
+    meta.earn(101);
+    expect(meta.coins, 131);
+    final result = meta.resetRun(lostOn: 4);
+    expect(result.coinsLost, 51, reason: 'half of 101, rounded toward losing');
+    expect(meta.coins, 80);
+    expect(meta.crewSize, 1, reason: 'skills reset');
+    // The next run starts its own count.
+    expect(meta.resetRun(lostOn: 1).coinsLost, 0);
+    expect(meta.coins, 80);
+
+    // Spent coins cannot be taken: it loses what is left, at most.
+    final spender = MetaState();
+    spender.earn(100);
+    spender.coins = 10;
+    expect(spender.resetRun().coinsLost, 10);
+    expect(spender.coins, 0);
+  });
+
+  test('the lead kid saves with the settings and falls back to Mike', () {
+    const picked = GameSettings(leadKid: 2);
+    expect(GameSettings.fromJson(picked.toJson()).leadKid, 2);
+    expect(GameSettings.fromJson({'leadKid': 7}).leadKid, 0);
+    expect(GameSettings.fromJson({}).leadKid, 0);
+    expect(picked.copyWith(leadKid: 1).leadKid, 1);
+  });
+
+  test('kids join by name, in any order, and the order is saved', () {
+    final meta = MetaState(coins: 1000);
+    expect(meta.crew, [0], reason: 'Mike starts by default');
+    expect(meta.waitingKids, [1, 2]);
+    final second = meta.nextKidCost;
+    expect(meta.recruit(2), isTrue, reason: 'Ruben first');
+    expect(meta.crew, [0, 2]);
+    expect(meta.coins, 1000 - second!);
+    expect(meta.recruit(2), isFalse, reason: 'already in');
+    expect(meta.recruit(1), isTrue);
+    expect(meta.crew, [0, 2, 1]);
+    expect(meta.kidAt(1), 2);
+    expect(meta.nextKidNode, isNull);
+
+    final back = MetaState.fromJson(meta.toJson());
+    expect(back.crew, [0, 2, 1]);
+    // An old save without an order: Mike, Beth, Ruben.
+    final old = Map<String, dynamic>.of(meta.toJson())..remove('crew');
+    expect(MetaState.fromJson(old).crew, [0, 1, 2]);
+    // A broken order falls back too.
+    expect(
+      MetaState.fromJson({
+        ...old,
+        'crew': [2, 2, 0],
+      }).crew,
+      [0, 1, 2],
+    );
+  });
+
+  test('the starter can change only while they are alone', () {
+    final meta = MetaState(coins: 1000);
+    meta.setStarter(1);
+    expect(meta.crew, [1]);
+    expect(meta.crewOrder, [1, 0, 2]);
+    expect(meta.inCrew(0), isFalse);
+    expect(meta.lockReason('throw-1', kid: 0), SkillTree.recruitLockReason);
+    expect(meta.lockReason('throw-1', kid: 1), isNull);
+    expect(meta.recruit(0), isTrue);
+    meta.setStarter(2);
+    expect(meta.crew, [1, 0], reason: 'no swap once someone has joined');
+  });
+
+  test("a kid's own skills read with their name", () {
+    String say(String id, String name) =>
+        SkillTree.personalDetail(SkillTree.node(id)!, name);
+    expect(say('throw-1', 'Mike'), 'Mike gets a quicker, stronger throw.');
+    expect(say('shield-1', 'Beth'), "Beth's shield blocks 1 hit every wave.");
+    expect(say('damage-1', 'Ruben'), "Ruben's snowballs hit twice as hard.");
+    expect(say('hp-1', 'Beth'), 'Beth gets 1 more heart.');
+    expect(say('aim-2', 'Ruben'), 'Ruben aims even better on their own.');
+    // Team skills keep their own words.
+    expect(say('team-2', 'Mike'), SkillTree.node('team-2')!.detail);
   });
 }

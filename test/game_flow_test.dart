@@ -574,6 +574,9 @@ void main() {
     await tester.pump();
     game.openShopFromReport();
     await tester.pump();
+    // Skills opens on Team; Mike's own skills sit behind his tab.
+    await tester.tap(find.byKey(const Key('shop-filter-kid-0')));
+    await tester.pump();
     expect(find.text('Next wave'), findsOneWidget);
     expect(find.byKey(const Key('buy-throw')), findsOneWidget);
 
@@ -1253,7 +1256,10 @@ void main() {
     expect(game.coinCarryLabel, isNull);
     expect(find.byKey(const Key('retry')), findsOneWidget);
     expect(
-      find.text('Skills reset. Unspent coins carry over.'),
+      find.text(
+        'Back to wave 1. Skills and potions reset, and half the '
+        'coins earned this run are lost.',
+      ),
       findsOneWidget,
     );
     // Summer is switched off, so defeat offers no season choice.
@@ -1355,6 +1361,9 @@ void main() {
 
     await tester.tap(find.byKey(const Key('open-skills')));
     await tester.pump();
+    // Skills opens on Team; Mike's own skills sit behind his tab.
+    await tester.tap(find.byKey(const Key('shop-filter-kid-0')));
+    await tester.pump();
     expect(find.byKey(const Key('buy-throw')), findsOneWidget);
     await tester.tap(find.byKey(const Key('buy-throw')));
     await tester.pump();
@@ -1421,6 +1430,9 @@ void main() {
     await tester.pump();
     game.openShopFromReport();
     await tester.pump();
+    // Skills opens on Team; Mike's own skills sit behind his tab.
+    await tester.tap(find.byKey(const Key('shop-filter-kid-0')));
+    await tester.pump();
     expect(tester.takeException(), isNull);
     expect(find.byKey(const Key('buy-throw')), findsOneWidget);
     expect(find.text('Next wave'), findsOneWidget);
@@ -1458,7 +1470,110 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const Key('skill-branch-team')));
     await tester.pump();
-    expect(find.byKey(const Key('skill-team-2')), findsOneWidget);
+    // Crew lists every kid by name: Mike is in, Beth unlocks (Ruben is
+    // further down the list).
+    expect(find.byKey(const Key('joined-0')), findsOneWidget);
+    expect(find.byKey(const Key('unlock-1')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('skills opens on Team; the Settings pick leads each wave', (
+    tester,
+  ) async {
+    final game = (await boot(
+      tester,
+      MetaState(coins: 400, skills: {'team-2', 'team-3'}),
+    )).game;
+    // Mike leads by default.
+    expect(game.selectedKid, game.players[0]);
+
+    // Settings: start as Ruben. He leads from the next wave.
+    game.pauseMatch();
+    game.openSettings();
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('lead-kid-2')));
+    await tester.pump();
+    expect(game.feel.settings.leadKid, 2);
+    game.closeSettings();
+    game.resumeMatch();
+
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+    game.openShopFromReport();
+    await tester.pump();
+    // The team's shared skills show first.
+    expect(find.byKey(const Key('skill-branch-pressure')), findsOneWidget);
+    expect(find.byKey(const Key('skill-branch-throwSpeed')), findsNothing);
+    expect(find.text('Shared by the whole crew.'), findsOneWidget);
+
+    game.continueFromShop();
+    game.finishEntrance();
+    expect(game.selectedKid, game.players[2]);
+
+    // A lead who is down hands over to the first kid standing.
+    knockOut([game.players[2]]);
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    // Still down going in (Normal keeps a knocked-out kid down): the
+    // first kid standing leads instead.
+    expect(game.nextCrewHp[2], 0);
+    game.openShopFromReport();
+    game.continueFromShop();
+    game.finishEntrance();
+    expect(game.selectedKid, game.players[0]);
+  });
+
+  testWidgets('a new game starts as the Settings pick; kids unlock by name', (
+    tester,
+  ) async {
+    final game = (await boot(
+      tester,
+      MetaState(mode: PlayMode.campaign, coins: 500),
+    )).game;
+    game.feel.apply(game.feel.settings.copyWith(leadKid: 1));
+    game.pauseMatch();
+    game.startNewGame();
+    game.finishEntrance();
+    expect(game.meta.crew, [1], reason: 'Beth starts');
+    expect(game.players.single.kidId, 1);
+    expect(game.selectedKid, game.players.single);
+
+    game.meta.coins = 500;
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+    expect(find.text('Beth'), findsWidgets);
+    game.openShopFromReport();
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('skill-group-crew')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('skill-branch-team')));
+    await tester.pump();
+    expect(find.byKey(const Key('joined-1')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('unlock-2')));
+    await tester.pump();
+    expect(game.meta.crew, [1, 2], reason: 'Ruben next, Mike waits');
+    expect(find.byKey(const Key('joined-2')), findsOneWidget);
+    expect(find.byKey(const Key('unlock-0')), findsOneWidget);
+    // Ruben's tab shows his own skills, in his name.
+    await tester.tap(find.byKey(const Key('shop-filter-kid-2')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('skill-group-fight')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('skill-branch-throwSpeed')));
+    await tester.pump();
+    expect(find.text('Ruben gets a quicker, stronger throw.'), findsOneWidget);
+
+    game.continueFromShop();
+    game.finishEntrance();
+    expect([for (final kid in game.players) kid.kidId], [1, 2]);
     expect(tester.takeException(), isNull);
   });
 
@@ -1478,6 +1593,9 @@ void main() {
     game.update(0.6);
     await tester.pump();
     game.openShopFromReport();
+    await tester.pump();
+    // Skills opens on Team; Mike's own skills sit behind his tab.
+    await tester.tap(find.byKey(const Key('shop-filter-kid-0')));
     await tester.pump();
     String count(String key) => tester
         .widgetList<Text>(
@@ -1512,6 +1630,9 @@ void main() {
     await tester.pump();
     game.openShopFromReport();
     await tester.pump();
+    // Skills opens on Team; Mike's own skills sit behind his tab.
+    await tester.tap(find.byKey(const Key('shop-filter-kid-0')));
+    await tester.pump();
 
     expect(find.byKey(const Key('skill-group-fight')), findsOneWidget);
     expect(find.byKey(const Key('skill-branch-throwSpeed')), findsOneWidget);
@@ -1541,7 +1662,7 @@ void main() {
     expect(find.text('Aim'), findsNothing);
     await tester.tap(find.byKey(const Key('skill-branch-team')));
     await tester.pump();
-    await tester.tap(find.byKey(const Key('skill-team-2')));
+    await tester.tap(find.byKey(const Key('unlock-1')));
     await tester.pump();
     expect(game.meta.crewSize, 2);
 
@@ -1600,6 +1721,9 @@ void main() {
     await tester.pump();
     game.openShopFromReport();
     await tester.pump();
+    // Skills opens on Team; Mike's own skills sit behind his tab.
+    await tester.tap(find.byKey(const Key('shop-filter-kid-0')));
+    await tester.pump();
 
     booted.pulses.kinds.clear();
     booted.playback.sfx.clear();
@@ -1626,6 +1750,9 @@ void main() {
     game.update(0.6);
     await tester.pump();
     game.openShopFromReport();
+    await tester.pump();
+    // Skills opens on Team; Mike's own skills sit behind his tab.
+    await tester.tap(find.byKey(const Key('shop-filter-kid-0')));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('Next wave'), findsOneWidget);
@@ -1655,10 +1782,8 @@ void main() {
     expect(find.byKey(const Key('charge-zone')), findsOneWidget);
     expect(find.byKey(const Key('move-zone')), findsOneWidget);
     expect(find.byKey(const Key('power-bar')), findsNothing);
-    expect(
-      find.text('Drag on the left to move  ·  hold the right side to throw'),
-      findsOneWidget,
-    );
+    // The controls hint is gone from the top of the screen.
+    expect(find.byKey(const Key('hud-hint')), findsNothing);
 
     game.pressChargeZone();
     game.update(0.12);
@@ -3149,6 +3274,63 @@ void main() {
       expect(sawWindup, isTrue, reason: '${game.bossType} winds up first');
       expect(fired, isTrue, reason: '${game.bossType} fires');
     }
+  });
+
+  testWidgets('between waves: settings gear, skills back, Arcade New Game', (
+    tester,
+  ) async {
+    final game = (await boot(
+      tester,
+      MetaState(mode: PlayMode.campaign, coins: 300),
+    )).game;
+    knockOut(game.enemies);
+    game.resolveKnockouts();
+    game.update(0.7);
+    game.update(0.6);
+    await tester.pump();
+    expect(find.byKey(const Key('wave-report')), findsOneWidget);
+
+    // The report keeps Settings in reach.
+    await tester.tap(find.byKey(const Key('report-settings')));
+    await tester.pump();
+    expect(find.byKey(const Key('settings-sheet')), findsOneWidget);
+    expect(find.byKey(const Key('settings-new-game')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('settings-back')));
+    await tester.pump();
+    expect(find.byKey(const Key('settings-sheet')), findsNothing);
+
+    // Skills has a back button to the report.
+    game.openShopFromReport();
+    await tester.pump();
+    expect(find.byKey(const Key('shop-settings')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('shop-back')));
+    await tester.pump();
+    expect(game.overlays.isActive('shop'), isFalse);
+    expect(find.byKey(const Key('wave-report')), findsOneWidget);
+
+    // Settings → New Game asks, then wipes the run and starts wave 1.
+    game.wave = 4;
+    await tester.tap(find.byKey(const Key('report-settings')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('settings-new-game')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('new-game-warning')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('new-game-yes')));
+    await tester.pumpAndSettle();
+    expect(game.meta.coins, 0);
+    expect(game.wave, 1);
+    expect(game.overlays.isActive('report'), isFalse);
+    expect(game.overlays.isActive('settings'), isFalse);
+    expect(game.phase, isNot(MatchPhase.shop));
+  });
+
+  testWidgets('Campaign settings do not offer New Game', (tester) async {
+    final game = (await boot(tester, MetaState())).game;
+    game.pauseMatch();
+    game.openSettings();
+    await tester.pump();
+    expect(find.byKey(const Key('settings-sheet')), findsOneWidget);
+    expect(find.byKey(const Key('settings-new-game')), findsNothing);
   });
 
   testWidgets('a loss shows skills and potions lost, and potions back', (

@@ -182,7 +182,7 @@ void main() {
   );
 
   test(
-    'Hard chips a full lob into your own fort; Easy and Normal clear it',
+    'on Insane your own fort stops a full lob without damage; Easy and Hard clear it',
     () {
       final poses = KidPoseSprites(
         idle: sprite,
@@ -232,7 +232,7 @@ void main() {
         Difficulty.normal,
         Difficulty.hard,
       ]) {
-        final chip = DifficultyTuning.of(difficulty).friendlyFortDamage;
+        final chip = DifficultyTuning.of(difficulty).ownFortBlocks;
         final before = fort.hp;
         var fortHits = 0;
         final shot = LobProjectile(
@@ -243,7 +243,7 @@ void main() {
           owner: kid,
           blockedByFort: true,
           forts: [fort],
-          friendlyFortDamage: chip,
+          ownFortBlocks: chip,
           groundTrack: lob.groundTrack,
           throwerRow: lob.throwerRow,
           throwerColumn: lob.throwerColumn,
@@ -272,11 +272,12 @@ void main() {
           shot.update(1 / 60);
         }
         if (difficulty == Difficulty.hard) {
+          // Your own fort stops the lob, but is never hurt by it.
           expect(chip, isTrue);
           expect(fortHits, 1);
-          expect(shot.fortDamage, isTrue);
+          expect(shot.fortDamage, isFalse);
           expect(shot.struckFort, fort);
-          expect(fort.hp, before - 1);
+          expect(fort.hp, before);
         } else {
           expect(chip, isFalse);
           expect(fortHits, 0);
@@ -334,7 +335,7 @@ void main() {
       owner: kid,
       blockedByFort: true,
       forts: [fort],
-      friendlyFortDamage: true,
+      ownFortBlocks: true,
       passOwnFort: true,
       groundTrack: lob.groundTrack,
       throwerRow: lob.throwerRow,

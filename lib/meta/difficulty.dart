@@ -6,10 +6,13 @@ enum Difficulty {
   normal,
   hard;
 
+  /// Shown names. The middle level reads as Hard and the top one as
+  /// Insane (Oct 2026); the stored names stay `normal` / `hard` so saves
+  /// and settings keep working.
   String get label => switch (this) {
     Difficulty.easy => 'Easy',
-    Difficulty.normal => 'Normal',
-    Difficulty.hard => 'Hard',
+    Difficulty.normal => 'Hard',
+    Difficulty.hard => 'Insane',
   };
 
   /// One line for the home screen under the picker.
@@ -47,7 +50,7 @@ class DifficultyTuning {
     required this.throwGapMax,
     required this.throwsPerStep,
     required this.matchPlayerRow,
-    required this.friendlyFortDamage,
+    required this.ownFortBlocks,
     required this.enemyStepSpeed,
     required this.chargeVersusPlayer,
     required this.playerChargeTimeScale,
@@ -69,8 +72,9 @@ class DifficultyTuning {
   /// hold still once a living player is already within one row.
   final bool matchPlayerRow;
 
-  /// When true, a player's own lob can chip the player fort.
-  final bool friendlyFortDamage;
+  /// When true, your own standing fort stops your lobs from behind it
+  /// (they cannot sail over it). It never damages that fort.
+  final bool ownFortBlocks;
 
   /// Pixels per second for an enemy's single-cell step.
   final double enemyStepSpeed;
@@ -148,7 +152,7 @@ class DifficultyTuning {
       throwGapMax: throwGapMax * gapScale,
       throwsPerStep: throwsPerStep,
       matchPlayerRow: matchPlayerRow,
-      friendlyFortDamage: friendlyFortDamage,
+      ownFortBlocks: ownFortBlocks,
       enemyStepSpeed: enemyStepSpeed,
       chargeVersusPlayer: chargeVersusPlayer,
       playerChargeTimeScale: playerChargeTimeScale,
@@ -173,7 +177,7 @@ class DifficultyTuning {
       throwGapMax: throwGapMax * pace,
       throwsPerStep: throwsPerStep,
       matchPlayerRow: matchPlayerRow,
-      friendlyFortDamage: friendlyFortDamage,
+      ownFortBlocks: ownFortBlocks,
       enemyStepSpeed: enemyStepSpeed * step,
       chargeVersusPlayer: chargeVersusPlayer,
       playerChargeTimeScale: playerChargeTimeScale,
@@ -205,7 +209,7 @@ class DifficultyTuning {
           throwGapMax: max,
           throwsPerStep: 2,
           matchPlayerRow: false,
-          friendlyFortDamage: false,
+          ownFortBlocks: false,
           enemyStepSpeed: 120,
           chargeVersusPlayer: versus,
           playerChargeTimeScale: 0.5,
@@ -220,7 +224,7 @@ class DifficultyTuning {
           throwGapMax: max,
           throwsPerStep: 1,
           matchPlayerRow: true,
-          friendlyFortDamage: true,
+          ownFortBlocks: true,
           enemyStepSpeed: 170,
           chargeVersusPlayer: 0.15,
           playerChargeTimeScale: 0.7,
@@ -240,7 +244,7 @@ class DifficultyTuning {
           throwGapMax: max,
           throwsPerStep: 1,
           matchPlayerRow: false,
-          friendlyFortDamage: false,
+          ownFortBlocks: false,
           enemyStepSpeed: 150,
           chargeVersusPlayer: 1,
           playerChargeTimeScale: 2 / 3,

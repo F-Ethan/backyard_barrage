@@ -4,6 +4,7 @@ import '../meta/power_up.dart';
 /// One kid's state at a moment: hearts, shield, and their own upgrades.
 class KidState {
   const KidState({
+    this.kid = 0,
     required this.hp,
     required this.maxHp,
     required this.shield,
@@ -14,13 +15,16 @@ class KidState {
   /// Where [kid] stands in [meta] going into the next wave: full hearts,
   /// a full shield, and whatever they own now.
   factory KidState.fresh(MetaState meta, int kid) => KidState(
+    kid: kid,
     hp: meta.kidMaxHp(kid),
     maxHp: meta.kidMaxHp(kid),
     shield: meta.kidShield(kid),
     upgrades: meta.kidUpgrades(kid),
-    inCrew: kid < meta.crewSize,
+    inCrew: meta.inCrew(kid),
   );
 
+  /// Which crew kid (0 Mike, 1 Beth, 2 Ruben).
+  final int kid;
   final int hp;
   final int maxHp;
   final int shield;

@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 
 import '../ads/remove_ads.dart';
 import '../feel/feel_bus.dart';
+import '../game/kid_colors.dart';
 import '../meta/game_settings.dart';
 import 'barrage_colors.dart';
 import 'barrage_theme.dart';
 import 'draft_button.dart';
 import 'motion.dart';
+import 'new_game.dart';
 import 'parental_gate.dart';
 
 /// SFX, music, haptics, difficulty, and credits. Shared by the menu and
@@ -22,6 +24,7 @@ class SettingsOverlay extends StatefulWidget {
     this.feel,
     this.onAdPrivacy,
     this.removeAds,
+    this.onNewGame,
   });
 
   final GameSettings settings;
@@ -30,6 +33,9 @@ class SettingsOverlay extends StatefulWidget {
   final FeelBus? feel;
   final Future<void> Function()? onAdPrivacy;
   final RemoveAdsController? removeAds;
+
+  /// Arcade in a match: start a new game (asks first). Null hides it.
+  final VoidCallback? onNewGame;
 
   @override
   State<SettingsOverlay> createState() => _SettingsOverlayState();
@@ -91,6 +97,38 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                   padding: EdgeInsets.only(right: tokens.space.sm),
                   child: Column(
                     children: [
+                      if (widget.onNewGame != null) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Arcade run',
+                                style: BarrageType.heading.copyWith(
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                            NewGameButton(
+                              key: const Key('settings-new-game'),
+                              onPressed: () async {
+                                if (await confirmNewGame(
+                                  context,
+                                  feel: widget.feel,
+                                )) {
+                                  widget.onNewGame?.call();
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: tokens.space.sm),
+                      ],
+                      _LeadKidRow(
+                        lead: _settings.leadKid,
+                        onChanged: (kid) =>
+                            _set(_settings.copyWith(leadKid: kid)),
+                      ),
+                      SizedBox(height: tokens.space.xs),
                       _ToggleRow(
                         label: 'Sound effects',
                         icon: Icons.volume_up_rounded,
@@ -117,7 +155,7 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                       ),
                       SizedBox(height: tokens.space.sm),
                       const Text(
-                        'Sound, music, and haptics for this device. Difficulty is picked on the home screen.',
+                        'Who you start as, sound, music, and haptics for this device. Difficulty is picked on the home screen.',
                         textAlign: TextAlign.center,
                         style: BarrageType.muted,
                       ),
@@ -291,6 +329,60 @@ class BarrageToggle extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// "Start as": which kid you control when a wave starts.
+class _LeadKidRow extends StatelessWidget {
+  const _LeadKidRow({required this.lead, required this.onChanged});
+
+  final int lead;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return Row(
+      children: [
+        Icon(Icons.person_pin_rounded, color: tokens.primary),
+        SizedBox(width: tokens.space.sm),
+        const Expanded(child: Text('Start as', style: BarrageType.body)),
+        for (var kid = 0; kid < KidColors.names.length; kid++) ...[
+          SizedBox(width: tokens.space.xs),
+          Semantics(
+            button: true,
+            selected: kid == lead,
+            label: 'Start as ${KidColors.nameOf(kid)}',
+            child: PressScale(
+              key: Key('lead-kid-$kid'),
+              pressedScale: 0.94,
+              onTap: () => onChanged(kid),
+              child: AnimatedContainer(
+                duration: context.motion.fast,
+                padding: EdgeInsets.symmetric(
+                  horizontal: tokens.space.md,
+                  vertical: tokens.space.xs + 2,
+                ),
+                decoration: BoxDecoration(
+                  color: kid == lead ? KidColors.of(kid) : tokens.surface,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: KidColors.of(kid), width: 2),
+                ),
+                child: Text(
+                  KidColors.nameOf(kid),
+                  style: BarrageType.button.copyWith(
+                    fontSize: 14,
+                    color: kid == lead
+                        ? tokens.onPrimary
+                        : KidColors.deepOf(kid),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

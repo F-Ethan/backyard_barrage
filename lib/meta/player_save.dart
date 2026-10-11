@@ -70,6 +70,7 @@ class PlayerSave {
       ..resumeArena = snap.resumeArena
       ..resumeCrewHp = snap.resumeCrewHp
       ..ledger = snap.ledger.copy()
+      ..crewOrder = List<int>.of(snap.crewOrder)
       ..replaceItems(snap.items)
       ..replaceSkills(snap.skills);
   }
@@ -183,6 +184,7 @@ class WalletSnap {
     this.resumeCrewHp,
     this.items = const {},
     RunLedger? ledger,
+    this.crewOrder = const [0, 1, 2],
   }) : ledger = ledger ?? RunLedger();
 
   factory WalletSnap.from(MetaState state) {
@@ -202,6 +204,7 @@ class WalletSnap {
       items: Map<PowerUp, int>.from(state.items),
       skills: Set<String>.from(state.skills),
       ledger: state.ledger.copy(),
+      crewOrder: List<int>.of(state.crewOrder),
     );
   }
 
@@ -218,4 +221,5 @@ class WalletSnap {
   final List<int>? resumeCrewHp;
   final Map<PowerUp, int> items;
   final RunLedger ledger;
+  final List<int> crewOrder;
 }

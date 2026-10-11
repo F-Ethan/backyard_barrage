@@ -27,7 +27,10 @@ void main() {
     // A save left on summer comes back as winter, with no season switch.
     expect(find.byKey(const Key('home-backdrop-winter')), findsOneWidget);
     expect(find.byKey(const Key('season-summer')), findsNothing);
-    expect(find.text('Skills wipe on defeat. Coins stay.'), findsOneWidget);
+    expect(
+      find.text('A loss wipes skills and half the coins you earned.'),
+      findsOneWidget,
+    );
     expect(
       find.text('Skills stay. A loss sends you back to your stage.'),
       findsOneWidget,
@@ -127,5 +130,33 @@ void main() {
     expect(label('arcade').data, 'Play');
     expect(find.text('wave 6'), findsOneWidget);
     expect(find.byKey(const Key('arcade-resume-wave')), findsNothing);
+  });
+
+  testWidgets('the Arcade card offers New Game once a run has started', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final store = SaveStore(preferences: prefs);
+    final profile = await store.load();
+    final arcade = profile.wallet(PlayMode.campaign, Difficulty.normal)
+      ..mode = PlayMode.campaign
+      ..coins = 120;
+    await store.saveProfile(profile);
+
+    await tester.pumpWidget(BackyardBarrageApp(saveStore: store));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // Arcade has a run to wipe; Campaign never offers it.
+    expect(find.byKey(const Key('new-game-campaign')), findsOneWidget);
+    expect(find.byKey(const Key('new-game-arcade')), findsNothing);
+    await tester.tap(find.byKey(const Key('new-game-campaign')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('new-game-warning')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('new-game-cancel')));
+    await tester.pumpAndSettle();
+    expect(arcade.coins, 120, reason: 'Cancel keeps the run');
+    expect(find.byKey(const Key('new-game-warning')), findsNothing);
   });
 }

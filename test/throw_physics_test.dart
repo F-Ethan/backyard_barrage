@@ -451,90 +451,76 @@ void main() {
       );
     });
 
-    test('fort shots clear only at the peak and friendly damage is opt-in', () {
-      expect(
-        ThrowPhysics.resolveFortShot(
-          overlaps: true,
-          atPeak: true,
-          sameSide: true,
-          throwerBehind: true,
-          friendlyDamage: false,
-        ),
-        FortShotResult.none,
-      );
-      expect(
-        ThrowPhysics.resolveFortShot(
-          overlaps: true,
-          atPeak: false,
-          sameSide: true,
-          throwerBehind: true,
-          friendlyDamage: false,
-        ),
-        FortShotResult.blocked,
-      );
-      expect(
-        ThrowPhysics.resolveFortShot(
-          overlaps: true,
-          atPeak: false,
-          sameSide: true,
-          throwerBehind: true,
-          friendlyDamage: true,
-        ),
-        FortShotResult.damaged,
-      );
-      expect(
-        ThrowPhysics.resolveFortShot(
-          overlaps: true,
-          atPeak: false,
-          sameSide: true,
-          throwerBehind: false,
-          friendlyDamage: true,
-        ),
-        FortShotResult.none,
-      );
-      expect(
-        ThrowPhysics.resolveFortShot(
-          overlaps: true,
-          atPeak: false,
-          sameSide: false,
-          throwerBehind: false,
-          friendlyDamage: false,
-        ),
-        FortShotResult.damaged,
-      );
-      expect(
-        ThrowPhysics.resolveFortShot(
-          overlaps: true,
-          atPeak: true,
-          sameSide: false,
-          throwerBehind: false,
-          friendlyDamage: false,
-        ),
-        FortShotResult.none,
-      );
-      expect(
-        ThrowPhysics.resolveFortShot(
-          overlaps: true,
-          atPeak: false,
-          sameSide: true,
-          throwerBehind: true,
-          friendlyDamage: false,
-          collapsed: true,
-        ),
-        FortShotResult.none,
-      );
-      expect(
-        ThrowPhysics.resolveFortShot(
-          overlaps: true,
-          atPeak: false,
-          sameSide: false,
-          throwerBehind: false,
-          friendlyDamage: false,
-          collapsed: true,
-        ),
-        FortShotResult.none,
-      );
-    });
+    test(
+      'fort shots clear only at the peak; your own fort blocks, never damages',
+      () {
+        expect(
+          ThrowPhysics.resolveFortShot(
+            overlaps: true,
+            atPeak: true,
+            sameSide: true,
+            throwerBehind: true,
+          ),
+          FortShotResult.none,
+        );
+        expect(
+          ThrowPhysics.resolveFortShot(
+            overlaps: true,
+            atPeak: false,
+            sameSide: true,
+            throwerBehind: true,
+          ),
+          FortShotResult.blocked,
+        );
+        expect(
+          ThrowPhysics.resolveFortShot(
+            overlaps: true,
+            atPeak: false,
+            sameSide: true,
+            throwerBehind: false,
+          ),
+          FortShotResult.none,
+        );
+        expect(
+          ThrowPhysics.resolveFortShot(
+            overlaps: true,
+            atPeak: false,
+            sameSide: false,
+            throwerBehind: false,
+          ),
+          FortShotResult.damaged,
+        );
+        expect(
+          ThrowPhysics.resolveFortShot(
+            overlaps: true,
+            atPeak: true,
+            sameSide: false,
+            throwerBehind: false,
+          ),
+          FortShotResult.none,
+        );
+        expect(
+          ThrowPhysics.resolveFortShot(
+            overlaps: true,
+            atPeak: false,
+            sameSide: true,
+            throwerBehind: true,
+            collapsed: true,
+          ),
+          FortShotResult.none,
+        );
+        expect(
+          ThrowPhysics.resolveFortShot(
+            overlaps: true,
+            atPeak: false,
+            sameSide: false,
+            throwerBehind: false,
+            collapsed: true,
+          ),
+          FortShotResult.none,
+        );
+      },
+    );
 
     test('a lob from behind the fort peaks past it', () {
       final feet = ArenaGrid.cellCenter(KidSide.player, 0, 4);

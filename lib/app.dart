@@ -8,6 +8,7 @@ import 'ads/remove_ads.dart';
 import 'feel/feel_bus.dart';
 import 'game/backyard_barrage_game.dart';
 import 'meta/meta_state.dart';
+import 'meta/play_mode.dart';
 import 'meta/save_store.dart';
 import 'meta/settings_store.dart';
 import 'ui/barrage_theme.dart';
@@ -214,6 +215,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               onClose: game.closeSettings,
               onAdPrivacy: widget.onAdPrivacy,
               removeAds: widget.removeAds,
+              onNewGame: game.meta.mode == PlayMode.campaign
+                  ? game.startNewGame
+                  : null,
             ),
             'report': (context, game) => WaveReport(game: game),
             'shop': (context, game) => ShopOverlay(game: game),
